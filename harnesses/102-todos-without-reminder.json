@@ -1,0 +1,20 @@
+{
+  "id": "todos-no-reminder",
+  "name": "102-todos-without-reminder.json",
+  "description": "Todo 执行 agent（无提醒版）",
+  "category": "advanced",
+  "model": {
+    "name": "Claude Sonnet 4.5",
+    "response_format": "text",
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "top_p": 1
+  },
+  "tools": [
+    { "name": "read_file", "description": "读取本地文件内容", "parameters": { "path": { "type": "string", "required": true } } },
+    { "name": "write_file", "description": "写入文件内容", "parameters": { "path": { "type": "string", "required": true }, "content": { "type": "string", "required": true } } },
+    { "name": "bash", "description": "执行 shell/bash 命令。可用于系统操作，文件查看等", "parameters": { "command": { "type": "string", "required": true } } },
+    { "name": "write_todos", "description": "更新前端面板中的 TODO 任务状态", "parameters": { "todos": { "type": "array", "required": true } } }
+  ],
+  "systemPrompt": "你是一个高效的任务执行 agent。\n\n## 执行原则\n- 收到任务后，先用 write_todos 分解任务\n- 逐步执行每个子任务\n- 执行完毕后更新任务状态为 completed\n- 不要在所有任务完成前给出最终答案\n\n## 注意事项\n- 执行过程中如发现新的子任务，动态添加到 TODO 列表\n- 遇到错误立即标记为 failed 并尝试替代方案"
+}

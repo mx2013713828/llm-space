@@ -1,0 +1,44 @@
+{
+  "id": "chat-bot",
+  "name": "01-chat-bot.json",
+  "description": "基础对话 agent",
+  "category": "basic",
+  "model": {
+    "name": "Doubao Seed 2.0 Code",
+    "response_format": "text",
+    "temperature": 1,
+    "max_tokens": 2048,
+    "top_p": 1
+  },
+  "tools": [
+    {
+      "name": "weather_report",
+      "description": "获取指定城市的天气信息",
+      "parameters": {
+        "city": {
+          "type": "string",
+          "description": "城市名称（中文）",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "bash",
+      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The bash command to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    }
+  ],
+  "systemPrompt": "你是一个智能助手，可以帮助用户查询天气信息。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户",
+  "skills": []
+}
