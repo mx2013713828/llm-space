@@ -58,6 +58,7 @@ export default function App() {
   // 加载特定文件
   useEffect(() => {
     if (!activeHarnessId) return;
+    setHarness(null); // Clear harness first to avoid stale state initialization in child components
     fetch(`http://localhost:3001/api/harnesses/${activeHarnessId}`)
       .then(res => res.json())
       .then(data => setHarness(data))
