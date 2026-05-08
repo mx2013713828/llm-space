@@ -296,7 +296,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isRunning) return;
-    if (!apiKey) return alert('请先配置 API Key！');
+    if (!selectedModel || !selectedModel.key) return alert('请先选择或配置包含 API Key 的模型！');
 
     setInputText('');
     if (textareaRef.current) textareaRef.current.style.height = '44px';
