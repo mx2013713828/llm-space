@@ -78,6 +78,21 @@ export function ToolCallCard({ toolName, toolInput, toolOutput }) {
     } catch { return String(obj); }
   };
 
+  /** 处理终端输出中的回车符 (\r)，实现进度条原地更新 */
+  const processTerminalOutput = (text) => {
+    if (typeof text !== 'string') return text;
+    // 按行分割
+    const lines = text.split('\n');
+    const processedLines = lines.map(line => {
+      // 找到最后一个 \r 的位置
+      const lastCR = line.lastIndexOf('\r');
+      if (lastCR === -1) return line;
+      // 只保留最后一个 \r 之后的内容（模拟原地覆盖）
+      return line.substring(lastCR + 1);
+    });
+    return processedLines.join('\n');
+  };
+
   return (
     <div className="message-bubble msg-tool animate-fade-in" style={{ padding: 0 }}>
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
@@ -106,7 +121,9 @@ export function ToolCallCard({ toolName, toolInput, toolOutput }) {
               <div className="tool-section-label">
                 <span>📤</span> 输出结果
               </div>
-              <div className="tool-output-code">{formatJson(toolOutput)}</div>
+              <div className="tool-output-code">
+                {toolName === 'bash' ? processTerminalOutput(toolOutput) : formatJson(toolOutput)}
+              </div>
             </div>
           )}
         </div>
