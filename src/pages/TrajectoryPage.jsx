@@ -99,59 +99,96 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   };
 
   /** 组装 API 历史记录 */
+  /** 组装 API 历史记录 (终极修复版：严格保持顺序 + 智能块聚合) */
   const buildApiMessages = (sourceMessages) => {
-    const apiMsgs = [];
+    const finalMsgs = [];
     const flatBlocks = [];
     
+    // 1. 平铺所有原子块，并标记其应有的角色
     sourceMessages.forEach(msg => {
       if (msg.role === 'user') {
-        flatBlocks.push({ role: 'user', content: msg.content });
+        flatBlocks.push({ role: 'user', block: { type: 'text', text: msg.content } });
       } else if (msg.role === 'assistant') {
         if (msg.type === 'text') {
           flatBlocks.push({ role: 'assistant', block: { type: 'text', text: msg.content } });
         } else if (msg.type === 'thinking') {
-          const block = { type: 'thinking', thinking: msg.content };
-          if (msg.signature) block.signature = msg.signature;
-          flatBlocks.push({ role: 'assistant', block });
+          const b = { type: 'thinking', thinking: msg.content };
+          if (msg.signature) b.signature = msg.signature;
+          flatBlocks.push({ role: 'assistant', block: b });
         } else if (msg.type === 'tool_call') {
-          const toolCallId = msg.id || `call_${Math.random().toString(36).substring(2, 10)}`;
-          msg.id = toolCallId; // 保存生成的 ID 保证前后一致
-          flatBlocks.push({ role: 'assistant', block: { type: 'tool_use', id: toolCallId, name: msg.toolName, input: msg.toolInput } });
-          
+          flatBlocks.push({ role: 'assistant', block: { type: 'tool_use', id: msg.id, name: msg.toolName, input: msg.toolInput } });
           if (msg.toolOutput) {
-            flatBlocks.push({ role: 'user', block: { type: 'tool_result', tool_use_id: toolCallId, content: String(msg.toolOutput) } });
+            // 重要：tool_result 标记为 'tool_result' role 暂存，稍后统一聚合
+            flatBlocks.push({ role: 'tool_result', block: { type: 'tool_result', tool_use_id: msg.id, content: String(msg.toolOutput) } });
           }
         }
-      } else if (msg.role === 'tool') {
-        flatBlocks.push({ role: 'user', block: { type: 'tool_result', tool_use_id: msg.toolId, content: String(msg.content) } });
       }
     });
 
-    for (const item of flatBlocks) {
-      const lastMsg = apiMsgs[apiMsgs.length - 1];
-      if (lastMsg && lastMsg.role === item.role) {
-        if (!Array.isArray(lastMsg.content)) {
-          lastMsg.content = [{ type: 'text', text: lastMsg.content }];
-        }
-        if (item.block) {
-          lastMsg.content.push(item.block);
-        } else {
-          lastMsg.content.push({ type: 'text', text: item.content });
-        }
+    // 2. 聚合原子块为消息对象
+    flatBlocks.forEach(item => {
+      let last = finalMsgs[finalMsgs.length - 1];
+      const targetRole = item.role === 'tool_result' ? 'user' : item.role;
+      
+      // 判定逻辑：
+      // - 如果角色不同，必须另起一个消息。
+      // - 如果角色相同，但当前是 tool_result 且上一个块是 tool_use，则合并（它们属于同一个响应回合）。
+      // - 如果从 assistant 块切换到 tool_result，必须另起一个 user 角色消息。
+      if (last && last.role === targetRole) {
+        last.content.push(item.block);
       } else {
-        if (item.block) {
-          apiMsgs.push({ role: item.role, content: [item.block] });
-        } else {
-          apiMsgs.push({ role: item.role, content: item.content });
-        }
+        finalMsgs.push({ role: targetRole, content: [item.block] });
       }
-    }
-    
-    return apiMsgs;
+    });
+
+    return finalMsgs;
   };
 
-  const runAgentLoop = async (currentMessages, turnIndex) => {
-    const apiMessages = buildApiMessages(currentMessages);
+
+  // ── 核心 Agent Loop（递归执行） ──
+  const runAgentLoop = async (currentMessages, turnIndex, roundsSinceTodo = 0) => {
+    let apiMessages = buildApiMessages(currentMessages);
+
+    // ── 优化：看板注入 (State Injection) ──
+    // 为了最大化 Prompt Cache，我们将看板挂在消息序列的最后
+    if (todos && todos.length > 0) {
+      const todoSummary = todos.map(t => {
+        const marker = { pending: '[ ]', in_progress: '[>]', completed: '[x]', failed: '[!]' }[t.status] || '[ ]';
+        return `${marker} ${t.content}`;
+      }).join('\n');
+
+      const stateBlock = {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `\n<current_tasks_status>\n${todoSummary}\n</current_tasks_status>\n`
+          }
+        ]
+      };
+      
+      // 如果最后一根是用户消息，则合并；否则新增一条
+      const lastMsg = apiMessages[apiMessages.length - 1];
+      if (lastMsg && lastMsg.role === 'user') {
+        lastMsg.content.push(stateBlock.content[0]);
+      } else {
+        apiMessages.push(stateBlock);
+      }
+    }
+
+    // ── 优化：催促机制 (Nag Mechanism) ──
+    if (roundsSinceTodo >= 3 && todos && todos.length > 0) {
+      const nagBlock = {
+        type: 'text',
+        text: `\n<system_reminder>\n你已经连续 3 轮没有更新任务看板了。请在采取下一步行动前，务必使用 write_todos 工具同步当前的执行进度。\n</system_reminder>\n`
+      };
+      const lastMsg = apiMessages[apiMessages.length - 1];
+      if (lastMsg && lastMsg.role === 'user') {
+        lastMsg.content.push(nagBlock);
+      } else {
+        apiMessages.push({ role: 'user', content: [nagBlock] });
+      }
+    }
 
     try {
       const res = await fetch('http://localhost:3001/api/chat', {
@@ -171,6 +208,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       });
 
       if (!res.ok) {
+        // ... (错误处理保持不变)
         let errorMsg = `HTTP ${res.status}`;
         try { 
           const errData = await res.json();
@@ -185,8 +223,8 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       let currentMsg = null;
       let stopReason = null;
       let newMessages = [...currentMessages];
+      let hasUpdatedTodoThisTurn = false;
 
-      // 工具更新辅助函数
       const updateLatestMsg = () => setMessages([...newMessages]);
 
       while (true) {
@@ -207,27 +245,49 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               newMessages.push({ role: 'assistant', type: 'text', turn: turnIndex, content: `[API 返回错误]: ${evt.message}` });
               updateLatestMsg();
               break;
+            case 'message_start':
+              if (evt.inputTokens) window._lastInputTokens = evt.inputTokens;
+              break;
             case 'thinking_start':
-              currentMsg = { role: 'assistant', type: 'thinking', turn: turnIndex, content: '', tokens: { input: 0, output: 0 }, signature: evt.signature };
+              currentMsg = { 
+                role: 'assistant', 
+                type: 'thinking', 
+                turn: turnIndex, 
+                content: '', 
+                tokens: { input: window._lastInputTokens || 0, output: 0 }, 
+                signature: evt.signature 
+              };
               newMessages.push(currentMsg);
               updateLatestMsg();
               break;
             case 'thinking_delta':
-              currentMsg.content += evt.text;
-              updateLatestMsg();
+              if (currentMsg) {
+                currentMsg.content += evt.delta || '';
+                updateLatestMsg();
+              }
+              break;
+            case 'message_delta':
+              if (currentMsg && evt.outputTokens) {
+                currentMsg.tokens = { ...currentMsg.tokens, output: evt.outputTokens };
+                updateLatestMsg();
+              }
               break;
             case 'text_start':
-              currentMsg = { role: 'assistant', type: 'text', turn: turnIndex, content: '' };
+              currentMsg = { 
+                role: 'assistant', 
+                type: 'text', 
+                turn: turnIndex, 
+                content: '',
+                tokens: { input: window._lastInputTokens || 0, output: 0 }
+              };
               newMessages.push(currentMsg);
               updateLatestMsg();
               break;
             case 'text_delta':
-              if (!currentMsg || currentMsg.type !== 'text') {
-                currentMsg = { role: 'assistant', type: 'text', turn: turnIndex, content: '' };
-                newMessages.push(currentMsg);
+              if (currentMsg) {
+                currentMsg.content += evt.delta || '';
+                updateLatestMsg();
               }
-              currentMsg.content += evt.text;
-              updateLatestMsg();
               break;
             case 'tool_start':
               currentMsg = { role: 'assistant', type: 'tool_call', turn: turnIndex, id: evt.id, toolName: evt.name, toolInputRaw: '', toolInput: {} };
@@ -242,7 +302,6 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               }
               break;
             case 'tool_end':
-              // 这里仅做状态同步，真实执行放到最后
               updateLatestMsg();
               break;
             case 'stop':
@@ -252,39 +311,69 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         }
       }
 
-      // 如果模型停止原因是调用了工具，则继续下一轮循环
       if (stopReason === 'tool_use') {
         const toolsToRun = newMessages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
-        
-        for (const tool of toolsToRun) {
-          // 本地状态更新工具
+
+        await Promise.all(toolsToRun.map(async (tool) => {
           if (tool.toolName === 'write_todos' && tool.toolInput?.todos) {
             setTodos(tool.toolInput.todos);
-            tool.toolOutput = `[系统] 已成功解析并覆盖写入 ${tool.toolInput.todos.length} 个 TODO 任务。`;
+            hasUpdatedTodoThisTurn = true;
+            
+            // 优化：返回更详细的 tool_result
+            const counts = {
+              pending: tool.toolInput.todos.filter(t => t.status === 'pending').length,
+              completed: tool.toolInput.todos.filter(t => t.status === 'completed').length,
+            };
+            tool.toolOutput = `[系统] 已更新看板。当前进度: ${counts.completed}/${tool.toolInput.todos.length} 已完成。`;
           } else if (tool.toolName === 'web_search' || tool.toolName === 'web_fetch') {
-            // 预留的 Mock 工具
-            tool.toolOutput = `[模拟执行] ${tool.toolName} 已成功调用。`;
+            tool.toolOutput = `[模拟执行] ${tool.toolName} 已成功调用（待接入真实 API）。`;
           } else {
-            // 真实调用后端代理执行系统命令与文件读写等规范工具
             try {
               const execRes = await fetch('http://localhost:3001/api/execute-tool', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ toolName: tool.toolName, toolInput: tool.toolInput })
               });
-              const resData = await execRes.json();
-              if (!execRes.ok) throw new Error(resData.error || '执行失败');
-              tool.toolOutput = String(resData.output);
+              
+              if (!execRes.ok) throw new Error('网络请求失败');
+              
+              const reader = execRes.body.getReader();
+              const decoder = new TextDecoder();
+              let buffer = '';
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  if (!line.startsWith('data: ')) continue;
+                  try {
+                    const evt = JSON.parse(line.slice(6));
+                    if (evt.type === 'chunk') {
+                      tool.toolOutput = (tool.toolOutput || '') + evt.content;
+                      updateLatestMsg(); // 实时触发 UI 刷新
+                    } else if (evt.type === 'done') {
+                      tool.toolOutput = String(evt.output);
+                    } else if (evt.type === 'error') {
+                      tool.toolOutput = `[错误] ${evt.message}`;
+                    }
+                  } catch (e) {}
+                }
+              }
             } catch (err) {
               tool.toolOutput = `[工具执行错误]\n${err.message}`;
             }
           }
           updateLatestMsg();
-        }
+        }));
 
-        // 短暂延迟避免请求过快
-        await new Promise(r => setTimeout(r, 800));
-        await runAgentLoop(newMessages, turnIndex);
+        await new Promise(r => setTimeout(r, 500));
+        // 递归调用，传递更新后的计数器
+        await runAgentLoop(newMessages, turnIndex, hasUpdatedTodoThisTurn ? 0 : roundsSinceTodo + 1);
       }
 
     } catch (err) {
