@@ -267,16 +267,29 @@ app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
 });
 
-/** 工具执行端点 */
+/** 工具执行端点 (支持 SSE 流式返回) */
 app.post('/api/execute-tool', async (req, res) => {
   const { toolName, toolInput } = req.body;
   if (!toolName) return res.status(400).json({ error: '缺少 toolName 参数' });
 
+  // 设置 SSE 响应头
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
   try {
-    const result = await executeTool(toolName, toolInput || {});
-    res.json({ output: result });
+    const finalResult = await executeTool(toolName, toolInput || {}, (chunk) => {
+      // 实时推送数据块
+      res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+    });
+
+    // 任务完成后发送结束标记和最终完整结果
+    res.write(`data: ${JSON.stringify({ type: 'done', output: finalResult })}\n\n`);
+    res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+    res.end();
   }
 });
 

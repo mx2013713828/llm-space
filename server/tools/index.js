@@ -2,12 +2,14 @@ import bash from './bash.js';
 import readFile from './read_file.js';
 import writeFile from './write_file.js';
 import weatherReport from './weather_report.js';
+import writeTodos from './write_todos.js';
 
 const tools = {
   bash,
   read_file: readFile,
   write_file: writeFile,
   weather_report: weatherReport,
+  write_todos: writeTodos,
 };
 
 // 获取可用工具清单，用于传给大模型 (兼容 Anthropic 规范)
@@ -25,13 +27,23 @@ export function getToolSchemas() {
   }));
 }
 
-// 统一执行接口
-export async function executeTool(toolName, toolInput) {
+// 单工具执行
+export async function executeTool(toolName, toolInput, onData) {
   const tool = tools[toolName];
   if (!tool) {
     throw new Error(`未知工具: ${toolName}`);
   }
-  return await tool.execute(toolInput);
+  return await tool.execute(toolInput, onData);
+}
+
+// 并行执行多个工具（接受 [{toolName, toolInput, id}] 数组，返回同序结果）
+export async function executeToolsParallel(toolCalls) {
+  return Promise.all(
+    toolCalls.map(({ toolName, toolInput }) => executeTool(toolName, toolInput)
+      .then(output => ({ ok: true, output: String(output) }))
+      .catch(err => ({ ok: false, output: `[工具执行错误] ${err.message}` }))
+    )
+  );
 }
 
 export default tools;
