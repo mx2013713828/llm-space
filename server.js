@@ -180,6 +180,10 @@ app.post('/api/chat', async (req, res) => {
             break;
 
           case 'message_delta':
+            sendEvent(res, 'message_delta', {
+              outputTokens: evt.usage?.output_tokens,
+              stopReason: evt.delta?.stop_reason,
+            });
             if (evt.delta?.stop_reason) {
               sendEvent(res, 'stop', {
                 stopReason: evt.delta.stop_reason,

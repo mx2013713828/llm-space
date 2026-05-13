@@ -262,7 +262,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               break;
             case 'thinking_delta':
               if (currentMsg) {
-                currentMsg.content += evt.delta || '';
+                currentMsg.content += evt.text || '';
                 updateLatestMsg();
               }
               break;
@@ -285,7 +285,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               break;
             case 'text_delta':
               if (currentMsg) {
-                currentMsg.content += evt.delta || '';
+                currentMsg.content += evt.text || '';
                 updateLatestMsg();
               }
               break;
