@@ -37,8 +37,40 @@
           "command"
         ]
       }
+    },
+    {
+      "name": "web_search",
+      "description": "搜索互联网获取最新信息。返回结构化结果，包含标题、URL、内容摘要。适用场景：需要实时信息、新闻、数据查询。",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "搜索关键词或问题（建议用简洁的自然语言描述）"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "web_fetch",
+      "description": "获取指定网页的完整正文内容（已清洗为 Markdown）。适用场景：在 web_search 找到网页后，抓取全文深入阅读。",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "要抓取的网页完整 URL（如 https://example.com/article）"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
     }
   ],
-  "systemPrompt": "你是一个智能助手，可以帮助用户查询天气信息。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户",
+  "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n当用户搜索互联网信息时，请：\n1. 分析用户提到的关键词。\n2. 调用web_search 工具获取信息。\n3. 将结果整理后回复给用户。\n",
   "skills": []
 }

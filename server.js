@@ -7,10 +7,31 @@ import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { executeTool, getToolSchemas } from './server/tools/index.js';
 
+// 加载 .env 文件到 process.env
+const dotEnvPath = path.join(process.cwd(), '.env');
+try {
+  const envContent = await fs.readFile(dotEnvPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = value;
+  }
+  console.log('  ✅ .env 已加载');
+} catch { console.log('  ⚠️  .env 文件未找到，跳过'); }
+
+// Node.js fetch 不自动读取 HTTPS_PROXY，用 EnvHttpProxyAgent 全局适配
+setGlobalDispatcher(new EnvHttpProxyAgent());
+console.log('  🔁 代理 agent 已全局启用（自动检测 HTTPS_PROXY / NO_PROXY）');
+
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: 'http://localhost:5174' }));
 app.use(express.json({ limit: '4mb' }));
@@ -52,20 +73,23 @@ app.post('/api/chat', async (req, res) => {
     }));
   }
 
-  // Extended Thinking（Claude 3.7+ / claude-sonnet-4-5+）
-  if (thinkingEnabled) {
-    requestBody.thinking = { type: 'enabled', budget_tokens: Math.min(maxTokens * 0.6 || 5000, 10000) };
-    // thinking 模式下温度必须为 1
-    requestBody.temperature = 1;
-    requestBody.betas = ['interleaved-thinking-2025-05-07'];
-  } else if (temperature !== undefined) {
-    requestBody.temperature = temperature;
-  }
-
   try {
     const isDeepSeek = endpoint.includes('deepseek.com');
-    
-    // DeepSeek API 不支持 Anthropic 的 thinking beta
+
+    // Extended Thinking
+    if (thinkingEnabled) {
+      requestBody.thinking = { type: 'enabled', budget_tokens: Math.floor(Math.min(maxTokens * 0.6 || 5000, 10000)) };
+      if (!isDeepSeek) {
+        requestBody.temperature = 1;
+        requestBody.betas = ['interleaved-thinking-2025-05-07'];
+      }
+    } else if (isDeepSeek) {
+      requestBody.thinking = { type: 'disabled' };
+      if (temperature !== undefined) requestBody.temperature = temperature;
+    } else if (temperature !== undefined) {
+      requestBody.temperature = temperature;
+    }
+
     const reqHeaders = {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
@@ -75,16 +99,28 @@ app.post('/api/chat', async (req, res) => {
       reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
     }
 
-    // DeepSeek 不能传 thinking 字段
-    if (thinkingEnabled && isDeepSeek) {
-      delete requestBody.thinking;
+    // 带重试的 upstream 请求
+    let upstream;
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        upstream = await fetch(endpoint, {
+          method: 'POST',
+          headers: reqHeaders,
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(120000),
+        });
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 2) {
+          console.log(`  ⚠️ 请求失败 (attempt ${attempt + 1}/3): ${e.message}，1s 后重试...`);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
     }
-
-    const upstream = await fetch(endpoint, {
-      method: 'POST',
-      headers: reqHeaders,
-      body: JSON.stringify(requestBody),
-    });
+    if (!upstream) throw lastErr;
 
     if (!upstream.ok) {
       const errText = await upstream.text();
@@ -130,6 +166,8 @@ app.post('/api/chat', async (req, res) => {
             sendEvent(res, 'message_start', {
               model: evt.message?.model,
               inputTokens: evt.message?.usage?.input_tokens,
+              cacheReadTokens: evt.message?.usage?.cache_read_input_tokens ?? 0,
+              cacheCreationTokens: evt.message?.usage?.cache_creation_input_tokens ?? 0,
             });
             break;
 
@@ -182,6 +220,8 @@ app.post('/api/chat', async (req, res) => {
           case 'message_delta':
             sendEvent(res, 'message_delta', {
               outputTokens: evt.usage?.output_tokens,
+              cacheReadTokens: evt.usage?.cache_read_input_tokens ?? 0,
+              cacheCreationTokens: evt.usage?.cache_creation_input_tokens ?? 0,
               stopReason: evt.delta?.stop_reason,
             });
             if (evt.delta?.stop_reason) {
@@ -202,7 +242,8 @@ app.post('/api/chat', async (req, res) => {
     sendEvent(res, 'done', {});
     res.end();
   } catch (err) {
-    sendEvent(res, 'error', { message: err.message });
+    console.error(`[ERROR] fetch failed to ${endpoint}: ${err.message} (cause: ${err.cause?.message || 'unknown'})`);
+    sendEvent(res, 'error', { message: `网络请求失败: ${err.message} → ${endpoint}` });
     res.end();
   }
 });
@@ -300,17 +341,14 @@ app.post('/api/execute-tool', async (req, res) => {
 /** 健康检查 */
 app.get('/api/health', (_, res) => res.json({ status: 'ok', version: '1.0.0' }));
 
-/** 
- * GET /api/models 
- * 从 .env 读取配置的模型列表
+/**
+ * GET /api/models
+ * 从已加载的 process.env 读取模型列表（启动时由 .env 加载）
  */
 app.get('/api/models', async (req, res) => {
   try {
-    const envPath = path.join(process.cwd(), '.env');
-    const envStr = await fs.readFile(envPath, 'utf-8').catch(() => '');
-    const match = envStr.match(/^MODELS_CONFIG=(.+)$/m);
-    if (match) {
-      return res.json(JSON.parse(match[1]));
+    if (process.env.MODELS_CONFIG) {
+      return res.json(JSON.parse(process.env.MODELS_CONFIG));
     }
     return res.json([]);
   } catch(e) {
@@ -347,6 +385,7 @@ app.post('/api/models', async (req, res) => {
     }
     
     await fs.writeFile(envPath, envStr, 'utf-8');
+    process.env.MODELS_CONFIG = JSON.stringify(models);  // 同步更新内存
     res.json(models);
   } catch(e) {
     res.status(500).json({error: e.message});

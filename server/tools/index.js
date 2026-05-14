@@ -3,6 +3,8 @@ import readFile from './read_file.js';
 import writeFile from './write_file.js';
 import weatherReport from './weather_report.js';
 import writeTodos from './write_todos.js';
+import webSearch from './web_search.js';
+import webFetch from './web_fetch.js';
 
 const tools = {
   bash,
@@ -10,6 +12,8 @@ const tools = {
   write_file: writeFile,
   weather_report: weatherReport,
   write_todos: writeTodos,
+  web_search: webSearch,
+  web_fetch: webFetch,
 };
 
 // 获取可用工具清单，用于传给大模型 (兼容 Anthropic 规范)

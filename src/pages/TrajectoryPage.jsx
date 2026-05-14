@@ -5,7 +5,7 @@ import { TodoList } from '../components/TodoList';
 export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessionReset }) {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
-  
+
   useEffect(() => {
     fetch('http://localhost:3001/api/models')
       .then(r => r.json())
@@ -48,15 +48,16 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   // 模型参数
   const [temperature, setTemperature] = useState(harness.model.temperature || 1.0);
   const [maxTokens, setMaxTokens] = useState(harness.model.max_tokens || 8000);
-  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState(harness.systemPrompt);
-  
+
   // 界面状态
   const [activeRightTab, setActiveRightTab] = useState('trajectory');
   const [messages, setMessages] = useState(savedSession?.messages || harness.trajectory || []);
   const [todos, setTodos] = useState(savedSession?.todos || harness.todos || []);
   const [inputText, setInputText] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [cacheStats, setCacheStats] = useState({ hitTokens: 0, missTokens: 0 });
 
   // 同步状态到上层
   useEffect(() => {
@@ -64,7 +65,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       onSessionUpdate(messages, todos);
     }
   }, [messages, todos]);
-  
+
   const chatEndRef = useRef(null);
   const textareaRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -103,7 +104,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const buildApiMessages = (sourceMessages) => {
     const finalMsgs = [];
     const flatBlocks = [];
-    
+
     // 1. 平铺所有原子块，并标记其应有的角色
     sourceMessages.forEach(msg => {
       if (msg.role === 'user') {
@@ -112,9 +113,11 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         if (msg.type === 'text') {
           flatBlocks.push({ role: 'assistant', block: { type: 'text', text: msg.content } });
         } else if (msg.type === 'thinking') {
-          const b = { type: 'thinking', thinking: msg.content };
-          if (msg.signature) b.signature = msg.signature;
-          flatBlocks.push({ role: 'assistant', block: b });
+          if (thinkingEnabled) {
+            const b = { type: 'thinking', thinking: msg.content };
+            if (msg.signature) b.signature = msg.signature;
+            flatBlocks.push({ role: 'assistant', block: b });
+          }
         } else if (msg.type === 'tool_call') {
           flatBlocks.push({ role: 'assistant', block: { type: 'tool_use', id: msg.id, name: msg.toolName, input: msg.toolInput } });
           if (msg.toolOutput) {
@@ -129,7 +132,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     flatBlocks.forEach(item => {
       let last = finalMsgs[finalMsgs.length - 1];
       const targetRole = item.role === 'tool_result' ? 'user' : item.role;
-      
+
       // 判定逻辑：
       // - 如果角色不同，必须另起一个消息。
       // - 如果角色相同，但当前是 tool_result 且上一个块是 tool_use，则合并（它们属于同一个响应回合）。
@@ -166,7 +169,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           }
         ]
       };
-      
+
       // 如果最后一根是用户消息，则合并；否则新增一条
       const lastMsg = apiMessages[apiMessages.length - 1];
       if (lastMsg && lastMsg.role === 'user') {
@@ -210,10 +213,10 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       if (!res.ok) {
         // ... (错误处理保持不变)
         let errorMsg = `HTTP ${res.status}`;
-        try { 
+        try {
           const errData = await res.json();
           errorMsg = errData.error || errorMsg;
-        } catch(e) {}
+        } catch (e) { }
         throw new Error(errorMsg);
       }
 
@@ -247,15 +250,21 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               break;
             case 'message_start':
               if (evt.inputTokens) window._lastInputTokens = evt.inputTokens;
+              if (evt.cacheReadTokens !== undefined) {
+                setCacheStats(prev => ({
+                  hitTokens: prev.hitTokens + (evt.cacheReadTokens || 0),
+                  missTokens: prev.missTokens + (evt.inputTokens || 0),
+                }));
+              }
               break;
             case 'thinking_start':
-              currentMsg = { 
-                role: 'assistant', 
-                type: 'thinking', 
-                turn: turnIndex, 
-                content: '', 
-                tokens: { input: window._lastInputTokens || 0, output: 0 }, 
-                signature: evt.signature 
+              currentMsg = {
+                role: 'assistant',
+                type: 'thinking',
+                turn: turnIndex,
+                content: '',
+                tokens: { input: window._lastInputTokens || 0, output: 0 },
+                signature: evt.signature
               };
               newMessages.push(currentMsg);
               updateLatestMsg();
@@ -273,10 +282,10 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               }
               break;
             case 'text_start':
-              currentMsg = { 
-                role: 'assistant', 
-                type: 'text', 
-                turn: turnIndex, 
+              currentMsg = {
+                role: 'assistant',
+                type: 'text',
+                turn: turnIndex,
                 content: '',
                 tokens: { input: window._lastInputTokens || 0, output: 0 }
               };
@@ -297,7 +306,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
             case 'tool_input_delta':
               if (currentMsg && currentMsg.type === 'tool_call') {
                 currentMsg.toolInputRaw += evt.partial;
-                try { currentMsg.toolInput = JSON.parse(currentMsg.toolInputRaw); } catch {}
+                try { currentMsg.toolInput = JSON.parse(currentMsg.toolInputRaw); } catch { }
                 updateLatestMsg();
               }
               break;
@@ -318,15 +327,13 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           if (tool.toolName === 'write_todos' && tool.toolInput?.todos) {
             setTodos(tool.toolInput.todos);
             hasUpdatedTodoThisTurn = true;
-            
+
             // 优化：返回更详细的 tool_result
             const counts = {
               pending: tool.toolInput.todos.filter(t => t.status === 'pending').length,
               completed: tool.toolInput.todos.filter(t => t.status === 'completed').length,
             };
             tool.toolOutput = `[系统] 已更新看板。当前进度: ${counts.completed}/${tool.toolInput.todos.length} 已完成。`;
-          } else if (tool.toolName === 'web_search' || tool.toolName === 'web_fetch') {
-            tool.toolOutput = `[模拟执行] ${tool.toolName} 已成功调用（待接入真实 API）。`;
           } else {
             try {
               const execRes = await fetch('http://localhost:3001/api/execute-tool', {
@@ -334,9 +341,9 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ toolName: tool.toolName, toolInput: tool.toolInput })
               });
-              
+
               if (!execRes.ok) throw new Error('网络请求失败');
-              
+
               const reader = execRes.body.getReader();
               const decoder = new TextDecoder();
               let buffer = '';
@@ -344,7 +351,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                
+
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
@@ -361,7 +368,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
                     } else if (evt.type === 'error') {
                       tool.toolOutput = `[错误] ${evt.message}`;
                     }
-                  } catch (e) {}
+                  } catch (e) { }
                 }
               }
             } catch (err) {
@@ -395,11 +402,11 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     const nextTurn = loopCount + 1;
     const userMsg = { role: 'user', content: text, turn: nextTurn };
     const currentMessages = [...messages, userMsg];
-    
+
     setMessages(currentMessages);
 
     await runAgentLoop(currentMessages, nextTurn);
-    
+
     setIsRunning(false);
   };
 
@@ -413,27 +420,27 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
               API 核心配置
             </div>
-            <button 
-              className="btn btn-ghost" 
+            <button
+              className="btn btn-ghost"
               style={{ padding: '2px 8px', fontSize: 11 }}
               onClick={() => setShowAddModel(!showAddModel)}
             >
               + 添加模型
             </button>
           </div>
-          
+
           {showAddModel && (
             <div style={{ marginBottom: 16, padding: 12, background: 'var(--bg-base)', borderRadius: 6, border: '1px dashed var(--border)' }}>
               <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>新增模型配置 (保存至 .env)</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="显示名称 (如: 本地 DeepSeek)" value={newModelConfig.name} onChange={e => setNewModelConfig({...newModelConfig, name: e.target.value})} />
-                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (如: deepseek-chat)" value={newModelConfig.modelId} onChange={e => setNewModelConfig({...newModelConfig, modelId: e.target.value})} />
-                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (如: https://api.deepseek.com/anthropic)" value={newModelConfig.url} onChange={e => setNewModelConfig({...newModelConfig, url: e.target.value})} />
-                <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={newModelConfig.key} onChange={e => setNewModelConfig({...newModelConfig, key: e.target.value})} />
+                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="显示名称 (如: 本地 DeepSeek)" value={newModelConfig.name} onChange={e => setNewModelConfig({ ...newModelConfig, name: e.target.value })} />
+                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (如: deepseek-chat)" value={newModelConfig.modelId} onChange={e => setNewModelConfig({ ...newModelConfig, modelId: e.target.value })} />
+                <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (如: https://api.deepseek.com/anthropic)" value={newModelConfig.url} onChange={e => setNewModelConfig({ ...newModelConfig, url: e.target.value })} />
+                <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={newModelConfig.key} onChange={e => setNewModelConfig({ ...newModelConfig, key: e.target.value })} />
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={handleAddModel}>保存</button>
                   <button className="btn btn-ghost" style={{ flex: 1, padding: '4px' }} onClick={() => setShowAddModel(false)}>取消</button>
@@ -446,9 +453,9 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
             <div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2 }}>选择可用模型</div>
               <div className="model-select-wrapper">
-                <select 
-                  className="model-select" 
-                  value={selectedModel?.id || ''} 
+                <select
+                  className="model-select"
+                  value={selectedModel?.id || ''}
                   onChange={e => {
                     const found = models.find(m => m.id === e.target.value);
                     if (found) setSelectedModel(found);
@@ -465,7 +472,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         {/* 模型参数 */}
         <div className="card model-config-card">
           <div className="panel-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
             模型参数
           </div>
 
@@ -515,13 +522,19 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               onClick={() => setActiveRightTab(tab.key)}
             >{tab.label}</button>
           ))}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
+            {(cacheStats.hitTokens + cacheStats.missTokens) > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+                title={`缓存命中: ${cacheStats.hitTokens} tokens | 未命中: ${cacheStats.missTokens} tokens`}>
+                💾 {Math.round(cacheStats.hitTokens / (cacheStats.hitTokens + cacheStats.missTokens) * 100)}% 命中
+              </span>
+            )}
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
               已产生 {loopCount} 轮对话
             </span>
             {messages.length > 0 && (
               <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11, color: 'var(--red)' }} onClick={() => {
-                if(window.confirm('确定要重置当前 Harness 的 Session（清空对话与 TODO 状态）吗？')) {
+                if (window.confirm('确定要重置当前 Harness 的 Session（清空对话与 TODO 状态）吗？')) {
                   setMessages([]);
                   setTodos([]);
                   if (onSessionReset) onSessionReset();
@@ -556,7 +569,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               ))}
               {isRunning && (
                 <div className="running-indicator animate-fade-in" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>
-                  <div className="running-dots"><div className="loading-dot"/><div className="loading-dot"/><div className="loading-dot"/></div>
+                  <div className="running-dots"><div className="loading-dot" /><div className="loading-dot" /><div className="loading-dot" /></div>
                   正在处理中...
                 </div>
               )}
@@ -585,7 +598,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
               disabled={isRunning}
             />
             <button className="send-btn" onClick={handleSend} disabled={!inputText.trim() || isRunning}>
-              {isRunning ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>}
+              {isRunning ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>}
             </button>
           </div>
         </div>
