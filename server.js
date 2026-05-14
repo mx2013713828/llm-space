@@ -294,6 +294,44 @@ app.get('/api/harnesses/:id', async (req, res) => {
   }
 });
 
+/** 新建 Harness 配置 */
+app.post('/api/harnesses', async (req, res) => {
+  try {
+    const { name, description, category } = req.body;
+    if (!name) return res.status(400).json({ error: '缺少 name 字段' });
+
+    const id = name.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const filename = `${name}.json`;
+    const targetPath = path.join(HARNESS_DIR, filename);
+
+    if (await fs.access(targetPath).then(() => true).catch(() => false)) {
+      return res.status(409).json({ error: '同名 Harness 已存在' });
+    }
+
+    const harness = {
+      id,
+      name: filename,
+      description: description || '',
+      category: category || 'basic',
+      model: {
+        name: '',
+        response_format: 'text',
+        temperature: 1,
+        max_tokens: 2048,
+        top_p: 1
+      },
+      tools: [],
+      systemPrompt: '',
+      skills: []
+    };
+
+    await fs.writeFile(targetPath, JSON.stringify(harness, null, 2), 'utf-8');
+    res.json({ success: true, harness });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** 保存/更新 Harness 配置 */
 app.post('/api/harnesses/:id', async (req, res) => {
   try {

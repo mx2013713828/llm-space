@@ -37,10 +37,53 @@ const FILE_ICONS = {
 export default function App() {
   const [activeTab, setActiveTab] = useState('trajectory');
   const [activeHarnessId, setActiveHarnessId] = useState('');
-  
+
   const [harnessFiles, setHarnessFiles] = useState([]);
   const [harness, setHarness] = useState(null);
   const [sessions, setSessions] = useState({});
+
+  // 新建 Harness 表单状态
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newCategory, setNewCategory] = useState('basic');
+  const [newError, setNewError] = useState('');
+
+  const loadHarnessList = () => {
+    fetch('http://localhost:3001/api/harnesses')
+      .then(r => r.json())
+      .then(setHarnessFiles)
+      .catch(err => console.error("加载文件列表失败:", err));
+  };
+
+  const handleCreateHarness = async (e) => {
+    e.preventDefault();
+    setNewError('');
+    if (!newName.trim()) {
+      setNewError('请输入名称');
+      return;
+    }
+    try {
+      const res = await fetch('http://localhost:3001/api/harnesses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), category: newCategory })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNewError(data.error || '创建失败');
+        return;
+      }
+      await loadHarnessList();
+      setActiveHarnessId(data.harness.id);
+      setNewName('');
+      setNewDesc('');
+      setNewCategory('basic');
+      setShowNewForm(false);
+    } catch (err) {
+      setNewError('网络错误: ' + err.message);
+    }
+  };
 
   // 加载列表
   useEffect(() => {
@@ -116,14 +159,22 @@ export default function App() {
         <aside className="sidebar">
           <div className="sidebar-header">
             Harness 资源管理器
-            <button 
-              style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer' }}
-              onClick={() => {
-                fetch('http://localhost:3001/api/harnesses').then(r=>r.json()).then(setHarnessFiles);
-              }}
-            >
-              ↻
-            </button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                onClick={loadHarnessList}
+                title="刷新列表"
+              >
+                ↻
+              </button>
+              <button
+                style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--green)', color: '#fff', border: '1px solid var(--green)', cursor: 'pointer' }}
+                onClick={() => setShowNewForm(v => !v)}
+                title="新建 Harness"
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="sidebar-list">
             {harnessFiles.map(file => (
@@ -143,6 +194,75 @@ export default function App() {
               </div>
             ))}
           </div>
+
+          {/* 新建 Harness 表单 */}
+          {showNewForm && (
+            <form
+              onSubmit={handleCreateHarness}
+              style={{
+                padding: '10px 12px',
+                borderTop: '1px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>新建 Harness</span>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewForm(false); setNewError(''); }}
+                  style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1 }}
+                >
+                  ✕
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="名称（如: 03-example）"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
+                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
+                }}
+                autoFocus
+              />
+              <input
+                type="text"
+                placeholder="描述（可选）"
+                value={newDesc}
+                onChange={e => setNewDesc(e.target.value)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
+                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
+                }}
+              />
+              <select
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
+                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
+                }}
+              >
+                <option value="basic">basic</option>
+                <option value="advanced">advanced</option>
+              </select>
+              {newError && (
+                <span style={{ fontSize: 11, color: 'var(--red)' }}>{newError}</span>
+              )}
+              <button
+                type="submit"
+                style={{
+                  padding: '4px 0', fontSize: 12, borderRadius: 4,
+                  background: 'var(--green)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                创建
+              </button>
+            </form>
+          )}
 
           {/* 侧边栏底部信息 */}
           <div style={{
