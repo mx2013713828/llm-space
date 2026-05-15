@@ -29,11 +29,6 @@ const TABS = [
   },
 ];
 
-const FILE_ICONS = {
-  basic: '💬',
-  advanced: '🔬',
-};
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('trajectory');
   const [activeHarnessId, setActiveHarnessId] = useState('');
@@ -46,8 +41,10 @@ export default function App() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newCategory, setNewCategory] = useState('basic');
   const [newError, setNewError] = useState('');
+
+  // 右键菜单状态
+  const [ctxMenu, setCtxMenu] = useState(null); // { x, y, harnessId }
 
   const loadHarnessList = () => {
     fetch('http://localhost:3001/api/harnesses')
@@ -67,7 +64,7 @@ export default function App() {
       const res = await fetch('http://localhost:3001/api/harnesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), category: newCategory })
+        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -78,11 +75,34 @@ export default function App() {
       setActiveHarnessId(data.harness.id);
       setNewName('');
       setNewDesc('');
-      setNewCategory('basic');
       setShowNewForm(false);
     } catch (err) {
       setNewError('网络错误: ' + err.message);
     }
+  };
+
+  const handleDeleteHarness = async (id) => {
+    if (!confirm(`确定删除 Harness "${id}"？此操作不可撤销。`)) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/harnesses/${id}`, { method: 'DELETE' });
+      if (!res.ok) { alert('删除失败'); return; }
+      await loadHarnessList();
+      if (activeHarnessId === id) {
+        setActiveHarnessId('');
+        setHarness(null);
+      }
+    } catch (err) { alert('网络错误: ' + err.message); }
+  };
+
+  const handleCopyHarness = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/harnesses/${id}/copy`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || '复制失败'); return; }
+      await loadHarnessList();
+      setActiveHarnessId(data.harness.id);
+    } catch (err) { alert('网络错误: ' + err.message); }
+    setCtxMenu(null);
   };
 
   // 加载列表
@@ -161,7 +181,7 @@ export default function App() {
             Harness 资源管理器
             <div style={{ display: 'flex', gap: 4 }}>
               <button
-                style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                className="icon-btn"
                 onClick={loadHarnessList}
                 title="刷新列表"
               >
@@ -183,14 +203,23 @@ export default function App() {
                 id={`harness-${file.id}`}
                 className={`sidebar-item ${activeHarnessId === file.id ? 'active' : ''}`}
                 onClick={() => setActiveHarnessId(file.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setCtxMenu({ x: e.clientX, y: e.clientY, harnessId: file.id });
+                }}
               >
-                <span className="sidebar-item-icon">
-                  {FILE_ICONS[file.category] || '📄'}
-                </span>
+                <span className="sidebar-item-icon">📄</span>
                 <div className="sidebar-item-info">
                   <div className="sidebar-item-name">{file.name}</div>
                   <div className="sidebar-item-desc">{file.description}</div>
                 </div>
+                <button
+                  className="sidebar-item-delete"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteHarness(file.id); }}
+                  title="删除"
+                >
+                  🗑
+                </button>
               </div>
             ))}
           </div>
@@ -238,17 +267,6 @@ export default function App() {
                   border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
                 }}
               />
-              <select
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value)}
-                style={{
-                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
-                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
-                }}
-              >
-                <option value="basic">basic</option>
-                <option value="advanced">advanced</option>
-              </select>
               {newError && (
                 <span style={{ fontSize: 11, color: 'var(--red)' }}>{newError}</span>
               )}
@@ -314,6 +332,44 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* 右键菜单 */}
+      {ctxMenu && (
+        <>
+          <div
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              left: ctxMenu.x,
+              top: ctxMenu.y,
+              zIndex: 100,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              padding: '4px 0',
+              minWidth: 140,
+            }}
+          >
+            <button
+              onClick={() => handleCopyHarness(ctxMenu.harnessId)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '6px 12px', fontSize: 12, background: 'none', border: 'none',
+                color: 'var(--text)', cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.target.style.background = 'var(--surface-hover)'}
+              onMouseLeave={e => e.target.style.background = 'none'}
+            >
+              📋 复制 Harness
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

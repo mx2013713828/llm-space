@@ -297,7 +297,7 @@ app.get('/api/harnesses/:id', async (req, res) => {
 /** 新建 Harness 配置 */
 app.post('/api/harnesses', async (req, res) => {
   try {
-    const { name, description, category } = req.body;
+    const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: '缺少 name 字段' });
 
     const id = name.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -312,7 +312,7 @@ app.post('/api/harnesses', async (req, res) => {
       id,
       name: filename,
       description: description || '',
-      category: category || 'basic',
+      category: 'basic',
       model: {
         name: '',
         response_format: 'text',
@@ -340,6 +340,57 @@ app.post('/api/harnesses/:id', async (req, res) => {
     const targetPath = path.join(HARNESS_DIR, filename);
     await fs.writeFile(targetPath, JSON.stringify(data, null, 2), 'utf-8');
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** 删除 Harness 配置 */
+app.delete('/api/harnesses/:id', async (req, res) => {
+  try {
+    const files = await fs.readdir(HARNESS_DIR);
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
+      try {
+        const data = JSON.parse(content);
+        if (data.id === req.params.id) {
+          await fs.unlink(path.join(HARNESS_DIR, file));
+          return res.json({ success: true });
+        }
+      } catch {}
+    }
+    res.status(404).json({ error: 'Harness not found' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** 复制 Harness 配置 */
+app.post('/api/harnesses/:id/copy', async (req, res) => {
+  try {
+    const files = await fs.readdir(HARNESS_DIR);
+    let source = null;
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
+      try {
+        const data = JSON.parse(content);
+        if (data.id === req.params.id) { source = data; break; }
+      } catch {}
+    }
+    if (!source) return res.status(404).json({ error: 'Harness not found' });
+
+    const newId = source.id + '-copy';
+    const newName = source.name.replace(/\.json$/, '-copy.json');
+    const harness = {
+      ...source,
+      id: newId,
+      name: newName,
+      description: (source.description || '') + ' (副本)',
+    };
+    await fs.writeFile(path.join(HARNESS_DIR, newName), JSON.stringify(harness, null, 2), 'utf-8');
+    res.json({ success: true, harness });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -96,6 +96,46 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 图标按钮（透明，hover 显底色） */
+.icon-btn {
+  padding: 2px 5px;
+  font-size: 12px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all var(--duration-fast);
+}
+.icon-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* 侧边栏项删除按钮（hover 显示） */
+.sidebar-item-delete {
+  opacity: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.sidebar-item:hover .sidebar-item-delete { opacity: 1; }
+.sidebar-item-delete:hover {
+  background: rgba(239,68,68,0.15);
+  border-color: rgba(239,68,68,0.3);
+  color: #f87171;
 }
 .sidebar-list { overflow-y: auto; flex: 1; padding: 0 8px 8px; }
 .sidebar-item {
