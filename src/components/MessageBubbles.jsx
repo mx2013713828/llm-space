@@ -62,7 +62,7 @@ export function ThinkingBubble({ content, tokens, duration, isCollapsed: default
  * 工具调用卡片
  * 展示工具名称、输入参数、输出结果，支持折叠
  */
-export function ToolCallCard({ toolName, toolInput, toolOutput }) {
+export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
   const [expanded, setExpanded] = useState(false);
 
   const TOOL_ICONS = {
@@ -123,6 +123,22 @@ export function ToolCallCard({ toolName, toolInput, toolOutput }) {
               </div>
               <div className="tool-output-code">
                 {toolName === 'bash' ? processTerminalOutput(toolOutput) : formatJson(toolOutput)}
+              </div>
+            </div>
+          )}
+          {subMessages && subMessages.length > 0 && (
+            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+              <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
+                <span>🤖</span> 子代理执行轨迹 (Sub-agent Trajectory)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {subMessages.map((msg, idx) => {
+                  if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
+                  if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
+                  if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                  return null;
+                })}
               </div>
             </div>
           )}

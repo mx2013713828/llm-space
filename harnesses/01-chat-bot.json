@@ -72,5 +72,8 @@
     }
   ],
   "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n当用户搜索互联网信息时，请：\n1. 分析用户提到的关键词。\n2. 调用web_search 工具获取信息。\n3. 将结果整理后回复给用户。\n",
-  "skills": []
+  "skills": [],
+  "features": {
+    "parallel_tool_execution": true
+  }
 }

@@ -5,6 +5,7 @@ import weatherReport from './weather_report.js';
 import writeTodos from './write_todos.js';
 import webSearch from './web_search.js';
 import webFetch from './web_fetch.js';
+import subAgent from './sub_agent.js';
 
 const tools = {
   bash,
@@ -14,6 +15,7 @@ const tools = {
   write_todos: writeTodos,
   web_search: webSearch,
   web_fetch: webFetch,
+  sub_agent: subAgent,
 };
 
 // 获取可用工具清单，用于传给大模型 (兼容 Anthropic 规范)

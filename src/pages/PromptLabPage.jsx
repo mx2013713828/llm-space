@@ -10,6 +10,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [selectedTools, setSelectedTools] = useState(harness.tools || []);
   const [availableTools, setAvailableTools] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
+  const [features, setFeatures] = useState(harness.features || {});
 
   useEffect(() => {
     fetch('http://localhost:3001/api/tools')
@@ -70,6 +71,7 @@ export function PromptLabPage({ harness, onSave }) {
           { key: 'editor', label: '✍️ Prompt 编辑器' },
           { key: 'skills', label: '✨ Skills 配置' },
           { key: 'tools-edit', label: '🔧 Tools 挂载' },
+          { key: 'features', label: '🔬 实验特性' },
           { key: 'templates', label: '📄 模板库' },
         ].map(tab => (
           <button
@@ -90,7 +92,8 @@ export function PromptLabPage({ harness, onSave }) {
                   ...harness,
                   systemPrompt: systemPrompt,
                   skills: selectedSkills,
-                  tools: selectedTools
+                  tools: selectedTools,
+                  features: features
                 });
               }
             }}
@@ -243,6 +246,32 @@ export function PromptLabPage({ harness, onSave }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* 实验特性配置 */}
+        {activeTab === 'features' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
+              🔬 这里是 Agent 架构互动实验室的高级特性开关。你可以在这里自由开启或关闭各项底层架构能力。
+            </div>
+            
+            <div className="card" style={{ padding: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={features.parallel_tool_execution || false}
+                  onChange={e => setFeatures({ ...features, parallel_tool_execution: e.target.checked })}
+                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段一：并行工具执行 (Parallel Tool Execution)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    开启后，如果大模型在同一回合输出了多个 tool call（如同时查寻多个网页或读多个文件），底层 Harness 将使用并发（Promise.all）执行，大幅缩短等待时间。关闭则退回传统的串行等待。
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 

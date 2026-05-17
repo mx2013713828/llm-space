@@ -6,11 +6,11 @@
  */
 const writeTodos = {
   name: 'write_todos',
-  description: '更新前端面板中的 TODO 任务列表。在制定或更新多步任务计划时使用。每次更新都应该包含所有任务的完整状态。',
+  description: 'Update the TODO task list in the frontend panel. Use this when creating or updating a multi-step task plan. Every update should contain the complete state of all tasks.',
   parameters: {
     todos: {
       type: 'array',
-      description: 'TODO 任务列表，每个元素包含 content（任务内容）、status（pending/in_progress/completed/failed）、priority（high/medium/low）',
+      description: 'List of TODO tasks. Each element must contain content (task description), status (pending/in_progress/completed/failed), and priority (high/medium/low).',
       required: true,
     },
   },
@@ -22,7 +22,7 @@ const writeTodos = {
       in_progress: todos.filter(t => t.status === 'in_progress').length,
       completed: todos.filter(t => t.status === 'completed').length,
     };
-    return `已更新 ${todos.length} 个 TODO 任务（待执行: ${counts.pending}, 进行中: ${counts.in_progress}, 已完成: ${counts.completed}）`;
+    return `Successfully updated ${todos.length} TODO tasks (Pending: ${counts.pending}, In Progress: ${counts.in_progress}, Completed: ${counts.completed})`;
   },
 };
 

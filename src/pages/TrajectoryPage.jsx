@@ -148,6 +148,133 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   };
 
 
+  // ── 核心 Sub-Agent Loop（独立的子环境） ──
+  const runSubAgentLoop = async (prompt, tool, updateLatestMsg) => {
+    let subMessages = [{ role: 'user', content: prompt }];
+    tool.subMessages = subMessages;
+    updateLatestMsg();
+
+    const subTools = harness.tools.filter(t => t.name !== 'sub_agent');
+
+    for (let i = 0; i < 15; i++) {
+      let apiMessages = buildApiMessages(subMessages);
+
+      const res = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          system: "你是一个子代理（Sub-agent）。请根据用户的具体任务，利用工具完成研究或操作。完成任务后，请输出最终的总结报告。请尽力而为，如果尝试多次失败也请如实报告。",
+          tools: subTools,
+          model: selectedModel?.modelId || 'claude-3-7-sonnet-20250219',
+          apiKey: selectedModel?.key || '',
+          baseUrl: selectedModel?.url || 'https://api.anthropic.com',
+          temperature,
+          maxTokens,
+          thinkingEnabled,
+        })
+      });
+
+      if (!res.ok) throw new Error('Sub-agent API request failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentMsg = null;
+      let stopReason = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let evt; try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+          switch (evt.type) {
+            case 'thinking_start':
+              currentMsg = { role: 'assistant', type: 'thinking', turn: i+1, content: '', tokens: { input: 0, output: 0 } };
+              subMessages.push(currentMsg);
+              updateLatestMsg();
+              break;
+            case 'thinking_delta':
+              if (currentMsg) { currentMsg.content += evt.text || ''; updateLatestMsg(); }
+              break;
+            case 'text_start':
+              currentMsg = { role: 'assistant', type: 'text', turn: i+1, content: '', tokens: { input: 0, output: 0 } };
+              subMessages.push(currentMsg);
+              updateLatestMsg();
+              break;
+            case 'text_delta':
+              if (currentMsg) { currentMsg.content += evt.text || ''; updateLatestMsg(); }
+              break;
+            case 'tool_start':
+              currentMsg = { role: 'assistant', type: 'tool_call', turn: i+1, id: evt.id, toolName: evt.name, toolInputRaw: '', toolInput: {} };
+              subMessages.push(currentMsg);
+              updateLatestMsg();
+              break;
+            case 'tool_input_delta':
+              if (currentMsg && currentMsg.type === 'tool_call') {
+                currentMsg.toolInputRaw += evt.partial;
+                try { currentMsg.toolInput = JSON.parse(currentMsg.toolInputRaw); } catch { }
+                updateLatestMsg();
+              }
+              break;
+            case 'tool_end':
+              updateLatestMsg();
+              break;
+            case 'stop':
+              stopReason = evt.stopReason;
+              break;
+          }
+        }
+      }
+
+      if (stopReason === 'tool_use') {
+        const toolsToRun = subMessages.filter(m => m.turn === i+1 && m.type === 'tool_call');
+        for (const subTool of toolsToRun) {
+          if (subTool.toolName === 'write_todos') {
+            subTool.toolOutput = "[系统拦截] 子代理被禁止修改全局 TODO 看板。";
+            updateLatestMsg();
+            continue;
+          }
+          try {
+            const execRes = await fetch('http://localhost:3001/api/execute-tool', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ toolName: subTool.toolName, toolInput: subTool.toolInput })
+            });
+            const reader = execRes.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                  const chunkEvt = JSON.parse(line.slice(6));
+                  if (chunkEvt.type === 'chunk') { subTool.toolOutput = (subTool.toolOutput || '') + chunkEvt.content; updateLatestMsg(); }
+                  else if (chunkEvt.type === 'done') { subTool.toolOutput = String(chunkEvt.output); }
+                  else if (chunkEvt.type === 'error') { subTool.toolOutput = `[错误] ${chunkEvt.message}`; }
+                } catch(e) {}
+              }
+            }
+          } catch (e) { subTool.toolOutput = `[错误] ${e.message}`; }
+          updateLatestMsg();
+        }
+      } else {
+        const textBlocks = subMessages.filter(m => m.type === 'text').map(m => m.content);
+        return textBlocks.length > 0 ? textBlocks.join('') : "(子代理未返回任何文字总结)";
+      }
+    }
+    return "子代理运行超过最大轮次 (15)，被迫终止。";
+  };
+
   // ── 核心 Agent Loop（递归执行） ──
   const runAgentLoop = async (currentMessages, turnIndex, roundsSinceTodo = 0) => {
     let apiMessages = buildApiMessages(currentMessages);
@@ -323,8 +450,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       if (stopReason === 'tool_use') {
         const toolsToRun = newMessages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
 
-        await Promise.all(toolsToRun.map(async (tool) => {
-          if (tool.toolName === 'write_todos' && tool.toolInput?.todos) {
+        const executeToolCall = async (tool) => {
+          if (tool.toolName === 'sub_agent' && tool.toolInput?.prompt) {
+            try {
+              tool.toolOutput = await runSubAgentLoop(tool.toolInput.prompt, tool, updateLatestMsg);
+            } catch (err) {
+              tool.toolOutput = `[子代理异常崩溃]\n${err.message}`;
+            }
+          } else if (tool.toolName === 'write_todos' && tool.toolInput?.todos) {
             setTodos(tool.toolInput.todos);
             hasUpdatedTodoThisTurn = true;
 
@@ -376,7 +509,19 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
             }
           }
           updateLatestMsg();
-        }));
+        };
+
+        const isParallel = harness.features?.parallel_tool_execution === true;
+
+        if (isParallel) {
+          // 阶段一：并行工具执行 (Parallel Tool Execution)
+          await Promise.all(toolsToRun.map(executeToolCall));
+        } else {
+          // 传统的串行执行
+          for (const tool of toolsToRun) {
+            await executeToolCall(tool);
+          }
+        }
 
         await new Promise(r => setTimeout(r, 500));
         // 递归调用，传递更新后的计数器
@@ -561,7 +706,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
                   {msgs.map((msg, idx) => {
                     if (msg.role === 'user') return <UserMessage key={idx} content={msg.content} />;
                     if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
                     if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
                     return null;
                   })}

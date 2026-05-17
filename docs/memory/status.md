@@ -13,11 +13,12 @@
 - **会话保持 (Session State Lifting)**：`App.jsx` 作为状态最高层，维护了 `sessions` 对象。当用户在不同 Harness 之间切换时，各 Agent 的对话历史 (`messages`) 和任务列表 (`todos`) 得以无损保留。支持通过"🔄 重置 Session"按钮清空状态。
 
 ### 2.2 Agent Harness 与 ReAct Loop
-- **Harness 配置体系**：所有的 Agent 配置存放在 `harnesses/` 目录下的 JSON 文件中（如 `01-chat-bot.json`, `02-deep-research.json`, `102-todos-without-reminder.json`）。
+- **Harness 配置体系**：所有的 Agent 配置存放在 `harnesses/` 目录下的 JSON 文件中。引入了 `features` 配置字段，支持将底层的并发执行等高级架构能力作为可选开关，供“互动实验室”测试。
 - **运行引擎 (TrajectoryPage)**：
   - 前端负责驱动 ReAct Loop，支持多轮递归直到大模型生成最终答案。
   - **协议完整性 (Protocol Integrity)**：采用原子块聚合算法，严格确保 `thinking`、`text`、`tool_use` 与随后的 `tool_result` 按照 Anthropic/DeepSeek API 要求的物理顺序对齐。
-  - **并行执行支持**：已在后端实现 `executeToolsParallel`，能够同时分发多个工具调用。
+  - **并行工具执行**：前端引擎支持读取 `features.parallel_tool_execution`，动态切换串行或 `Promise.all` 并行工具调用机制，大幅缩短复杂任务耗时。
+  - **Sub-agent 多智能体引擎**：支持前端拦截 `sub_agent` 工具并开启独立的 Headless ReAct 循环（保持独立的全新 `messages`），并在结束后将最终摘要作为 `tool_result` 丢回给父 Agent，防止噪音污染主模型的 Context。
   - **TODO 状态注入**：每轮自动将任务看板注入消息序列末尾，支持催促机制（连续 3 轮未更新 TODO 时提醒）。
 
 ### 2.3 多模型适配
@@ -39,6 +40,7 @@
 | `write_todos` | `write_todos.js` | TODO 任务列表管理（前端拦截更新） |
 | `web_search` | `web_search.js` | Tavily `/search` — 关键词搜索，返回 AI 摘要 + 结构化结果 |
 | `web_fetch` | `web_fetch.js` | Tavily `/extract` — 传入 URL，返回清洗后 Markdown 正文 |
+| `sub_agent` | `sub_agent.js` | 派发子代理任务（纯前端拦截，实现独立的上下文循环） |
 
 ### 2.5 网络代理支持
 - 使用 `undici` 的 `EnvHttpProxyAgent` + `setGlobalDispatcher` 全局适配。
@@ -68,3 +70,5 @@
 4. **DeepSeek 思考模式全适配**：修复 thinking 块字段名不匹配、budget_tokens 浮点拒绝、thinking 参数缺失导致 400 等一系列模型兼容问题，实现双向热插拔。
 5. **Tavily 网络搜索集成**：从模拟执行升级为真实 API 调用，Agent 具备实时互联网搜索与网页抓取能力。
 6. **全局代理自动适配**：通过 `undici` 全局分发，解决 Node.js fetch 不认 `HTTPS_PROXY` 导致的网络超时问题。
+7. **架构特性可配置化 (Interactive Lab)**：在 Prompt Lab 界面中加入了“实验特性”面板，可直接通过 UI 动态调节底层引擎的行为模式（如并发执行）。
+8. **Sub-agent 隔离与可视化**：成功实现了子代理的上下文隔离（Context Isolation）。子代理的详细工作流在 API 传输层被安全抛弃以节省 tokens，但在前端 UI 的 ToolCallCard 中实现了深层嵌套的可视化渲染，彻底打破多智能体运行黑盒。
