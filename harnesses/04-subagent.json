@@ -1,0 +1,153 @@
+{
+  "id": "04-subagent",
+  "name": "04-subagent.json",
+  "description": "",
+  "category": "basic",
+  "model": {
+    "name": "",
+    "response_format": "text",
+    "temperature": 1,
+    "max_tokens": 2048,
+    "top_p": 1
+  },
+  "tools": [
+    {
+      "name": "bash",
+      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The bash command to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file from the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Write or overwrite contents into a file on the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          },
+          "content": {
+            "type": "string",
+            "description": "The exact content to write to the file"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "weather_report",
+      "description": "获取指定城市的天气信息",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "城市名称（如：北京、上海、New York）"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    },
+    {
+      "name": "write_todos",
+      "description": "Update the TODO task list in the frontend panel. Use this when creating or updating a multi-step task plan. Every update should contain the complete state of all tasks.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "todos": {
+            "type": "array",
+            "description": "List of TODO tasks. Each element must contain content (task description), status (pending/in_progress/completed/failed), and priority (high/medium/low)."
+          }
+        },
+        "required": [
+          "todos"
+        ]
+      }
+    },
+    {
+      "name": "sub_agent",
+      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search keyword or question (concise natural language is recommended)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "web_fetch",
+      "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The full URL of the web page to fetch (e.g., https://example.com/article)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  ],
+  "systemPrompt": "你是一个友好的智能助手，请准确、简洁地回答用户的问题。",
+  "skills": [],
+  "features": {
+    "parallel_tool_execution": true
+  }
+}

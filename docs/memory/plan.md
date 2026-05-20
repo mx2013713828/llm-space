@@ -14,20 +14,22 @@
 - [x] 将目前的 `for...of` 串行等待网络请求 (`fetch`) 的逻辑，重构为基于 `Promise.all()` 的并发请求逻辑。
 - [x] 确保前端在并发结束后，按原始顺序统一将 `tool_result` 组装并发送给 LLM。
 
-## 阶段二：上下文卸载机制 (Context Offloading) 🛡️
-**目标**：解决 `bash` 或 `read_file` 返回结果过长导致大模型 Context Window 爆炸的问题，实现“装不下就暂时放磁盘”。
+## 阶段二：缓存对齐式上下文压缩 (Cache-Aligned Watermark Compression) 🛡️
+**目标**：解决长轮次任务导致大模型 Context Window 爆炸，并最大化保护 Prompt Cache 命中率。
 **工作项**：
-- [ ] 在后端 `/api/execute-tool` 接口（或每个单独的 tool 内部）增加一个**安全拦截层**。
-- [ ] 设定阈值（例如单次输出长度 > 2000 字符时触发）。
-- [ ] 触发 Offloading 时，将原始超长文本保存到项目根目录下的 `.agent-tmp/` 目录中。
-- [ ] 向大模型返回一个仅包含数十 Token 的占位符（例如 `[OFFLOADED] saved to .agent-tmp/xxx.log (3542 tokens). Use read_file to retrieve.`）。
+- [x] **Stage 1 (日常护盾)**：在前端 `buildApiMessages` 组装层拦截 `tool_result`，当单次长于 4000 字符时执行掐头去尾，替换为 `[OUTPUT OFFLOADED]`，保证历史记录严格 Append-Only，对缓存极度友好。
+- [x] **Stage 2 (80% 水位线软清洗)**：在 UI 右上角添加动态 Memory Bar，精准绑定 API 每次返回的真实 `input_tokens`。
+- [x] **Stage 2 (批量重置纪元)**：当 Token 超出 160,000 (80%) 且多于 5 轮时，触发全量批处理（Batch Compact）：非对称掏空历史 `write_file` 的代码入参，折叠幂等的 `read_file` 返回结果和旧的 `<thinking>` 块，并永久性修改 UI 状态，开创新的 Cache 纪元。
+- [x] **Token 计数器鲁棒化**：修复非 Anthropic 模型（如豆包/Gemini）在流式传输中不返回 `input_tokens` 导致计数器显示 0 的问题。引入 `message_delta` 事件监听 + 基于 `(messages + systemPrompt + toolsSchema).length / 4` 的保底估算器。
+- [x] **压缩后计数器平滑过渡**：将压缩后的 `setContextTokens(0)` 粗暴清零，改为就地重新估算（`compressedEstimate`），避免断崖式归零误导用户。
+- [x] **软清洗可视化通知**：在压缩触发时，自动在对话轨迹中插入 🌊 系统提示气泡（`system_alert`），明确告知用户发生了什么操作以及压缩了多少处内容。
 
 ## 阶段三：动态 Nudge 与任务状态卫士 (Dynamic System Reminder) ⏰
 **目标**：解决大模型在执行多步复杂任务时，容易“遗忘”更新 Todos（`write_todos`）状态的问题。
 **工作项**：
-- [ ] 在 `TrajectoryPage.jsx` 的事件循环中，检查当前 Harness 是否配置了 `write_todos` 相关能力。
-- [ ] 如果存在未完成的任务（`pending` / `in_progress`），在发往 LLM 的新一轮请求的最后，硬编码插入一条 `<system-reminder>`。
-- [ ] 提醒内容：“你还有未标记为 completed 的 TODO，请在采取下一步行动前使用 write_todos 更新状态。”
+- [x] 在 `TrajectoryPage.jsx` 的事件循环中，检测 TODO 列表状态。
+- [x] 每轮自动将当前任务看板（`<current_tasks_status>`）注入消息序列末尾，与最后一条用户消息合并以保护 Cache。
+- [x] 当连续 3 轮未更新 TODO 时，自动追加 `<system_reminder>` 催促提醒。”
 
 ## 阶段四：Prompt Cache 结构感知排版 (Cache Alignment) 💰
 **目标**：最大限度命中 Anthropic / DeepSeek 的 Prompt Cache 前缀缓存机制，大幅降低上下文携带的 Token 费用与首字延迟。
@@ -65,3 +67,11 @@
 - [x] **前端子循环 (Sub-Loop)**：在 `TrajectoryPage.jsx` 拦截 `sub_agent` 调用，分配一个干净的 `messages=[]`，执行独立的 ReAct 循环。
 - [x] **嵌套 UI 渲染**：将子代理在后台产生的所有 `thinking`、`tool_use` 等详细过程存储在主调用的上下文里，并在主 Agent 的 `ToolCallCard` 中通过手风琴折叠面板可视化展现。
 - [x] **摘要返回 (Context Discard)**：子循环结束后，只将最终的文本答案作为 `tool_result` 返回给主 Agent，彻底隔离中间噪音。
+
+## 阶段九：可观测性与调试工具 (Observability & Debugging) 🔍
+**目标**：让开发者能全面透视 Agent 的内部运行状态，降低调试门槛。
+**工作项**：
+- [x] **上下文检查器 (Context Inspector)**：在右上角 Tab 栏添加「🔍 查看上下文」按钮，点击弹出全屏模态框，展示 `buildApiMessages()` 处理后实际发送给 API 的完整上下文（System Prompt + Tools Schema + Messages 序列），每条消息按角色着色、按 block 类型分区渲染，支持一键复制 JSON。
+- [x] **工具参数容错增强**：修复 `read_file` 和 `write_file` 因大模型参数命名混淆（`path` vs `filePath`）导致的 `undefined` 崩溃，改用宽松 `params` 对象解析。
+- [x] **软清洗系统通知气泡**：压缩触发时在对话时间线中插入可视化的 🌊 `system_alert` 提示，告知用户具体发生了什么操作。
+

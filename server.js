@@ -219,6 +219,7 @@ app.post('/api/chat', async (req, res) => {
 
           case 'message_delta':
             sendEvent(res, 'message_delta', {
+              inputTokens: evt.usage?.input_tokens,
               outputTokens: evt.usage?.output_tokens,
               cacheReadTokens: evt.usage?.cache_read_input_tokens ?? 0,
               cacheCreationTokens: evt.usage?.cache_creation_input_tokens ?? 0,
@@ -418,8 +419,29 @@ app.post('/api/execute-tool', async (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
     });
 
+    let returnResult = finalResult;
+
+    // 机制 A：对于非幂等且返回大的工具 (bash, web_fetch)，执行完毕后立刻写盘并返回引用+预览
+    if ((toolName === 'bash' || toolName === 'web_fetch') && finalResult.length > 4000) {
+      try {
+        const offloadsDir = path.join(process.cwd(), '.offloads');
+        await fs.mkdir(offloadsDir, { recursive: true });
+        const filename = `${toolName}_${Date.now()}.log`;
+        const filePath = path.join(offloadsDir, filename);
+        await fs.writeFile(filePath, finalResult, 'utf-8');
+
+        const head = finalResult.slice(0, 1500);
+        const tail = finalResult.slice(-500);
+        const truncatedCount = finalResult.length - 2000;
+        returnResult = `[OUTPUT OFFLOADED to .offloads/${filename}]\n\n${head}\n\n...[截断了 ${truncatedCount} 字符，完整日志已保存至 .offloads/${filename}]...\n\n${tail}`;
+        console.log(`  💾 [Mechanism A] ${toolName} 输出已落盘至 .offloads/${filename}`);
+      } catch (writeErr) {
+        console.error(`  ⚠️ [Mechanism A] 落盘失败: ${writeErr.message}`);
+      }
+    }
+
     // 任务完成后发送结束标记和最终完整结果
-    res.write(`data: ${JSON.stringify({ type: 'done', output: finalResult })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', output: returnResult })}\n\n`);
     res.end();
   } catch (err) {
     res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);

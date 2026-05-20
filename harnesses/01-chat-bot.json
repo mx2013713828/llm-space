@@ -39,34 +39,18 @@
       }
     },
     {
-      "name": "web_search",
-      "description": "搜索互联网获取最新信息。返回结构化结果，包含标题、URL、内容摘要。适用场景：需要实时信息、新闻、数据查询。",
+      "name": "sub_agent",
+      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
       "input_schema": {
         "type": "object",
         "properties": {
-          "query": {
+          "prompt": {
             "type": "string",
-            "description": "搜索关键词或问题（建议用简洁的自然语言描述）"
+            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
           }
         },
         "required": [
-          "query"
-        ]
-      }
-    },
-    {
-      "name": "web_fetch",
-      "description": "获取指定网页的完整正文内容（已清洗为 Markdown）。适用场景：在 web_search 找到网页后，抓取全文深入阅读。",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "description": "要抓取的网页完整 URL（如 https://example.com/article）"
-          }
-        },
-        "required": [
-          "url"
+          "prompt"
         ]
       }
     }

@@ -20,6 +20,11 @@
   - **并行工具执行**：前端引擎支持读取 `features.parallel_tool_execution`，动态切换串行或 `Promise.all` 并行工具调用机制，大幅缩短复杂任务耗时。
   - **Sub-agent 多智能体引擎**：支持前端拦截 `sub_agent` 工具并开启独立的 Headless ReAct 循环（保持独立的全新 `messages`），并在结束后将最终摘要作为 `tool_result` 丢回给父 Agent，防止噪音污染主模型的 Context。
   - **TODO 状态注入**：每轮自动将任务看板注入消息序列末尾，支持催促机制（连续 3 轮未更新 TODO 时提醒）。
+  - **上下文压缩与管理**：
+    - **日常护盾 (Always-On Shield)**：`buildApiMessages` 中自动拦截超过 4000 字符的工具输出（排除 `read_file`），掐头去尾替换为 `[OUTPUT OFFLOADED]`。
+    - **软清洗纪元 (Soft Compact Epoch)**：当 Token 超过 80% 水位线且多于 5 轮时，批量折叠旧的 thinking/write_file 入参/幂等工具返回，并插入 🌊 系统通知气泡告知用户。
+    - **Token 计数器鲁棒化**：支持 `message_start` + `message_delta` 双事件监听，并引入基于 `(messages + systemPrompt + toolsSchema).length / 4` 的保底估算器，确保非 Anthropic 模型也能正确显示。
+    - **压缩后平滑过渡**：压缩后不再粗暴清零，而是就地重新估算，避免断崖式归零误导用户。
 
 ### 2.3 多模型适配
 - **DeepSeek 思考模式兼容**：DeepSeek 的 `thinking` 参数支持 `enabled` / `disabled` 双向开关。`budget_tokens` 需取整（浮点数会被 DeepSeek 拒绝）。DeepSeek 不使用 signature 签名机制，thinking 块无需密码学验证即可在多轮对话中传递。
@@ -34,8 +39,8 @@
 | 工具 | 文件 | 能力 |
 |------|------|------|
 | `bash` | `bash.js` | Shell 执行，`spawn` 模式实时流式输出，120s 超时 |
-| `read_file` | `read_file.js` | 读取本地文件 |
-| `write_file` | `write_file.js` | 写入本地文件 |
+| `read_file` | `read_file.js` | 读取本地文件（容错 `path`/`filePath` 双参数名） |
+| `write_file` | `write_file.js` | 写入本地文件（容错 `path`/`filePath` 双参数名） |
 | `weather_report` | `weather_report.js` | 调用 Open-Meteo 真实天气 API |
 | `write_todos` | `write_todos.js` | TODO 任务列表管理（前端拦截更新） |
 | `web_search` | `web_search.js` | Tavily `/search` — 关键词搜索，返回 AI 摘要 + 结构化结果 |
@@ -58,17 +63,21 @@
 - **模型管理 UI**：左侧面板支持通过表单直接添加新模型配置并持久化到 `.env`。
 
 ## 4. 已知的瓶颈与风险
-- **Context 溢出风险**：如果 `bash` 或 `web_fetch` 返回内容过长，仍可能导致 Context 爆炸。需引入摘要或截断机制。
 - **后台任务缺失**：超过 2 分钟的极长任务仍依赖 HTTP Keep-alive。需引入 Job 管理器。
-- **安全性**：`bash` 缺乏沙盒化。
+- **安全性**：`bash` 缺乏沙箱化。
 - **web_fetch 内容截断**：Tavily `/extract` 对超长页面会截断，需评估最大可接受长度。
+- **会话持久化缺失**：刷新页面后对话历史会丢失，需引入后端存储层。
 
 ## 5. 最近工程突破 (Engineering Breakthroughs)
 1. **原子块顺序聚合算法**：解决了 ReAct 循环中思维链丢失的难题。
-2. **实时流式工具反馈**：将工具执行过程可视化，大幅降低了 Agent 运行时的黑盒感。
+2. **实时流式工具反馈**：将工具执行过程可视化，大幅降低了 Agent 运行时的黑箱感。
 3. **终端进度条渲染**：通过处理控制字符，在 Web UI 中实现了近乎原生终端的安装进度反馈。
 4. **DeepSeek 思考模式全适配**：修复 thinking 块字段名不匹配、budget_tokens 浮点拒绝、thinking 参数缺失导致 400 等一系列模型兼容问题，实现双向热插拔。
 5. **Tavily 网络搜索集成**：从模拟执行升级为真实 API 调用，Agent 具备实时互联网搜索与网页抓取能力。
 6. **全局代理自动适配**：通过 `undici` 全局分发，解决 Node.js fetch 不认 `HTTPS_PROXY` 导致的网络超时问题。
-7. **架构特性可配置化 (Interactive Lab)**：在 Prompt Lab 界面中加入了“实验特性”面板，可直接通过 UI 动态调节底层引擎的行为模式（如并发执行）。
-8. **Sub-agent 隔离与可视化**：成功实现了子代理的上下文隔离（Context Isolation）。子代理的详细工作流在 API 传输层被安全抛弃以节省 tokens，但在前端 UI 的 ToolCallCard 中实现了深层嵌套的可视化渲染，彻底打破多智能体运行黑盒。
+7. **架构特性可配置化 (Interactive Lab)**：在 Prompt Lab 界面中加入了"实验特性"面板，可直接通过 UI 动态调节底层引擎的行为模式（如并发执行）。
+8. **Sub-agent 隔离与可视化**：成功实现了子代理的上下文隔离（Context Isolation）。子代理的详细工作流在 API 传输层被安全抛弃以节省 tokens，但在前端 UI 的 ToolCallCard 中实现了深层嵌套的可视化渲染，彻底打破多智能体运行黑箱。
+9. **上下文检查器 (Context Inspector)**：新增全屏模态框可视化调试工具，完整展示 `buildApiMessages()` 处理后的实际 API 上下文（System Prompt + Tools Schema + Messages 序列），每条消息按角色着色、按 block 类型分区渲染，支持一键复制 JSON。
+10. **工具参数容错增强**：修复 `read_file`/`write_file` 因大模型参数命名混淆（`path` vs `filePath`）导致的 `undefined` 崩溃，改用宽松 `params` 对象解析。
+11. **软清洗可视化通知**：压缩触发时在对话时间线插入 🌊 `system_alert` 系统气泡，告知用户发生了什么操作及具体压缩数量，显著提升系统可观测性。
+12. **Token 计数器鲁棒化**：修复非 Anthropic 模型 Token 计数显示 0 的问题，引入双事件监听 + 保底估算器；压缩后从粗暴清零改为就地重新估算，避免断崖式归零。

@@ -7,8 +7,10 @@ export default {
   parameters: {
     path: { type: 'string', description: 'Absolute or relative path to the file', required: true }
   },
-  execute: async ({ path: filePath }) => {
+  execute: async (params) => {
     try {
+      const filePath = params.path || params.filePath;
+      if (!filePath) throw new Error('Missing parameter: path or filePath');
       const targetPath = path.resolve(process.cwd(), filePath);
       const content = await fs.readFile(targetPath, 'utf-8');
       return content;

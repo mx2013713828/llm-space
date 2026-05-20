@@ -8,8 +8,11 @@ export default {
     path: { type: 'string', description: 'Absolute or relative path to the file', required: true },
     content: { type: 'string', description: 'The exact content to write to the file', required: true }
   },
-  execute: async ({ path: filePath, content }) => {
+  execute: async (params) => {
     try {
+      const filePath = params.path || params.filePath;
+      if (!filePath) throw new Error('Missing parameter: path or filePath');
+      const content = params.content;
       const targetPath = path.resolve(process.cwd(), filePath);
       // Ensure directory exists
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
