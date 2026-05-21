@@ -1,0 +1,25 @@
+import { useRef, useEffect } from 'react';
+
+/**
+ * useAutoScroll — 自动滚动 Hook
+ *
+ * 当消息列表更新时自动滚动到底部（仅在 trajectory tab 激活时触发）。
+ *
+ * @param {Array} messages - 消息列表，变化时触发滚动
+ * @param {string} activeRightTab - 当前激活的右侧 Tab
+ * @returns {{ chatEndRef: React.RefObject, scrollContainerRef: React.RefObject }}
+ */
+export function useAutoScroll(messages, activeRightTab) {
+  const chatEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (activeRightTab === 'trajectory') {
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages, activeRightTab]);
+
+  return { chatEndRef, scrollContainerRef };
+}

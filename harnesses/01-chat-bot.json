@@ -12,17 +12,6 @@
   },
   "tools": [
     {
-      "name": "weather_report",
-      "description": "获取指定城市的天气信息",
-      "parameters": {
-        "city": {
-          "type": "string",
-          "description": "城市名称（中文）",
-          "required": true
-        }
-      }
-    },
-    {
       "name": "bash",
       "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
       "input_schema": {
@@ -51,6 +40,22 @@
         },
         "required": [
           "prompt"
+        ]
+      }
+    },
+    {
+      "name": "weather_report",
+      "description": "获取指定城市的天气信息",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "城市名称（如：北京、上海、New York）"
+          }
+        },
+        "required": [
+          "city"
         ]
       }
     }
