@@ -14,15 +14,15 @@
 
 ### 2.2 Agent Harness 与 ReAct Loop
 - **Harness 配置体系**：所有的 Agent 配置存放在 `harnesses/` 目录下的 JSON 文件中。引入了 `features` 配置字段，支持将底层的并发执行等高级架构能力作为可选开关，供“互动实验室”测试。
-- **运行引擎 (TrajectoryPage)**：
-  - 前端负责驱动 ReAct Loop，支持多轮递归直到大模型生成最终答案。
-  - **协议完整性 (Protocol Integrity)**：采用原子块聚合算法，严格确保 `thinking`、`text`、`tool_use` 与随后的 `tool_result` 按照 Anthropic/DeepSeek API 要求的物理顺序对齐。
-  - **并行工具执行**：前端引擎支持读取 `features.parallel_tool_execution`，动态切换串行或 `Promise.all` 并行工具调用机制，大幅缩短复杂任务耗时。
-  - **Sub-agent 多智能体引擎**：支持前端拦截 `sub_agent` 工具并开启独立的 Headless ReAct 循环（保持独立的全新 `messages`），并在结束后将最终摘要作为 `tool_result` 丢回给父 Agent，防止噪音污染主模型的 Context。
-  - **TODO 状态注入**：每轮自动将任务看板注入消息序列末尾，支持催促机制（连续 3 轮未更新 TODO 时提醒）。
+- **运行引擎 (AgentExecutor)**：
+  - **控制流完全下沉**：ReAct 循环已完全迁移至后端维护。后端 [`AgentExecutor.js`](file:///Users/mayufeng/fast_myf/LLM-Learning/llm-space/server/agent/AgentExecutor.js) 负责驱动循环，进行多轮递归调用、工具调度、上下文清洗与大模型流式调用。前端蜕化为纯事件消费与视图渲染层，仅通过单路 SSE（Server-Sent Events）信道实时渲染轨迹。
+  - **协议完整性 (Protocol Integrity)**：后端严格确保 `thinking`、`text`、`tool_use` 与随后的 `tool_result` 按照大模型 API 要求的物理顺序对齐。
+  - **并行工具执行**：后端引擎支持读取 `features.parallel_tool_execution`，动态切换串行或 `Promise.all` 并行工具调用与执行机制，大幅缩短复杂任务耗时。
+  - **Sub-agent 多智能体引擎**：支持后端系统级拦截 `sub_agent` 工具。当大模型触发子代理时，后端会自动在内存中实例化独立的子 `AgentExecutor` 并运行独立的 ReAct 循环。子代理在执行时产生的详细轨迹事件，会通过带 `parentToolCallId` 的二级路由实时透传回前端，在前端的 `ToolCallCard` 折叠卡片中渲染，结束后仅将最终总结摘要作为 `tool_result` 传回父 Agent。
+  - **TODO 状态注入**：后端在每一轮组装 API Messages 时自动将当前看板状态注入，并检测是否连续 3 轮未更新 TODO 以自动追加提醒。
   - **上下文压缩与管理**：
-    - **日常护盾 (Always-On Shield)**：`buildApiMessages` 中自动拦截超过 4000 字符的工具输出（排除 `read_file`），掐头去尾替换为 `[OUTPUT OFFLOADED]`。
-    - **软清洗纪元 (Soft Compact Epoch)**：当 Token 超过 80% 水位线且多于 5 轮时，批量折叠旧的 thinking/write_file 入参/幂等工具返回，并插入 🌊 系统通知气泡告知用户。
+    - **日常护盾 (Always-On Shield)**：后端 `buildApiMessages` 中自动拦截超过 4000 字符的工具输出（排除 `read_file`），掐头去尾替换为 `[OUTPUT OFFLOADED]`。
+    - **软清洗纪元 (Soft Compact Epoch)**：当 Token 超过 80% 水位线且多于 5 轮时，后端执行批量折叠，并向前端发送 `messages_update` 更新快照，同时向前端插入 🌊 系统通知气泡。
     - **Token 计数器鲁棒化**：支持 `message_start` + `message_delta` 双事件监听，并引入基于 `(messages + systemPrompt + toolsSchema).length / 4` 的保底估算器，确保非 Anthropic 模型也能正确显示。
     - **压缩后平滑过渡**：压缩后不再粗暴清零，而是就地重新估算，避免断崖式归零误导用户。
 
@@ -32,8 +32,8 @@
 - **KV Cache 监控**：DeepSeek 默认开启上下文硬盘缓存，自动检测公共前缀并落盘。服务端透传 `cache_read_input_tokens` 字段，前端实时显示缓存命中率（`💾 XX% 命中`）。
 
 ### 2.4 后端工具系统 (Tool Layer)
-- **工具注册中心**：`server/tools/index.js` 统一管理，导出 `getToolSchemas()` 和 `executeTool()`。
-- **流式执行引擎 (Streaming Engine)**：工具执行接口 `/api/execute-tool` 使用 SSE 流式架构。
+- **工具注册中心**：`server/tools/ToolRegistry.js` 统一管理，提供 `getSchemas()` 动态 Schema 生成与 `execute()` 分发。废弃了原本不安全的直接执行高危命令的 `/api/execute-tool` 路由。
+- **流式执行引擎 (Streaming Engine)**：工具的实时日志（例如 `bash` 工具的流式 stdout/stderr 输出）由统一的控制流 SSE 通道中继分发（作为 `tool_exec_chunk` 事件输出），不需要前端额外请求独立的文件通道或端点。
 - **工具列表**：
 
 | 工具 | 文件 | 能力 |
@@ -42,10 +42,10 @@
 | `read_file` | `read_file.js` | 读取本地文件（容错 `path`/`filePath` 双参数名） |
 | `write_file` | `write_file.js` | 写入本地文件（容错 `path`/`filePath` 双参数名） |
 | `weather_report` | `weather_report.js` | 调用 Open-Meteo 真实天气 API |
-| `write_todos` | `write_todos.js` | TODO 任务列表管理（前端拦截更新） |
+| `write_todos` | `write_todos.js` | TODO 任务列表管理（后端系统级拦截并向前端同步更新） |
 | `web_search` | `web_search.js` | Tavily `/search` — 关键词搜索，返回 AI 摘要 + 结构化结果 |
 | `web_fetch` | `web_fetch.js` | Tavily `/extract` — 传入 URL，返回清洗后 Markdown 正文 |
-| `sub_agent` | `sub_agent.js` | 派发子代理任务（纯前端拦截，实现独立的上下文循环） |
+| `sub_agent` | `sub_agent.js` | 派发子代理任务（后端系统级拦截并实例化子 Executor 循环） |
 
 ### 2.5 网络代理支持
 - 使用 `undici` 的 `EnvHttpProxyAgent` + `setGlobalDispatcher` 全局适配。
@@ -81,3 +81,7 @@
 10. **工具参数容错增强**：修复 `read_file`/`write_file` 因大模型参数命名混淆（`path` vs `filePath`）导致的 `undefined` 崩溃，改用宽松 `params` 对象解析。
 11. **软清洗可视化通知**：压缩触发时在对话时间线插入 🌊 `system_alert` 系统气泡，告知用户发生了什么操作及具体压缩数量，显著提升系统可观测性。
 12. **Token 计数器鲁棒化**：修复非 Anthropic 模型 Token 计数显示 0 的问题，引入双事件监听 + 保底估算器；压缩后从粗暴清零改为就地重新估算，避免断崖式归零。
+13. **主控循环下沉后端**：完成了核心 ReAct 循环（最大 15 轮）、上下文软压缩以及 TODO 看板催促组装逻辑由前端浏览器层到后端 Node 服务的全面迁移，减少了前端的内存和计算负荷，并提供了统一的 SSE（Server-Sent Events）事件输出协议，完成了视图与核心逻辑的清晰剥离。
+14. **基于 ToolRegistry 的工具安全防线**：引入后端统一工具注册表，动态转换并导出兼容主流大模型的 JSON Schema 工具集，物理废除了不安全的直执行外部工具的 `/api/execute-tool` 端点，构建起第一道工具安全阻断线。
+15. **二级路由多智能体流式穿透**：子代理的调度现在完全在后端并发/递归独立执行。通过统一控制信道配合 `parentToolCallId` 的二级路由协议，将子代理内部的思考和工具执行流原汁原味地在中途透传给前端，实现了嵌套 UI 的完美复现与轻量化数据隔离。
+16. **严格模式 Immutable 状态更新与 tool_end 对齐**：修复了在 React 开发严格模式（StrictMode）下流式叠字输出的 Mutation 副作用，重构事件解析为纯不可变更新；并且增加了对 `tool_end` 结束事件的监听，保障在工具输入流结束时强行将完整的输入参数同步到前端，彻底解决了因流式 JSON 片段解析不完整而导致工具参数在 UI 呈现上卡在 `{}` 空对象的问题。

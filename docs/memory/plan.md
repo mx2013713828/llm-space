@@ -10,16 +10,16 @@
 ## 阶段一：并行工具执行 (Parallel Tool Execution) 🚀
 **目标**：打破 Agent 运行瓶颈，让多个并行的 Tool Call 实现真正的并发执行。
 **工作项**：
-- [x] 改造前端 `TrajectoryPage.jsx` 的 `runAgentLoop` 方法。
-- [x] 将目前的 `for...of` 串行等待网络请求 (`fetch`) 的逻辑，重构为基于 `Promise.all()` 的并发请求逻辑。
-- [x] 确保前端在并发结束后，按原始顺序统一将 `tool_result` 组装并发送给 LLM。
+- [x] 改造后端 `AgentExecutor.js` 的 ReAct 循环逻辑。
+- [x] 将目前在后端串行等待工具执行的逻辑，重构为基于 `Promise.all()` 的并发请求逻辑（当启用 `parallel_tool_execution` 时）。
+- [x] 确保后端在并发结束后，按原始顺序统一将 `tool_result` 组装并发送给 LLM。
 
 ## 阶段二：缓存对齐式上下文压缩 (Cache-Aligned Watermark Compression) 🛡️
 **目标**：解决长轮次任务导致大模型 Context Window 爆炸，并最大化保护 Prompt Cache 命中率。
 **工作项**：
-- [x] **Stage 1 (日常护盾)**：在前端 `buildApiMessages` 组装层拦截 `tool_result`，当单次长于 4000 字符时执行掐头去尾，替换为 `[OUTPUT OFFLOADED]`，保证历史记录严格 Append-Only，对缓存极度友好。
+- [x] **Stage 1 (日常护盾)**：在后端 `buildApiMessages` 组装层拦截 `tool_result`，当单次长于 4000 字符时执行掐头去尾，替换为 `[OUTPUT OFFLOADED]`，保证历史记录严格 Append-Only，对缓存极度友好。
 - [x] **Stage 2 (80% 水位线软清洗)**：在 UI 右上角添加动态 Memory Bar，精准绑定 API 每次返回的真实 `input_tokens`。
-- [x] **Stage 2 (批量重置纪元)**：当 Token 超出 160,000 (80%) 且多于 5 轮时，触发全量批处理（Batch Compact）：非对称掏空历史 `write_file` 的代码入参，折叠幂等的 `read_file` 返回结果和旧的 `<thinking>` 块，并永久性修改 UI 状态，开创新的 Cache 纪元。
+- [x] **Stage 2 (批量重置纪元)**：当 Token 超出 160,000 (80%) 且多于 5 轮时，在后端触发全量批处理（Batch Compact）：非对称掏空历史 `write_file` 的代码入参，折叠幂等的 `read_file` 返回结果和旧的 `<thinking>` 块，通过 `messages_update` 事件实时同步前端，开创新的 Cache 纪元。
 - [x] **Token 计数器鲁棒化**：修复非 Anthropic 模型（如豆包/Gemini）在流式传输中不返回 `input_tokens` 导致计数器显示 0 的问题。引入 `message_delta` 事件监听 + 基于 `(messages + systemPrompt + toolsSchema).length / 4` 的保底估算器。
 - [x] **压缩后计数器平滑过渡**：将压缩后的 `setContextTokens(0)` 粗暴清零，改为就地重新估算（`compressedEstimate`），避免断崖式归零误导用户。
 - [x] **软清洗可视化通知**：在压缩触发时，自动在对话轨迹中插入 🌊 系统提示气泡（`system_alert`），明确告知用户发生了什么操作以及压缩了多少处内容。
@@ -27,9 +27,9 @@
 ## 阶段三：动态 Nudge 与任务状态卫士 (Dynamic System Reminder) ⏰
 **目标**：解决大模型在执行多步复杂任务时，容易“遗忘”更新 Todos（`write_todos`）状态的问题。
 **工作项**：
-- [x] 在 `TrajectoryPage.jsx` 的事件循环中，检测 TODO 列表状态。
-- [x] 每轮自动将当前任务看板（`<current_tasks_status>`）注入消息序列末尾，与最后一条用户消息合并以保护 Cache。
-- [x] 当连续 3 轮未更新 TODO 时，自动追加 `<system_reminder>` 催促提醒。”
+- [x] 在后端 `AgentExecutor.js` 的循环中，检测 TODO 列表状态。
+- [x] 后端每轮自动将当前任务看板（`<current_tasks_status>`）注入消息序列末尾，与最后一条用户消息合并以保护 Cache。
+- [x] 当连续 3 轮未更新 TODO 时，后端自动追加 `<system_reminder>` 催促提醒。
 
 ## 阶段四：Prompt Cache 结构感知排版 (Cache Alignment) 💰
 **目标**：最大限度命中 Anthropic / DeepSeek 的 Prompt Cache 前缀缓存机制，大幅降低上下文携带的 Token 费用与首字延迟。
@@ -64,8 +64,8 @@
 **目标**：实现“大任务拆小，干净的上下文”理念，防止长期复杂任务导致主模型 Context Window 被底层日志污染。
 **工作项**：
 - [x] **工具定义**：增加 `sub_agent` 工具，禁止其递归调用自身。
-- [x] **前端子循环 (Sub-Loop)**：在 `TrajectoryPage.jsx` 拦截 `sub_agent` 调用，分配一个干净的 `messages=[]`，执行独立的 ReAct 循环。
-- [x] **嵌套 UI 渲染**：将子代理在后台产生的所有 `thinking`、`tool_use` 等详细过程存储在主调用的上下文里，并在主 Agent 的 `ToolCallCard` 中通过手风琴折叠面板可视化展现。
+- [x] **后端子循环 (Sub-Loop)**：在后端 `AgentExecutor.js` 拦截 `sub_agent` 调用，实例化独立的子 AgentExecutor 并执行独立的 ReAct 循环。
+- [x] **嵌套 UI 渲染**：将子代理在后端产生的所有事件流（如 `thinking`、`tool_use`）通过带有 `parentToolCallId` 的二级路由推送给前端，在前端主 Agent 的 `ToolCallCard` 中通过手风琴折叠面板可视化展现。
 - [x] **摘要返回 (Context Discard)**：子循环结束后，只将最终的文本答案作为 `tool_result` 返回给主 Agent，彻底隔离中间噪音。
 
 ## 阶段九：可观测性与调试工具 (Observability & Debugging) 🔍
