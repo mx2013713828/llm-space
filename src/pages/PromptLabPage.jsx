@@ -272,6 +272,23 @@ export function PromptLabPage({ harness, onSave }) {
                 </div>
               </label>
             </div>
+
+            <div className="card" style={{ padding: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={features.context_compaction !== false}
+                  onChange={e => setFeatures({ ...features, context_compaction: e.target.checked })}
+                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段二：上下文压缩与实时折叠 (Context Compaction)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    开启后，当上下文长度或回合数超过阈值时，底层 Harness 会将已结算的思维链 (thinking block) 替换为固定的占位符 `[Thinking folded]`，以保证前缀一致，友好兼容 Prompt Cache 并节省大量 Token 消耗。同时对旧历史中的冗余数据进行清洗折叠。关闭则保留完整思维链与数据上下文。
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 

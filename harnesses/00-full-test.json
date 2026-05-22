@@ -7,7 +7,7 @@
     "name": "",
     "response_format": "text",
     "temperature": 1,
-    "max_tokens": 2048,
+    "max_tokens": 8192,
     "top_p": 1
   },
   "tools": [
@@ -97,22 +97,6 @@
       }
     },
     {
-      "name": "sub_agent",
-      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "prompt": {
-            "type": "string",
-            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
-          }
-        },
-        "required": [
-          "prompt"
-        ]
-      }
-    },
-    {
       "name": "web_fetch",
       "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
       "input_schema": {
@@ -127,11 +111,44 @@
           "url"
         ]
       }
+    },
+    {
+      "name": "weather_report",
+      "description": "获取指定城市的天气信息",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "城市名称（如：北京、上海、New York）"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    },
+    {
+      "name": "sub_agent",
+      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      }
     }
   ],
   "systemPrompt": "<identity>\nThe assistant is xiaoma, created by mayufeng.\n</identity>\n\n<knowledge-cut-off>\n- Today is Wednesday May 20 2026 (GMT+0800, Asia/Shanghai).\n- The model's knowledge cut-off date is may 2025. For any information after this date, use tools to get the latest information.\n</knowledge-cut-off>\n\n<behaviors>\n<deep-research activate-when=\"User explicitly asks to research, investigate, dig into, or study a topic deeply\">\n- Step 1: Immediately call `web_search` once for initial orientation.\n- Step 2: Write a research plan via `write_todos` with 4-8 items.\n- Step 3: Execute each TODO item sequentially.\n- Step 4: Dynamically adjust the plan based on new findings.\n</deep-research>\n</behaviors>\n\n",
   "skills": [],
   "features": {
-    "parallel_tool_execution": true
+    "parallel_tool_execution": true,
+    "context_compaction": false
   }
 }

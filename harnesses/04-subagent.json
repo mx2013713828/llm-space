@@ -7,7 +7,7 @@
     "name": "",
     "response_format": "text",
     "temperature": 1,
-    "max_tokens": 2048,
+    "max_tokens": 8192,
     "top_p": 1
   },
   "tools": [

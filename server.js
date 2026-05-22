@@ -8,7 +8,8 @@ import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
-import { executeTool, getToolSchemas } from './server/tools/index.js';
+import { getToolSchemas } from './server/tools/index.js';
+import { AgentExecutor } from './server/agent/AgentExecutor.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -63,7 +64,7 @@ app.post('/api/chat', async (req, res) => {
     requestBody.tools = tools.map(t => ({
       name: t.name,
       description: t.description,
-      input_schema: {
+      input_schema: t.input_schema || {
         type: 'object',
         properties: Object.fromEntries(
           Object.entries(t.parameters || {}).map(([k, v]) => [k, { type: v.type || 'string', description: v.description || '' }])
@@ -125,7 +126,7 @@ app.post('/api/chat', async (req, res) => {
     if (!upstream.ok) {
       const errText = await upstream.text();
       let errMsg = `API 错误 ${upstream.status}`;
-      try { errMsg = JSON.parse(errText)?.error?.message || errMsg; } catch {}
+      try { errMsg = JSON.parse(errText)?.error?.message || errMsg; } catch { }
       return res.status(upstream.status).json({ error: errMsg });
     }
 
@@ -211,7 +212,7 @@ app.post('/api/chat', async (req, res) => {
               sendEvent(res, 'text_end', { text: textContent });
             } else if (currentBlockType === 'tool_use') {
               let toolInput = {};
-              try { toolInput = JSON.parse(toolInputRaw || '{}'); } catch {}
+              try { toolInput = JSON.parse(toolInputRaw || '{}'); } catch { }
               sendEvent(res, 'tool_end', { name: toolName, input: toolInput });
             }
             currentBlockType = null;
@@ -257,7 +258,7 @@ app.get('/api/harnesses', async (req, res) => {
     await fs.mkdir(HARNESS_DIR, { recursive: true });
     const files = await fs.readdir(HARNESS_DIR);
     const harnesses = [];
-    
+
     for (const file of files) {
       if (!file.endsWith('.json')) continue;
       const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
@@ -269,7 +270,7 @@ app.get('/api/harnesses', async (req, res) => {
           description: data.description,
           category: data.category || 'basic'
         });
-      } catch (e) {}
+      } catch (e) { }
     }
     res.json(harnesses.sort((a, b) => a.name.localeCompare(b.name)));
   } catch (err) {
@@ -318,7 +319,7 @@ app.post('/api/harnesses', async (req, res) => {
         name: '',
         response_format: 'text',
         temperature: 1,
-        max_tokens: 2048,
+        max_tokens: 4096,
         top_p: 1
       },
       tools: [],
@@ -359,7 +360,7 @@ app.delete('/api/harnesses/:id', async (req, res) => {
           await fs.unlink(path.join(HARNESS_DIR, file));
           return res.json({ success: true });
         }
-      } catch {}
+      } catch { }
     }
     res.status(404).json({ error: 'Harness not found' });
   } catch (err) {
@@ -378,7 +379,7 @@ app.post('/api/harnesses/:id/copy', async (req, res) => {
       try {
         const data = JSON.parse(content);
         if (data.id === req.params.id) { source = data; break; }
-      } catch {}
+      } catch { }
     }
     if (!source) return res.status(404).json({ error: 'Harness not found' });
 
@@ -402,10 +403,23 @@ app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
 });
 
-/** 工具执行端点 (支持 SSE 流式返回) */
-app.post('/api/execute-tool', async (req, res) => {
-  const { toolName, toolInput } = req.body;
-  if (!toolName) return res.status(400).json({ error: '缺少 toolName 参数' });
+/** Agent 运行端点 (单路 SSE 控制流) */
+app.post('/api/agent/run', async (req, res) => {
+  const {
+    messages,
+    todos,
+    systemPrompt,
+    tools,
+    features,
+    model,
+    temperature,
+    maxTokens,
+    thinkingEnabled
+  } = req.body;
+
+  if (!model?.key) {
+    return res.status(400).json({ error: '缺少 API Key' });
+  }
 
   // 设置 SSE 响应头
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -413,38 +427,27 @@ app.post('/api/execute-tool', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  try {
-    const finalResult = await executeTool(toolName, toolInput || {}, (chunk) => {
-      // 实时推送数据块
-      res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
-    });
-
-    let returnResult = finalResult;
-
-    // 机制 A：对于非幂等且返回大的工具 (bash, web_fetch)，执行完毕后立刻写盘并返回引用+预览
-    if ((toolName === 'bash' || toolName === 'web_fetch') && finalResult.length > 4000) {
-      try {
-        const offloadsDir = path.join(process.cwd(), '.offloads');
-        await fs.mkdir(offloadsDir, { recursive: true });
-        const filename = `${toolName}_${Date.now()}.log`;
-        const filePath = path.join(offloadsDir, filename);
-        await fs.writeFile(filePath, finalResult, 'utf-8');
-
-        const head = finalResult.slice(0, 1500);
-        const tail = finalResult.slice(-500);
-        const truncatedCount = finalResult.length - 2000;
-        returnResult = `[OUTPUT OFFLOADED to .offloads/${filename}]\n\n${head}\n\n...[截断了 ${truncatedCount} 字符，完整日志已保存至 .offloads/${filename}]...\n\n${tail}`;
-        console.log(`  💾 [Mechanism A] ${toolName} 输出已落盘至 .offloads/${filename}`);
-      } catch (writeErr) {
-        console.error(`  ⚠️ [Mechanism A] 落盘失败: ${writeErr.message}`);
-      }
+  const executor = new AgentExecutor({
+    messages,
+    todos,
+    systemPrompt,
+    tools,
+    features,
+    model,
+    temperature,
+    maxTokens,
+    thinkingEnabled,
+    onEvent: (type, data) => {
+      sendEvent(res, type, data);
     }
+  });
 
-    // 任务完成后发送结束标记和最终完整结果
-    res.write(`data: ${JSON.stringify({ type: 'done', output: returnResult })}\n\n`);
-    res.end();
+  try {
+    await executor.run();
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+    console.error('[server.js /api/agent/run] 运行异常:', err);
+    sendEvent(res, 'error', { message: err.message });
+  } finally {
     res.end();
   }
 });
@@ -462,8 +465,8 @@ app.get('/api/models', async (req, res) => {
       return res.json(JSON.parse(process.env.MODELS_CONFIG));
     }
     return res.json([]);
-  } catch(e) {
-    res.status(500).json({error: e.message});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -477,29 +480,29 @@ app.post('/api/models', async (req, res) => {
     const envPath = path.join(process.cwd(), '.env');
     let envStr = await fs.readFile(envPath, 'utf-8').catch(() => '');
     let models = [];
-    
+
     const match = envStr.match(/^MODELS_CONFIG=(.+)$/m);
     if (match) {
       models = JSON.parse(match[1]);
     }
-    
+
     // 如果没有 id，生成一个
     if (!newModel.id) newModel.id = Date.now().toString();
-    
+
     models.push(newModel);
     const updatedLine = `MODELS_CONFIG=${JSON.stringify(models)}`;
-    
+
     if (match) {
       envStr = envStr.replace(/^MODELS_CONFIG=.*$/m, updatedLine);
     } else {
       envStr += (envStr.endsWith('\n') ? '' : '\n') + updatedLine + '\n';
     }
-    
+
     await fs.writeFile(envPath, envStr, 'utf-8');
     process.env.MODELS_CONFIG = JSON.stringify(models);  // 同步更新内存
     res.json(models);
-  } catch(e) {
-    res.status(500).json({error: e.message});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

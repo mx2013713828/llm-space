@@ -1,14 +1,15 @@
 import { buildApiMessages } from '../lib/messageBuilder.js';
 
-export function ContextInspector({ messages, systemPrompt, tools, setShowContextInspector, thinkingEnabled }) {
-  const apiMessages = buildApiMessages(messages, thinkingEnabled);
+export function ContextInspector({ messages, systemPrompt, tools, setShowContextInspector, thinkingEnabled, compactionEnabled = true, currentTokens }) {
+  const apiMessages = buildApiMessages(messages, thinkingEnabled, compactionEnabled);
   const fullContext = {
     system: systemPrompt || '(无)',
     tools: (tools || []).map(t => ({ name: t.name, description: t.description?.slice(0, 80) + '...' })),
     messages: apiMessages,
   };
   const totalChars = JSON.stringify(fullContext).length;
-  const estimatedTokens = Math.round(totalChars / 4);
+  // 优先采用精准 API Token 统计或完整的估算值，而非经过极简后的 estimatedTokens
+  const displayTokens = currentTokens || Math.round(totalChars / 4);
 
   // 角色颜色映射
   const roleStyle = (role) => ({
@@ -37,7 +38,7 @@ export function ContextInspector({ messages, systemPrompt, tools, setShowContext
             <span style={{ fontSize: 18 }}>🔍</span>
             <span style={{ fontWeight: 700, fontSize: 15 }}>上下文检查器 (Context Inspector)</span>
             <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 4 }}>
-              {apiMessages.length} 条消息 · ~{estimatedTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
+              {apiMessages.length} 条消息 · ~{displayTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
             </span>
           </div>
           <button onClick={() => setShowContextInspector(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px', borderRadius: 4 }} onMouseOver={e => e.target.style.color = 'var(--text-primary)'} onMouseOut={e => e.target.style.color = 'var(--text-muted)'}>✕</button>

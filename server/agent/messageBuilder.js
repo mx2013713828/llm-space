@@ -1,9 +1,8 @@
 /**
- * messageBuilder.js — API 消息构建 + 上下文压缩纯函数
+ * messageBuilder.js — 后端 API 消息构建 + 上下文压缩纯函数
  *
- * 从 TrajectoryPage.jsx 提取的零副作用逻辑，
- * 负责将内部消息格式转换为 Anthropic API 消息格式，
- * 以及在 Token 超标时进行智能压缩。
+ * 同步自前端，负责将内部消息格式转换为 Anthropic API 消息格式，
+ * 以及在 Token 超标时进行智能压缩和 TODO 状态注入。
  */
 
 /**
@@ -11,6 +10,7 @@
  *
  * @param {Array} sourceMessages - 内部消息数组
  * @param {boolean} thinkingEnabled - 是否启用了思维链
+ * @param {boolean} compactionEnabled - 是否启用了上下文压缩
  * @returns {Array} 符合 Anthropic API 规范的消息数组
  */
 export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnabled = true) {
@@ -27,9 +27,7 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
   });
 
   // 2. 辅助函数：判断某条 thinking 消息所对应的 tool_call 是否还在等待结果
-  // 在同一个助理响应块中，thinking 紧随其后的 tool_calls，如果有任何一个在等待结果，就需要保留 thinking
   const shouldKeepThinking = (thinkingMsg, index) => {
-    // 往后寻找，直到遇到 user 消息或者非同一个 turn 的助理消息
     for (let i = index + 1; i < sourceMessages.length; i++) {
       const nextMsg = sourceMessages[i];
       if (nextMsg.turn !== thinkingMsg.turn) break;
@@ -44,7 +42,6 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
   for (let idx = 0; idx < sourceMessages.length; idx++) {
     const msg = sourceMessages[idx];
     if (msg.role === 'user') {
-      // Flush any pending assistant content and tool results first
       if (currentAssistantContent.length > 0) {
         apiMessages.push({ role: 'assistant', content: currentAssistantContent });
         currentAssistantContent = [];
@@ -54,11 +51,8 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
         currentToolResults = [];
       }
 
-      // Add the user message
       apiMessages.push({ role: 'user', content: [{ type: 'text', text: msg.content }] });
     } else if (msg.role === 'assistant') {
-      // 当我们遇到非工具调用的 assistant 块（如 text/thinking），且累积了上一阶段的工具结果时，
-      // 说明已经进入了 ReAct 循环的下一个 Step，必须立刻将上一步的 assistant 消息和对应的 user tool_result 消息发送出去（Flush）。
       if (msg.type !== 'tool_call' && currentToolResults.length > 0) {
         if (currentAssistantContent.length > 0) {
           apiMessages.push({ role: 'assistant', content: currentAssistantContent });
@@ -68,12 +62,10 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
         currentToolResults = [];
       }
 
-      // 添加到当前的助手消息块中
       if (msg.type === 'text') {
         currentAssistantContent.push({ type: 'text', text: msg.content });
       } else if (msg.type === 'thinking' && thinkingEnabled) {
         let thinkingContent = msg.content;
-        // 实时精准折叠：如果开启了压缩，且不是正在等待结果的工具周期内的 Thinking，立刻折叠为占位符
         if (compactionEnabled && !shouldKeepThinking(msg, idx)) {
           thinkingContent = '[Thinking folded]';
         }
@@ -83,7 +75,6 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
       } else if (msg.type === 'tool_call') {
         currentAssistantContent.push({ type: 'tool_use', id: msg.id, name: msg.toolName, input: msg.toolInput });
         if (msg.toolOutput != null) {
-          // 阶段一：日常防护盾 (Always-On Shield) - 拦截超大文本（排除 read_file，确保当前轮次能读到完整源码）
           let outStr = String(msg.toolOutput);
           if (msg.toolName !== 'read_file' && outStr.length > 4000) {
             const head = outStr.slice(0, 1500);
@@ -101,7 +92,6 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
     }
   }
 
-  // Flush 结尾残留的所有内容
   if (currentAssistantContent.length > 0) {
     apiMessages.push({ role: 'assistant', content: currentAssistantContent });
   }
@@ -109,7 +99,6 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
     apiMessages.push({ role: 'user', content: currentToolResults });
   }
 
-  // 合并相邻 of 同角色消息（双重兜底防护）
   const collapsedMsgs = [];
   apiMessages.forEach(msg => {
     let last = collapsedMsgs[collapsedMsgs.length - 1];
@@ -153,15 +142,14 @@ export function estimateTokens(messages, thinkingEnabled, systemPrompt, tools, c
  * @param {string} systemPrompt - System Prompt
  * @param {Array} tools - 工具配置
  * @param {boolean} thinkingEnabled - 是否启用思维链
+ * @param {boolean} compactionEnabled - 是否启用压缩
  * @returns {{ messages: Array, compactedCount: number, estimatedTokens: number|null }}
  */
 export function compactMessages(messages, turnIndex, currentTokens, systemPrompt, tools, thinkingEnabled, compactionEnabled = true) {
-  // 如果未启用压缩，直接返回
   if (!compactionEnabled) {
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
 
-  // 触发条件：Token 超过 160000 且至少聊了 5 轮以上
   if (currentTokens <= 160000 || turnIndex <= 5) {
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
@@ -169,7 +157,6 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
   console.log("🌊 触发 Soft Compact Epoch，开始压缩历史...");
   let compactedCount = 0;
   let compactedMessages = messages.map(msg => {
-    // 只处理距离当前 > 5 轮的老消息
     if (turnIndex - (msg.turn || 1) <= 5) return msg;
 
     const newMsg = { ...msg };
@@ -182,7 +169,6 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         newMsg.toolInputRaw = JSON.stringify(newMsg.toolInput);
         compactedCount++;
       } else if (['ls', 'grep', 'web_search', 'web_fetch'].includes(newMsg.toolName) && newMsg.toolOutput && newMsg.toolOutput.length > 2000) {
-        // 机制 B：对旧的 ls/grep/web_search/web_fetch 输出，越过阈值（2000）则截断折叠
         const head = newMsg.toolOutput.slice(0, 1000);
         newMsg.toolOutput = `${head}\n\n...[已折叠旧的工具输出结果]...`;
         compactedCount++;
@@ -194,7 +180,6 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
   let estimatedTokens = null;
 
   if (compactedCount > 0) {
-    // 向消息历史中追加一条 system_alert，以提供可视化的清洗通知
     compactedMessages = [
       ...compactedMessages,
       {
@@ -204,7 +189,6 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         content: `触发上下文软清洗 (Soft Compact Epoch)：成功对 ${compactedCount} 处历史冗余数据进行了折叠或重写，从而释放 Context 空间，最大化保护 Prompt Cache。`
       }
     ];
-    // 就地重新估算压缩后的 Token 数
     estimatedTokens = Math.round((
       JSON.stringify(buildApiMessages(compactedMessages, thinkingEnabled, compactionEnabled)).length +
       (systemPrompt || '').length +
@@ -221,12 +205,11 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
  * @param {Array} apiMessages - buildApiMessages 的输出
  * @param {Array} todos - TODO 列表
  * @param {number} roundsSinceTodo - 距离上次更新 TODO 的轮数
- * @returns {Array} 注入后的消息数组（不修改原数组）
+ * @returns {Array} 注入后的消息数组
  */
 export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
   const result = apiMessages.map(msg => ({ ...msg, content: [...msg.content] }));
 
-  // 看板注入 (State Injection)
   if (todos && todos.length > 0) {
     const todoSummary = todos.map(t => {
       const marker = { pending: '[ ]', in_progress: '[>]', completed: '[x]', failed: '[!]' }[t.status] || '[ ]';
@@ -246,7 +229,6 @@ export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
     }
   }
 
-  // 催促机制 (Nag Mechanism)
   if (roundsSinceTodo >= 3 && todos && todos.length > 0) {
     const nagBlock = {
       type: 'text',

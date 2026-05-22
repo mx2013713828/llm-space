@@ -7,7 +7,7 @@
     "name": "Doubao Seed 2.0 Code",
     "response_format": "text",
     "temperature": 1,
-    "max_tokens": 2048,
+    "max_tokens": 4096,
     "top_p": 1
   },
   "tools": [

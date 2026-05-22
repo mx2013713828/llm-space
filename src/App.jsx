@@ -160,9 +160,6 @@ export default function App() {
 
         {/* 右侧信息 */}
         <div className="topbar-right">
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            {harness?.model?.name || '加载中...'}
-          </span>
           <div style={{
             width: 8, height: 8, borderRadius: '50%',
             background: 'var(--green)',
@@ -314,6 +311,9 @@ export default function App() {
                   ...prev,
                   [activeHarnessId]: null
                 }));
+              }}
+              onHarnessUpdate={(updatedHarness) => {
+                setHarness(updatedHarness);
               }}
             />
           )}
