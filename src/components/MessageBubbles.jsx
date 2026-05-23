@@ -152,44 +152,29 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
  * 用户消息气泡
  */
 export function UserMessage({ content, onRetry }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
-    <div 
-      className="message-bubble msg-user animate-fade-in"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ position: 'relative' }}
-    >
-      <div className="msg-user-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>👤</span>
-          <span>User</span>
+    <div className="msg-user-container">
+      {onRetry && (
+        <button 
+          className="btn-rewind" 
+          onClick={onRetry} 
+          title="回滚到本轮对话之前重新开始"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          REWIND
+        </button>
+      )}
+      <div className="message-bubble msg-user animate-fade-in">
+        <div className="msg-user-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>👤</span>
+            <span>User</span>
+          </div>
         </div>
-        {onRetry && (
-          <button
-            onClick={onRetry}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--purple)',
-              cursor: 'pointer',
-              fontSize: '11px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 6px',
-              borderRadius: 4,
-              opacity: hovered ? 1 : 0.6,
-              transition: 'opacity 0.2s',
-            }}
-            title="撤销本轮及之后对话，并重新填入输入框"
-          >
-            ⟲ 重试此轮
-          </button>
-        )}
+        <div style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>{content}</div>
       </div>
-      <div style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>{content}</div>
     </div>
   );
 }

@@ -974,3 +974,52 @@
   100% { background-position: 0% 50%; }
 }
 
+/* REWIND 胶囊按钮 */
+.msg-user-container {
+  position: relative;
+}
+
+.btn-rewind {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+}
+
+.msg-user-container:hover .btn-rewind {
+  opacity: 0.85;
+}
+
+.btn-rewind:hover {
+  opacity: 1 !important;
+  color: #f3e8ff;
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.45), inset 0 0 4px rgba(168, 85, 247, 0.2);
+}
+
+.btn-rewind svg {
+  transition: transform 0.2s ease;
+}
+
+.btn-rewind:hover svg {
+  transform: rotate(-180deg);
+}
+
+
