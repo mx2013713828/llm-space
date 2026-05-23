@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import './index.css';
 import './App.css';
 import { TrajectoryPage } from './pages/TrajectoryPage';
@@ -29,13 +30,31 @@ const TABS = [
   },
 ];
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('trajectory');
-  const [activeHarnessId, setActiveHarnessId] = useState('');
+function AppContent() {
+  const { harnessId, tab } = useParams();
+  const navigate = useNavigate();
+
+  const activeTab = tab || 'trajectory';
+  const activeHarnessId = harnessId || '';
 
   const [harnessFiles, setHarnessFiles] = useState([]);
   const [harness, setHarness] = useState(null);
   const [sessions, setSessions] = useState({});
+
+  const syncTimeoutRef = useRef(null);
+
+  const saveSessionToBackend = (harnessId, messages, todos) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    syncTimeoutRef.current = setTimeout(() => {
+      fetch(`http://localhost:3001/api/sessions/${harnessId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, todos })
+      }).catch(err => console.error("同步 Session 失败:", err));
+    }, 1000);
+  };
 
   // 新建 Harness 表单状态
   const [showNewForm, setShowNewForm] = useState(false);
@@ -72,7 +91,7 @@ export default function App() {
         return;
       }
       await loadHarnessList();
-      setActiveHarnessId(data.harness.id);
+      navigate(`/${data.harness.id}/${activeTab}`);
       setNewName('');
       setNewDesc('');
       setShowNewForm(false);
@@ -88,8 +107,12 @@ export default function App() {
       if (!res.ok) { alert('删除失败'); return; }
       await loadHarnessList();
       if (activeHarnessId === id) {
-        setActiveHarnessId('');
-        setHarness(null);
+        if (harnessFiles.length > 1) {
+          const nextHarness = harnessFiles.find(f => f.id !== id);
+          navigate(`/${nextHarness.id}/${activeTab}`);
+        } else {
+          navigate('/');
+        }
       }
     } catch (err) { alert('网络错误: ' + err.message); }
   };
@@ -100,7 +123,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) { alert(data.error || '复制失败'); return; }
       await loadHarnessList();
-      setActiveHarnessId(data.harness.id);
+      navigate(`/${data.harness.id}/${activeTab}`);
     } catch (err) { alert('网络错误: ' + err.message); }
     setCtxMenu(null);
   };
@@ -111,22 +134,53 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         setHarnessFiles(data);
-        if (data.length > 0 && !activeHarnessId) {
-          setActiveHarnessId(data[0].id);
-        }
       })
       .catch(err => console.error("加载文件列表失败:", err));
   }, []);
 
-  // 加载特定文件
+  // 当列表加载完毕且 URL 中缺失 harnessId 时，自动重定向到第一个有效 Harness
+  useEffect(() => {
+    if (harnessFiles.length > 0 && !harnessId) {
+      navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
+    }
+  }, [harnessFiles, harnessId, activeTab, navigate]);
+
+  // 加载特定文件及常驻 Session
   useEffect(() => {
     if (!activeHarnessId) return;
     setHarness(null); // Clear harness first to avoid stale state initialization in child components
-    fetch(`http://localhost:3001/api/harnesses/${activeHarnessId}`)
-      .then(res => res.json())
-      .then(data => setHarness(data))
-      .catch(err => console.error("加载 Harness 详情失败:", err));
-  }, [activeHarnessId]);
+    
+    Promise.all([
+      fetch(`http://localhost:3001/api/harnesses/${activeHarnessId}`).then(res => {
+        if (!res.ok) throw new Error('Harness not found');
+        return res.json();
+      }),
+      fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`).then(res => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+    ])
+    .then(([harnessData, sessionData]) => {
+      setHarness(harnessData);
+      if (sessionData) {
+        setSessions(prev => ({
+          ...prev,
+          [activeHarnessId]: sessionData
+        }));
+      } else {
+        setSessions(prev => ({
+          ...prev,
+          [activeHarnessId]: null
+        }));
+      }
+    })
+    .catch(err => {
+      console.error("加载 Harness 详情或 Session 失败:", err);
+      if (harnessFiles.length > 0) {
+        navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
+      }
+    });
+  }, [activeHarnessId, harnessFiles, activeTab, navigate]);
 
   const currentSession = sessions[activeHarnessId] || null;
 
@@ -149,7 +203,7 @@ export default function App() {
             <button
               key={tab.key}
               className={`topbar-tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => navigate(`/${activeHarnessId}/${tab.key}`)}
               id={`tab-${tab.key}`}
             >
               {tab.icon}
@@ -199,7 +253,7 @@ export default function App() {
                 key={file.id}
                 id={`harness-${file.id}`}
                 className={`sidebar-item ${activeHarnessId === file.id ? 'active' : ''}`}
-                onClick={() => setActiveHarnessId(file.id)}
+                onClick={() => navigate(`/${file.id}/${activeTab}`)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setCtxMenu({ x: e.clientX, y: e.clientY, harnessId: file.id });
@@ -305,12 +359,19 @@ export default function App() {
                   ...prev,
                   [activeHarnessId]: { messages, todos }
                 }));
+                saveSessionToBackend(activeHarnessId, messages, todos);
               }}
               onSessionReset={() => {
                 setSessions(prev => ({
                   ...prev,
                   [activeHarnessId]: null
                 }));
+                if (syncTimeoutRef.current) {
+                  clearTimeout(syncTimeoutRef.current);
+                }
+                fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`, {
+                  method: 'DELETE'
+                }).catch(err => console.error("清空后端 Session 失败:", err));
               }}
               onHarnessUpdate={(updatedHarness) => {
                 setHarness(updatedHarness);
@@ -371,5 +432,13 @@ export default function App() {
         </>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/:harnessId?/:tab?" element={<AppContent />} />
+    </Routes>
   );
 }

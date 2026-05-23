@@ -251,6 +251,12 @@ app.post('/api/chat', async (req, res) => {
 });
 
 const HARNESS_DIR = path.join(process.cwd(), 'harnesses');
+const SESSIONS_DIR = path.join(process.cwd(), 'server', 'sessions');
+
+// 自动检测并创建 sessions 目录
+fs.mkdir(SESSIONS_DIR, { recursive: true }).catch(err => {
+  console.error('[server.js] 自动创建 sessions 目录失败:', err);
+});
 
 /** 获取所有 Harness 文件列表 */
 app.get('/api/harnesses', async (req, res) => {
@@ -358,6 +364,9 @@ app.delete('/api/harnesses/:id', async (req, res) => {
         const data = JSON.parse(content);
         if (data.id === req.params.id) {
           await fs.unlink(path.join(HARNESS_DIR, file));
+          // 联动删除对应 session 磁盘文件
+          const sessionPath = path.join(SESSIONS_DIR, `${req.params.id}.json`);
+          await fs.unlink(sessionPath).catch(() => {});
           return res.json({ success: true });
         }
       } catch { }
@@ -503,6 +512,55 @@ app.post('/api/models', async (req, res) => {
     res.json(models);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+/** GET /api/sessions/:harnessId - 加载会话记录 */
+app.get('/api/sessions/:harnessId', async (req, res) => {
+  try {
+    const harnessId = req.params.harnessId;
+    if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+      return res.status(400).json({ error: '非法的 Harness ID' });
+    }
+    const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
+    const content = await fs.readFile(sessionPath, 'utf-8');
+    res.json(JSON.parse(content));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.json(null); // 不存在则返回 null
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** POST /api/sessions/:harnessId - 保存/同步会话记录 */
+app.post('/api/sessions/:harnessId', async (req, res) => {
+  try {
+    const harnessId = req.params.harnessId;
+    if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+      return res.status(400).json({ error: '非法的 Harness ID' });
+    }
+    const { messages, todos } = req.body;
+    const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
+    await fs.writeFile(sessionPath, JSON.stringify({ messages: messages || [], todos: todos || [] }, null, 2), 'utf-8');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** DELETE /api/sessions/:harnessId - 删除/重置会话记录 */
+app.delete('/api/sessions/:harnessId', async (req, res) => {
+  try {
+    const harnessId = req.params.harnessId;
+    if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+      return res.status(400).json({ error: '非法的 Harness ID' });
+    }
+    const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
+    await fs.unlink(sessionPath).catch(() => {}); // 允许文件不存在
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
