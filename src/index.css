@@ -25,6 +25,7 @@
   --red-dim: rgba(239, 68, 68, 0.12);
   --cyan: #06b6d4;
   --orange: #f97316;
+  --blue-laser: #3b82f6;
 
   /* 文字色 */
   --text-primary: #e8edf5;
@@ -105,7 +106,7 @@ body {
 .btn-ghost {
   background: rgba(255, 255, 255, 0.02);
   color: #a5b7d6;
-  border: 1px solid #263654;
+  border: 1px solid var(--border-light);
 }
 .btn-ghost:hover {
   background: var(--bg-elevated);
@@ -184,7 +185,7 @@ body {
   width: 100%;
 }
 .input:focus, .textarea:focus {
-  border-color: #3b82f6;
+  border-color: var(--blue-laser);
   box-shadow: 0 0 14px rgba(59, 130, 246, 0.25);
 }
 .textarea { resize: vertical; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; min-height: 80px; }

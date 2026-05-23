@@ -22,6 +22,19 @@ export function TrajectoryView({
   handleRetryTurn,
   loopCount
 }) {
+  const maxTokens = 200000;
+  const tokenPercent = Math.min(100, (currentTokens / maxTokens) * 100);
+  let tokenColorClass = "token-info-current-normal";
+  let progressFillClass = "progress-fill-glow";
+
+  if (tokenPercent >= 95) {
+    tokenColorClass = "token-info-current-danger";
+    progressFillClass = "progress-fill-danger";
+  } else if (tokenPercent >= 80) {
+    tokenColorClass = "token-info-current-warning";
+    progressFillClass = "progress-fill-warning";
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%' }}>
       {/* 右侧 Tab 栏 */}
@@ -40,17 +53,6 @@ export function TrajectoryView({
           >{tab.label}</button>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 120 }} title={`当前 Context 占用: ${currentTokens} tokens`}>
-            <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                background: currentTokens > 160000 ? 'var(--red)' : currentTokens > 140000 ? 'var(--orange)' : 'var(--blue)',
-                width: `${Math.min(100, (currentTokens / 200000) * 100)}%`,
-                transition: 'width 0.3s'
-              }} />
-            </div>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{Math.round(currentTokens / 1000)}k/200k</span>
-          </div>
           {(cacheStats.hitTokens + cacheStats.missTokens) > 0 && (
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
               title={`缓存命中: ${cacheStats.hitTokens} tokens | 未命中: ${cacheStats.missTokens} tokens`}>
@@ -73,64 +75,81 @@ export function TrajectoryView({
       </div>
 
       {/* 消息列表内容 */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }} ref={scrollContainerRef}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {activeRightTab === 'trajectory' && (
-          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {messages.length === 0 && (
-              <div className="empty-state">
-                <div className="empty-state-icon">💬</div>
-                <div className="empty-state-title">Harness 已就绪</div>
-                <div className="empty-state-desc">在左侧选择一个模型，在下方输入消息即可开启真实对话。支持思维链与工具调用。</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }} ref={scrollContainerRef}>
+              {messages.length === 0 && (
+                <div className="empty-state">
+                  <div className="empty-state-icon">💬</div>
+                  <div className="empty-state-title">Harness 已就绪</div>
+                  <div className="empty-state-desc">在左侧选择一个模型，在下方输入消息即可开启真实对话。支持思维链与工具调用。</div>
+                </div>
+              )}
+              {Object.entries(turns).map(([turn, msgs]) => (
+                <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="turn-divider"><span className="turn-label">🔄 Loop 第 {turn} 轮</span></div>
+                  {msgs.map((msg, idx) => {
+                    if (msg.role === 'user') return (
+                      <UserMessage 
+                        key={idx} 
+                        content={msg.content} 
+                        onRetry={isRunning ? null : () => handleRetryTurn(parseInt(turn, 10), msg.content)} 
+                      />
+                    );
+                    if (msg.type === 'system_alert') return (
+                      <div key={idx} className="system-alert-bubble" style={{
+                        margin: '8px 0',
+                        padding: '10px 14px',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        border: '1px dashed var(--blue)',
+                        borderRadius: 6,
+                        color: 'var(--blue)',
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        boxSizing: 'border-box'
+                      }}>
+                        <span style={{ fontSize: 16 }}>🌊</span>
+                        <div style={{ lineHeight: 1.4 }}>{msg.content}</div>
+                      </div>
+                    );
+                    if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
+                    if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                    return null;
+                  })}
+                </div>
+              ))}
+              {isRunning && (
+                <div className="running-indicator animate-fade-in" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>
+                  <div className="running-dots"><div className="loading-dot" /><div className="loading-dot" /><div className="loading-dot" /></div>
+                  正在处理中...
+                </div>
+              )}
+              <div ref={chatEndRef} style={{ height: 10 }} />
+            </div>
+            {/* 底部 Token 页脚 */}
+            <div className="token-dashboard">
+              <div className="token-info-text">
+                Tokens: <span className={tokenColorClass}>{currentTokens.toLocaleString()}</span> / {maxTokens.toLocaleString()}
               </div>
-            )}
-            {Object.entries(turns).map(([turn, msgs]) => (
-              <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div className="turn-divider"><span className="turn-label">🔄 Loop 第 {turn} 轮</span></div>
-                {msgs.map((msg, idx) => {
-                  if (msg.role === 'user') return (
-                    <UserMessage 
-                      key={idx} 
-                      content={msg.content} 
-                      onRetry={isRunning ? null : () => handleRetryTurn(parseInt(turn, 10), msg.content)} 
-                    />
-                  );
-                  if (msg.type === 'system_alert') return (
-                    <div key={idx} className="system-alert-bubble" style={{
-                      margin: '8px 0',
-                      padding: '10px 14px',
-                      background: 'rgba(59, 130, 246, 0.08)',
-                      border: '1px dashed var(--blue)',
-                      borderRadius: 6,
-                      color: 'var(--blue)',
-                      fontSize: 12,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      boxSizing: 'border-box'
-                    }}>
-                      <span style={{ fontSize: 16 }}>🌊</span>
-                      <div style={{ lineHeight: 1.4 }}>{msg.content}</div>
-                    </div>
-                  );
-                  if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
-                  if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
-                  return null;
-                })}
+              <div className="progress-bar-wide">
+                <div 
+                  className={progressFillClass} 
+                  style={{ width: `${tokenPercent}%` }}
+                />
               </div>
-            ))}
-            {isRunning && (
-              <div className="running-indicator animate-fade-in" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>
-                <div className="running-dots"><div className="loading-dot" /><div className="loading-dot" /><div className="loading-dot" /></div>
-                正在处理中...
+              <div className="token-info-text" style={{ width: '40px', textAlign: 'right' }}>
+                {tokenPercent.toFixed(1)}%
               </div>
-            )}
-            <div ref={chatEndRef} style={{ height: 10 }} />
+            </div>
           </div>
         )}
 
         {activeRightTab === 'todos' && (
-          <div style={{ padding: 20 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
             <TodoList todos={todos} />
           </div>
         )}
