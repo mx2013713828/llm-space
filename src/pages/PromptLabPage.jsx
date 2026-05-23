@@ -14,10 +14,18 @@ export function PromptLabPage({ harness, onSave }) {
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
 
   useEffect(() => {
+    let active = true;
     fetch('http://localhost:3001/api/tools')
       .then(r => r.json())
-      .then(setAvailableTools)
+      .then(data => {
+        if (active) {
+          setAvailableTools(data);
+        }
+      })
       .catch(console.error);
+    return () => {
+      active = false;
+    };
   }, []);
 
   const AVAILABLE_SKILLS = [

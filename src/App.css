@@ -1041,11 +1041,6 @@
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes bounce-in {
-  0% { transform: scale(0.85); opacity: 0; }
-  60% { transform: scale(1.05); opacity: 1; }
-  100% { transform: scale(1); }
-}
 
 
 
