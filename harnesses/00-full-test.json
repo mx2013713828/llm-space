@@ -28,22 +28,6 @@
       }
     },
     {
-      "name": "read_file",
-      "description": "Read the contents of a file from the local filesystem.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "Absolute or relative path to the file"
-          }
-        },
-        "required": [
-          "path"
-        ]
-      }
-    },
-    {
       "name": "write_file",
       "description": "Write or overwrite contents into a file on the local filesystem.",
       "input_schema": {
@@ -65,22 +49,6 @@
       }
     },
     {
-      "name": "web_search",
-      "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search keyword or question (concise natural language is recommended)"
-          }
-        },
-        "required": [
-          "query"
-        ]
-      }
-    },
-    {
       "name": "write_todos",
       "description": "Update the TODO task list in the frontend panel. Use this when creating or updating a multi-step task plan. Every update should contain the complete state of all tasks.",
       "input_schema": {
@@ -97,18 +65,18 @@
       }
     },
     {
-      "name": "web_fetch",
-      "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
+      "name": "read_file",
+      "description": "Read the contents of a file from the local filesystem.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "url": {
+          "path": {
             "type": "string",
-            "description": "The full URL of the web page to fetch (e.g., https://example.com/article)"
+            "description": "Absolute or relative path to the file"
           }
         },
         "required": [
-          "url"
+          "path"
         ]
       }
     },
@@ -129,6 +97,22 @@
       }
     },
     {
+      "name": "web_fetch",
+      "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The full URL of the web page to fetch (e.g., https://example.com/article)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
       "name": "sub_agent",
       "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
       "input_schema": {
@@ -141,6 +125,22 @@
         },
         "required": [
           "prompt"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search keyword or question (concise natural language is recommended)"
+          }
+        },
+        "required": [
+          "query"
         ]
       }
     }
