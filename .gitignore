@@ -31,3 +31,4 @@ dist-ssr
 *.png
 __pycache__/
 *.cpython-310.pyc
+server/sessions/*

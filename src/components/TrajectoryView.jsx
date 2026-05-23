@@ -19,6 +19,7 @@ export function TrajectoryView({
   scrollContainerRef,
   setShowContextInspector,
   handleResetSession,
+  handleRetryTurn,
   loopCount
 }) {
   return (
@@ -86,7 +87,13 @@ export function TrajectoryView({
               <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div className="turn-divider"><span className="turn-label">🔄 Loop 第 {turn} 轮</span></div>
                 {msgs.map((msg, idx) => {
-                  if (msg.role === 'user') return <UserMessage key={idx} content={msg.content} />;
+                  if (msg.role === 'user') return (
+                    <UserMessage 
+                      key={idx} 
+                      content={msg.content} 
+                      onRetry={isRunning ? null : () => handleRetryTurn(parseInt(turn, 10), msg.content)} 
+                    />
+                  );
                   if (msg.type === 'system_alert') return (
                     <div key={idx} className="system-alert-bubble" style={{
                       margin: '8px 0',

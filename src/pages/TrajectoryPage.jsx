@@ -145,6 +145,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         scrollContainerRef={scrollContainerRef}
         setShowContextInspector={setShowContextInspector}
         handleResetSession={agentState.handleResetSession}
+        handleRetryTurn={agentState.handleRetryTurn}
         loopCount={agentState.loopCount}
       />
 

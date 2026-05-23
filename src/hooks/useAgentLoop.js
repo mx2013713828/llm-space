@@ -373,6 +373,23 @@ export function useAgentLoop({
     }
   };
 
+  /** 回滚并重试指定轮次 */
+  const handleRetryTurn = (turnNum, originalText) => {
+    if (isRunning) return; // 运行中禁止回滚
+    if (window.confirm(`确定要回滚到第 ${turnNum} 轮对话吗？此轮及之后的消息历史将被永久擦除。`)) {
+      // 1. 剪枝消息：只保留 turn 小于 turnNum 的消息
+      setMessages(prev => prev.filter(m => (m.turn || 1) < turnNum));
+      // 2. 将原文本重新填入输入框
+      setInputText(originalText);
+      // 3. 聚焦输入框
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
+      }, 50);
+    }
+  };
+
   return {
     // 消息和状态
     messages,
@@ -396,5 +413,6 @@ export function useAgentLoop({
 
     // Session 管理
     handleResetSession,
+    handleRetryTurn,
   };
 }

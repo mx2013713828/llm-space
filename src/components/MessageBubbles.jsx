@@ -151,12 +151,43 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
 /**
  * 用户消息气泡
  */
-export function UserMessage({ content }) {
+export function UserMessage({ content, onRetry }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <div className="message-bubble msg-user animate-fade-in">
-      <div className="msg-user-header">
-        <span>👤</span>
-        <span>User</span>
+    <div 
+      className="message-bubble msg-user animate-fade-in"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: 'relative' }}
+    >
+      <div className="msg-user-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>👤</span>
+          <span>User</span>
+        </div>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--purple)',
+              cursor: 'pointer',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 6px',
+              borderRadius: 4,
+              opacity: hovered ? 1 : 0.6,
+              transition: 'opacity 0.2s',
+            }}
+            title="撤销本轮及之后对话，并重新填入输入框"
+          >
+            ⟲ 重试此轮
+          </button>
+        )}
       </div>
       <div style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>{content}</div>
     </div>
