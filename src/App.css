@@ -106,15 +106,17 @@
   padding: 2px 5px;
   font-size: 12px;
   border-radius: 4px;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #263654;
   cursor: pointer;
-  color: var(--text-muted);
+  color: #a5b7d6;
   transition: all var(--duration-fast);
 }
 .icon-btn:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
+  border-color: var(--blue);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
 /* 侧边栏项删除按钮（hover 显示） */
@@ -298,7 +300,10 @@
   outline: none;
   transition: border-color var(--duration-fast);
 }
-.prompt-editor:focus { border-color: var(--blue); }
+.prompt-editor:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.25);
+}
 .prompt-stats {
   display: flex;
   gap: 12px;

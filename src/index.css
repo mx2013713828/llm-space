@@ -1,5 +1,5 @@
 /* ===== Google Fonts ===== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ===== CSS 变量设计系统 ===== */
 :root {
@@ -33,7 +33,7 @@
   --text-code: #7dd3fc;
 
   /* 字体 */
-  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   /* 动画 */
@@ -63,7 +63,7 @@ html { font-size: 14px; -webkit-font-smoothing: antialiased; }
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg-base);
+  background: radial-gradient(circle at 50% 50%, #0c0f20 0%, #050811 100%);
   color: var(--text-primary);
   min-height: 100vh;
   overflow: hidden;
@@ -103,14 +103,15 @@ body {
 }
 
 .btn-ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: #a5b7d6;
+  border: 1px solid #263654;
 }
 .btn-ghost:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
-  border-color: var(--border-light);
+  border-color: var(--blue);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
 .btn-danger {
@@ -182,7 +183,10 @@ body {
   transition: border-color var(--duration-fast) var(--ease-smooth);
   width: 100%;
 }
-.input:focus, .textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(79,142,247,0.12); }
+.input:focus, .textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.25);
+}
 .textarea { resize: vertical; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; min-height: 80px; }
 
 /* ===== 分隔线 ===== */
