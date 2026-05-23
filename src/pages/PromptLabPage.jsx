@@ -61,6 +61,16 @@ export function PromptLabPage({ harness, onSave }) {
     });
   };
 
+  useEffect(() => {
+    let timer;
+    if (saveStatus === 'saved') {
+      timer = setTimeout(() => {
+        setSaveStatus('idle');
+      }, 1500);
+    }
+    return () => clearTimeout(timer);
+  }, [saveStatus]);
+
   const handleSave = async () => {
     setSaveStatus('saving');
     try {
@@ -74,9 +84,6 @@ export function PromptLabPage({ harness, onSave }) {
         });
       }
       setSaveStatus('saved');
-      setTimeout(() => {
-        setSaveStatus('idle');
-      }, 1500);
     } catch (err) {
       console.error(err);
       setSaveStatus('idle');
