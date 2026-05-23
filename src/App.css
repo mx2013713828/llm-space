@@ -1022,4 +1022,30 @@
   transform: rotate(-180deg);
 }
 
+/* 保存状态机过渡 */
+.btn-save-saving {
+  background: var(--bg-elevated) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border) !important;
+  cursor: not-allowed !important;
+}
+
+.btn-save-saved {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4) !important;
+  animation: bounce-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.animate-spin-fast {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+
 

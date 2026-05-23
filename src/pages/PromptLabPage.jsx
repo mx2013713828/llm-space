@@ -11,6 +11,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [availableTools, setAvailableTools] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [features, setFeatures] = useState(harness.features || {});
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
 
   useEffect(() => {
     fetch('http://localhost:3001/api/tools')
@@ -60,6 +61,63 @@ export function PromptLabPage({ harness, onSave }) {
     });
   };
 
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      if (onSave) {
+        await onSave({
+          ...harness,
+          systemPrompt: systemPrompt,
+          skills: selectedSkills,
+          tools: selectedTools,
+          features: features
+        });
+      }
+      setSaveStatus('saved');
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      setSaveStatus('idle');
+    }
+  };
+
+  let btnClass = "btn btn-primary";
+  let btnText = `保存至 ${harness.name}`;
+  let btnIcon = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+  );
+
+  if (saveStatus === 'saving') {
+    btnClass = "btn btn-save-saving";
+    btnText = "正在保存...";
+    btnIcon = (
+      <svg className="animate-spin-fast" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <line x1="12" y1="2" x2="12" y2="6"/>
+        <line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+        <line x1="2" y1="12" x2="6" y2="12"/>
+        <line x1="18" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+      </svg>
+    );
+  } else if (saveStatus === 'saved') {
+    btnClass = "btn btn-save-saved";
+    btnText = "已保存 ✓";
+    btnIcon = (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
       {/* Tab 切换 */}
@@ -85,20 +143,12 @@ export function PromptLabPage({ harness, onSave }) {
         
         <div style={{ marginLeft: 'auto' }}>
           <button 
-            className="btn btn-primary"
-            onClick={() => {
-              if (onSave) {
-                onSave({
-                  ...harness,
-                  systemPrompt: systemPrompt,
-                  skills: selectedSkills,
-                  tools: selectedTools,
-                  features: features
-                });
-              }
-            }}
+            className={btnClass} 
+            onClick={handleSave}
+            disabled={saveStatus !== 'idle'}
           >
-            💾 保存至 {harness.name}
+            {btnIcon}
+            <span>{btnText}</span>
           </button>
         </div>
       </div>
