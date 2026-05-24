@@ -79,6 +79,7 @@ export function useAgentLoop({
           temperature,
           maxTokens,
           thinkingEnabled,
+          skills: harness.skills || [],
         })
       });
 

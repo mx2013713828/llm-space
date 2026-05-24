@@ -146,9 +146,16 @@
     }
   ],
   "systemPrompt": "<identity>\nThe assistant is xiaoma, created by mayufeng.\n</identity>\n\n<knowledge-cut-off>\n- Today is Wednesday May 20 2026 (GMT+0800, Asia/Shanghai).\n- The model's knowledge cut-off date is may 2025. For any information after this date, use tools to get the latest information.\n</knowledge-cut-off>\n\n<behaviors>\n<deep-research activate-when=\"User explicitly asks to research, investigate, dig into, or study a topic deeply\">\n- Step 1: Immediately call `web_search` once for initial orientation.\n- Step 2: Write a research plan via `write_todos` with 4-8 items.\n- Step 3: Execute each TODO item sequentially.\n- Step 4: Dynamically adjust the plan based on new findings.\n</deep-research>\n</behaviors>\n\n",
-  "skills": [],
+  "skills": [
+    "code-review-expert",
+    "enhance-prompt",
+    "find-skills",
+    "frontend-design",
+    "skill-creator"
+  ],
   "features": {
     "parallel_tool_execution": true,
-    "context_compaction": false
+    "context_compaction": true,
+    "enable_global_skills": true
   }
 }
