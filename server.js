@@ -7,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { getToolSchemas } from './server/tools/index.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
@@ -446,37 +447,110 @@ function parseFrontmatter(content) {
   return meta;
 }
 
+/** 递归扫描子目录下的全部文件物理路径 */
+async function scanSubDirFiles(dirPath) {
+  const files = [];
+  try {
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const item of items) {
+      const fullPath = path.join(dirPath, item.name);
+      if (item.isDirectory()) {
+        const subFiles = await scanSubDirFiles(fullPath);
+        files.push(...subFiles);
+      } else {
+        files.push(fullPath);
+      }
+    }
+  } catch (e) {
+    // 忽略目录不存在等异常
+  }
+  return files;
+}
+
 /** 获取所有 Skill 元数据 */
 app.get('/api/skills', async (req, res) => {
   try {
+    const includeGlobal = req.query.global === 'true';
+    
+    // 1. 扫描项目本地技能
     await fs.mkdir(SKILLS_DIR, { recursive: true });
-    const items = await fs.readdir(SKILLS_DIR, { withFileTypes: true });
-    const skills = [];
+    const localItems = await fs.readdir(SKILLS_DIR, { withFileTypes: true });
+    const localSkills = [];
 
-    for (const item of items) {
+    for (const item of localItems) {
       if (!item.isDirectory()) continue;
-      
       const skillId = item.name;
-      const skillMdPath = path.join(SKILLS_DIR, skillId, 'SKILL.md');
+      const skillDir = path.join(SKILLS_DIR, skillId);
+      const skillMdPath = path.join(skillDir, 'SKILL.md');
       
       try {
         const content = await fs.readFile(skillMdPath, 'utf-8');
         const meta = parseFrontmatter(content);
         
-        skills.push({
+        // 扫描本地 scripts 和 references
+        const rawScripts = await scanSubDirFiles(path.join(skillDir, 'scripts'));
+        const rawRefs = await scanSubDirFiles(path.join(skillDir, 'references'));
+        
+        // 转换为相对路径
+        const scripts = rawScripts.map(p => path.relative(process.cwd(), p));
+        const references = rawRefs.map(p => path.relative(process.cwd(), p));
+
+        localSkills.push({
           id: skillId,
           name: meta.name || skillId,
           desc: meta.description || '专业技能说明',
-          file: `skills/${skillId}/SKILL.md`
+          file: path.relative(process.cwd(), skillMdPath),
+          isGlobal: false,
+          assets: { scripts, references }
         });
       } catch (err) {
-        if (err.code !== 'ENOENT') {
-          console.error(`解析技能 ${skillId} 失败:`, err);
-        }
+        if (err.code !== 'ENOENT') console.error(`解析本地技能 ${skillId} 失败:`, err);
       }
     }
 
-    res.json(skills);
+    const mergedMap = new Map(localSkills.map(s => [s.id, s]));
+
+    // 2. 有条件地扫描全局 ~/.agents/skills
+    if (includeGlobal) {
+      const globalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
+      try {
+        const globalItems = await fs.readdir(globalSkillsDir, { withFileTypes: true });
+        for (const item of globalItems) {
+          if (!item.isDirectory()) continue;
+          const skillId = item.name;
+          
+          // 本地覆盖全局：如果 localSkills 里已经有了，跳过加载全局
+          if (mergedMap.has(skillId)) continue;
+
+          const skillDir = path.join(globalSkillsDir, skillId);
+          const skillMdPath = path.join(skillDir, 'SKILL.md');
+          
+          try {
+            const content = await fs.readFile(skillMdPath, 'utf-8');
+            const meta = parseFrontmatter(content);
+            
+            // 扫描绝对路径下的 assets
+            const scripts = await scanSubDirFiles(path.join(skillDir, 'scripts'));
+            const references = await scanSubDirFiles(path.join(skillDir, 'references'));
+
+            mergedMap.set(skillId, {
+              id: skillId,
+              name: meta.name || skillId,
+              desc: meta.description || '专业技能说明',
+              file: skillMdPath, // 全局技能返回宿主机绝对路径
+              isGlobal: true,
+              assets: { scripts, references }
+            });
+          } catch (err) {
+            if (err.code !== 'ENOENT') console.error(`解析全局技能 ${skillId} 失败:`, err);
+          }
+        }
+      } catch (err) {
+        // 全局目录不存在则忽略
+      }
+    }
+
+    res.json(Array.from(mergedMap.values()));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
