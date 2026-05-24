@@ -1,5 +1,5 @@
 import { toolRegistry } from '../tools/ToolRegistry.js';
-import { buildApiMessages, compactMessages, estimateTokens, injectTodoState } from './messageBuilder.js';
+import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 
 /**
  * AgentExecutor — 后端 Agent 循环执行器
@@ -30,6 +30,7 @@ export class AgentExecutor {
     temperature = 1,
     maxTokens = 8192,
     thinkingEnabled = false,
+    skills = [],
     onEvent = () => {}
   }) {
     this.messages = [...messages];
@@ -41,6 +42,7 @@ export class AgentExecutor {
     this.temperature = temperature;
     this.maxTokens = maxTokens;
     this.thinkingEnabled = thinkingEnabled;
+    this.skills = [...skills];
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
@@ -227,20 +229,30 @@ export class AgentExecutor {
     const endpoint = `${(this.model.url || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
     const isDeepSeek = endpoint.includes('deepseek.com');
 
+    // 提取目前启用的工具清单并生成后端统一定义的 Schema
+    const enabledToolNames = this.tools.map(t => typeof t === 'string' ? t : t.name);
+    const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
+
+    // 使用 alignRequestPayload 进行对齐 and 重排
+    const aligned = alignRequestPayload(
+      this.systemPrompt || '',
+      toolSchemas,
+      apiMessages,
+      this.model,
+      this.skills
+    );
+
     // 准备大模型 API 请求体
     const requestBody = {
       model: this.model.modelId || 'claude-sonnet-4-5',
       max_tokens: this.maxTokens || 8192,
-      system: this.systemPrompt || '',
-      messages: apiMessages,
+      system: aligned.system || '',
+      messages: aligned.messages || [],
       stream: true,
     };
 
-    // 提取目前启用的工具清单并生成后端统一定义的 Schema
-    const enabledToolNames = this.tools.map(t => typeof t === 'string' ? t : t.name);
-    const toolSchemas = toolRegistry.getSchemas(enabledToolNames);
-    if (toolSchemas && toolSchemas.length > 0) {
-      requestBody.tools = toolSchemas;
+    if (aligned.tools && aligned.tools.length > 0) {
+      requestBody.tools = aligned.tools;
     }
 
     // 处理大模型推理的扩展思考 (Extended Thinking) 特性

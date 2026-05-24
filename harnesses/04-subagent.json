@@ -146,7 +146,9 @@
     }
   ],
   "systemPrompt": "你是一个友好的智能助手，请准确、简洁地回答用户的问题。",
-  "skills": [],
+  "skills": [
+    "git-conventions"
+  ],
   "features": {
     "parallel_tool_execution": true
   }

@@ -34,16 +34,16 @@
 ## 阶段四：Prompt Cache 结构感知排版 (Cache Alignment) 💰
 **目标**：最大限度命中 Anthropic / DeepSeek 的 Prompt Cache 前缀缓存机制，大幅降低上下文携带的 Token 费用与首字延迟。
 **工作项**：
-- [ ] 重新梳理 API 请求体的 `messages` 装配顺序。
-- [ ] **静态部分前置**：将 System Prompt 的核心身份定义、长效 Guidelines、Tools Definition 等固定内容放在最前面。
-- [ ] **动态部分后置**：将诸如“当前时间”、“动态获取的 Git 状态”或“系统 Nudge 提醒”等随对话轮次会变的内容（Dynamic Sections）放到 System 提示词的最末尾。
+- [x] 重新梳理 API 请求体的 `messages` 装配顺序。
+- [x] **静态部分前置**：将 System Prompt 的核心身份定义、长效 Guidelines、Tools Definition 等固定内容放在最前面。
+- [x] **动态部分后置**：将诸如“当前时间”、“动态获取的 Git 状态”或“系统 Nudge 提醒”等随对话轮次会变的内容（Dynamic Sections）放到 System 提示词的最末尾。
 
 ## 阶段五：虚拟文件系统抽象 (AFS) 与渐进式技能 (Progressive Skills) 🛠️
 **目标**：摆脱粗暴的全能 Sandbox，建立安全的隔离工作区；支持在不撑爆 System Prompt 的前提下，挂载数百种领域技能。
 **工作项**：
-- [ ] **AFS (Agent File System)**：重构后端的 `read_file`, `write_file`, `bash` 等工具，增加路径隔离。定义 `/mnt/workspace/` 为工作区，`/mnt/skills/` 为只读技能库。
-- [ ] **Progressive Disclosure**：调整前端 Prompt Lab，在 `<skills>` 标签内仅放置各技能的元数据（`name` 与 `description` 及虚拟路径）。
-- [ ] **按需拉取**：大模型需要调用某项复杂能力时，依靠现有的 `read_file` 工具读取该技能的 `SKILL.md` 正文，从而达到极低的冷启动成本与无限的能力伸缩空间。
+- [x] **物理只读技能库与扫描 API**：在根目录创建 `skills/` 只读库，后端通过 `/api/skills` 动态扫描 Markdown 提取首行标题和描述。
+- [x] **Progressive Disclosure (技能元数据暴露)**：调整前端 Prompt Lab 及后端 Executor，在静态 System Prompt 末尾中仅放置可用技能元数据与 `read_file` 路径引导（如 `<available_skills>` 块），实现零 token 开销冷启动并保持前缀缓存友好。
+- [x] **按需拉取与 ReAct 闭环**：大模型执行特定复杂任务（如 Conventional Commit 提交）时，根据引导自主发起 `read_file("skills/git-conventions.md")` 等调用来按需加载正文，从而完美解决 System Prompt 膨胀问题。
  
 ## 阶段六：会话持久化与恢复 (Session Persistence & Recovery) 💾
 **目标**：实现会话状态的磁盘持久化，支持跨页面刷新、跨服务器重启的任务连续性。

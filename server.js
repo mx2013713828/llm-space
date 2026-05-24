@@ -10,6 +10,7 @@ import path from 'path';
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { getToolSchemas } from './server/tools/index.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
+import { alignRequestPayload } from './server/agent/messageBuilder.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -50,18 +51,10 @@ app.post('/api/chat', async (req, res) => {
 
   const endpoint = `${(baseUrl || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
 
-  // 构建请求体
-  const requestBody = {
-    model: model || 'claude-sonnet-4-5',
-    max_tokens: maxTokens || 8000,
-    system: system || '',
-    messages,
-    stream: true,
-  };
-
-  // 工具配置
+  // 提取目前启用的工具清单并生成后端统一定义的 Schema
+  let toolSchemas = [];
   if (tools && tools.length > 0) {
-    requestBody.tools = tools.map(t => ({
+    toolSchemas = tools.map(t => ({
       name: t.name,
       description: t.description,
       input_schema: t.input_schema || {
@@ -72,6 +65,28 @@ app.post('/api/chat', async (req, res) => {
         required: Object.entries(t.parameters || {}).filter(([, v]) => v.required).map(([k]) => k),
       },
     }));
+  }
+
+  // 使用 alignRequestPayload 进行对齐和重排
+  const modelConfig = { modelId: model, url: baseUrl || '' };
+  const aligned = alignRequestPayload(
+    system || '',
+    toolSchemas,
+    messages || [],
+    modelConfig
+  );
+
+  // 构建请求体
+  const requestBody = {
+    model: model || 'claude-sonnet-4-5',
+    max_tokens: maxTokens || 8000,
+    system: aligned.system || '',
+    messages: aligned.messages || [],
+    stream: true,
+  };
+
+  if (aligned.tools && aligned.tools.length > 0) {
+    requestBody.tools = aligned.tools;
   }
 
   try {
@@ -407,6 +422,52 @@ app.post('/api/harnesses/:id/copy', async (req, res) => {
   }
 });
 
+const SKILLS_DIR = path.join(process.cwd(), 'skills');
+
+/** 获取所有 Skill 元数据 */
+app.get('/api/skills', async (req, res) => {
+  try {
+    await fs.mkdir(SKILLS_DIR, { recursive: true });
+    const files = await fs.readdir(SKILLS_DIR);
+    const skills = [];
+
+    for (const file of files) {
+      if (!file.endsWith('.md')) continue;
+      const id = file.replace(/\.md$/, '');
+      const content = await fs.readFile(path.join(SKILLS_DIR, file), 'utf-8');
+      
+      // 提取首行 Markdown 作为名字
+      const lines = content.split('\n');
+      let name = id;
+      const firstLine = lines.find(l => l.trim().startsWith('#'));
+      if (firstLine) {
+        name = firstLine.replace(/^#\s*/, '').trim();
+      }
+
+      // 提取首行后面的非空行作为简短描述
+      let desc = '专业技能说明';
+      const firstDescLine = lines.find(l => {
+        const t = l.trim();
+        return t && !t.startsWith('#') && !t.startsWith('*') && !t.startsWith('-');
+      });
+      if (firstDescLine) {
+        desc = firstDescLine.trim();
+      }
+
+      skills.push({
+        id,
+        name,
+        desc,
+        file: `skills/${file}`
+      });
+    }
+
+    res.json(skills);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** 获取后端注册的所有工具 Schema */
 app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
@@ -423,7 +484,8 @@ app.post('/api/agent/run', async (req, res) => {
     model,
     temperature,
     maxTokens,
-    thinkingEnabled
+    thinkingEnabled,
+    skills
   } = req.body;
 
   if (!model?.key) {
@@ -446,6 +508,7 @@ app.post('/api/agent/run', async (req, res) => {
     temperature,
     maxTokens,
     thinkingEnabled,
+    skills,
     onEvent: (type, data) => {
       sendEvent(res, type, data);
     }

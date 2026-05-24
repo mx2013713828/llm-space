@@ -9,6 +9,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [selectedSkills, setSelectedSkills] = useState(harness.skills || []);
   const [selectedTools, setSelectedTools] = useState(harness.tools || []);
   const [availableTools, setAvailableTools] = useState([]);
+  const [availableSkills, setAvailableSkills] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [features, setFeatures] = useState(harness.features || {});
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
@@ -23,19 +24,29 @@ export function PromptLabPage({ harness, onSave }) {
         }
       })
       .catch(console.error);
+
+    fetch('http://localhost:3001/api/skills')
+      .then(r => r.json())
+      .then(data => {
+        if (active) {
+          setAvailableSkills(data);
+        }
+      })
+      .catch(console.error);
+
     return () => {
       active = false;
     };
   }, []);
 
-  const AVAILABLE_SKILLS = [
-    { id: 'deep-research', name: 'deep-research', desc: '激活深度调研工作流', icon: '🔬', color: 'var(--blue)' },
-    { id: 'web-tools', name: 'web-tools', desc: '启用网络搜索与抓取', icon: '🌐', color: 'var(--cyan)' },
-    { id: 'todo-manager', name: 'todo-manager', desc: '启用任务分解与追踪', icon: '✅', color: 'var(--green)' },
-    { id: 'code-executor', name: 'code-executor', desc: '允许执行代码', icon: '⚡', color: 'var(--amber)' },
-    { id: 'memory', name: 'memory', desc: '持久化记忆系统', icon: '🧠', color: 'var(--purple)' },
-    { id: 'structured-output', name: 'structured-output', desc: '结构化输出格式', icon: '📋', color: 'var(--orange)' },
-  ];
+  const getSkillUI = (id) => {
+    const map = {
+      'git-conventions': { icon: '📦', color: 'var(--blue)' },
+      'jest-testing': { icon: '🧪', color: 'var(--green)' },
+      'code-review': { icon: '🔍', color: 'var(--purple)' }
+    };
+    return map[id] || { icon: '✨', color: 'var(--cyan)' };
+  };
 
   const PROMPT_TEMPLATES = [
     { name: '基础聊天助手', icon: '💬', prompt: '你是一个友好的智能助手，请准确、简洁地回答用户的问题。' },
@@ -207,8 +218,9 @@ export function PromptLabPage({ harness, onSave }) {
               💡 Skills 是嵌入到 system prompt 中的行为规则片段。启用后，agent 会在特定条件下自动触发对应的工作流。
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {AVAILABLE_SKILLS.map(skill => {
+              {availableSkills.map(skill => {
                 const active = selectedSkills.includes(skill.id);
+                const { icon, color } = getSkillUI(skill.id);
                 return (
                   <div
                     key={skill.id}
@@ -216,15 +228,15 @@ export function PromptLabPage({ harness, onSave }) {
                     onClick={() => toggleSkill(skill.id)}
                     style={{
                       padding: 16, cursor: 'pointer',
-                      borderColor: active ? `${skill.color}50` : 'var(--border)',
-                      background: active ? `${skill.color}08` : 'var(--bg-card)',
+                      borderColor: active ? `${color}50` : 'var(--border)',
+                      background: active ? `${color}08` : 'var(--bg-card)',
                       transition: 'all 0.2s',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      <span style={{ fontSize: 22 }}>{skill.icon}</span>
+                      <span style={{ fontSize: 22 }}>{icon}</span>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? skill.color : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: active ? color : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                           {skill.name}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{skill.desc}</div>
@@ -232,8 +244,8 @@ export function PromptLabPage({ harness, onSave }) {
                       <div style={{ marginLeft: 'auto' }}>
                         <div style={{
                           width: 18, height: 18, borderRadius: 4,
-                          border: `2px solid ${active ? skill.color : 'var(--border-light)'}`,
-                          background: active ? skill.color : 'transparent',
+                          border: `2px solid ${active ? color : 'var(--border-light)'}`,
+                          background: active ? color : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 11, color: '#fff',
                           transition: 'all 0.2s',
@@ -244,8 +256,8 @@ export function PromptLabPage({ harness, onSave }) {
                     </div>
                     {active && (
                       <div style={{
-                        fontSize: 11, color: skill.color, fontWeight: 500,
-                        padding: '3px 8px', background: `${skill.color}15`,
+                        fontSize: 11, color: color, fontWeight: 500,
+                        padding: '3px 8px', background: `${color}15`,
                         borderRadius: 99, display: 'inline-flex', alignItems: 'center', gap: 4,
                       }}>
                         ✓ 已激活

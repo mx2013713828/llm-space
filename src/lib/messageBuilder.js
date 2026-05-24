@@ -262,3 +262,175 @@ export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
 
   return result;
 }
+
+/**
+ * 自动检测模型是否属于 Anthropic/Claude 模型系列
+ *
+ * @param {Object} modelConfig 模型配置信息
+ * @returns {boolean}
+ */
+export function checkIfAnthropic(modelConfig) {
+  if (!modelConfig) return false;
+  const url = String(modelConfig.url || '').toLowerCase();
+  const modelId = String(modelConfig.modelId || '').toLowerCase();
+  const name = String(modelConfig.name || '').toLowerCase();
+
+  if (url.includes('anthropic.com')) return true;
+  if (modelId.includes('claude')) return true;
+  if (name.includes('claude')) return true;
+
+  return false;
+}
+
+/**
+ * 对 System Prompt 进行结构拆分，提取动态信息（如今天的时间或知识库截止设定）后置
+ *
+ * @param {string} systemPrompt 原始 System Prompt 文本
+ * @returns {{ staticSystem: string, dynamicSystem: string }}
+ */
+export function separateSystemPrompt(systemPrompt) {
+  if (!systemPrompt) return { staticSystem: '', dynamicSystem: '' };
+
+  const dynamicBlocks = [];
+  let cleanedSystem = systemPrompt;
+
+  // 1. 提取带 XML 标记的动态块
+  const xmlTags = ['knowledge-cut-off', 'current_time', 'current_directory', 'dynamic_context'];
+  xmlTags.forEach(tag => {
+    const regex = new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'g');
+    let match;
+    while ((match = regex.exec(systemPrompt)) !== null) {
+      dynamicBlocks.push(match[0].trim());
+    }
+    cleanedSystem = cleanedSystem.replace(regex, '');
+  });
+
+  // 2. 提取不带 XML 标记但具有典型时间/环境特征的单行信息
+  const lines = cleanedSystem.split('\n');
+  const staticLines = [];
+  const dynamicLines = [];
+
+  const dynamicPatterns = [
+    /today\s+is\s+/i,
+    /current\s+time\s+is/i,
+    /current\s+date\s+is/i,
+    /current\s+directory\s+is/i,
+    /current\s+workspace\s+is/i,
+    /current\s+git\s+branch\s+is/i
+  ];
+
+  lines.forEach(line => {
+    const isDynamic = dynamicPatterns.some(pattern => pattern.test(line));
+    if (isDynamic) {
+      dynamicLines.push(line.trim());
+    } else {
+      staticLines.push(line);
+    }
+  });
+
+  cleanedSystem = staticLines.join('\n');
+
+  const allDynamic = [
+    ...dynamicBlocks,
+    ...dynamicLines
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    staticSystem: cleanedSystem.replace(/\n{3,}/g, '\n\n').trim(),
+    dynamicSystem: allDynamic.trim()
+  };
+}
+
+/**
+ * 核心对齐处理函数 (普适型接口，所有模型通用，cache_control 仅对 Anthropic 生效)
+ *
+ * @param {string} systemPrompt 原始 System Prompt
+ * @param {Array} tools 原始 Tools 数组 (API 标准 Schema 格式)
+ * @param {Array} apiMessages 已经过 buildApiMessages 与看板注入的最终 messages 数组
+ * @param {Object} modelConfig 模型配置
+ * @param {Array} skills 启用的技能 ID 列表
+ * @returns {{ system: string|Array, tools: Array, messages: Array }} 转换后的大模型请求 payload
+ */
+export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfig, skills = []) {
+  const isAnthropic = checkIfAnthropic(modelConfig);
+
+  // 1. Tools 列表进行字母排序 (按 name 排序对齐)
+  let alignedTools = [];
+  if (tools && tools.length > 0) {
+    alignedTools = tools.map(t => ({ ...t }));
+    alignedTools.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // 2. System Prompt 动静重排与 Skills 动态目录注入
+  const { staticSystem, dynamicSystem } = separateSystemPrompt(systemPrompt);
+  let finalSystemText = staticSystem;
+
+  if (skills && skills.length > 0) {
+    const skillsPrompt = `\n\n<available_skills>\n当前会话为您挂载了以下专业技能 (Skills)。它们以 Markdown 格式保存在您工作区的只读目录 \`skills/\` 下。\n如果您需要执行与这些技能相关的复杂任务，请务必直接使用 \`read_file\` 工具读取其对应的 \`.md\` 技能指南，以获取精确的业务知识与规范约束：\n\n${skills.map(s => `- ${s}: 读取 \`skills/${s}.md\` 来激活该技能`).join('\n')}\n</available_skills>`;
+    finalSystemText += skillsPrompt;
+  }
+
+  if (dynamicSystem) {
+    finalSystemText += `\n\n<dynamic_context>\n${dynamicSystem}\n</dynamic_context>`;
+  }
+
+  // 3. 浅拷贝 apiMessages 以免直接 Mutation 影响外部原始数据
+  let alignedMessages = (apiMessages || []).map(msg => ({
+    ...msg,
+    content: Array.isArray(msg.content) ? msg.content.map(c => ({ ...c })) : msg.content
+  }));
+
+  // 4. 为 Anthropic 模型动态注入 cache_control
+  if (isAnthropic) {
+    // A. 注入 System 缓存锚点
+    let systemPayload = [];
+    if (finalSystemText) {
+      systemPayload = [
+        {
+          type: 'text',
+          text: finalSystemText,
+          cache_control: { type: 'ephemeral' }
+        }
+      ];
+    }
+
+    // B. 注入 Tools 最后一个工具的缓存锚点
+    if (alignedTools.length > 0) {
+      alignedTools[alignedTools.length - 1] = {
+        ...alignedTools[alignedTools.length - 1],
+        cache_control: { type: 'ephemeral' }
+      };
+    }
+
+    // C. 注入 Messages 缓存锚点 (通常放在倒数第 3 条，即倒数第二次的 User/Tool 返回上)
+    if (alignedMessages.length >= 3) {
+      const targetIdx = alignedMessages.length - 3;
+      alignedMessages = alignedMessages.map((msg, idx) => {
+        if (idx === targetIdx) {
+          const newContent = msg.content.map((block, bIdx) => {
+            if (bIdx === msg.content.length - 1) {
+              return { ...block, cache_control: { type: 'ephemeral' } };
+            }
+            return block;
+          });
+          return { ...msg, content: newContent };
+        }
+        return msg;
+      });
+    }
+
+    return {
+      system: systemPayload,
+      tools: alignedTools,
+      messages: alignedMessages
+    };
+  }
+
+  // 5. 针对非 Anthropic 模型 (DeepSeek/Gemini 等)，仅提供排序与动静分离的头部优化，避免 cache_control 引起校验报错
+  return {
+    system: finalSystemText,
+    tools: alignedTools,
+    messages: alignedMessages
+  };
+}
+

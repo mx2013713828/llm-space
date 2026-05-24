@@ -153,12 +153,15 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       {showContextInspector && (
         <ContextInspector
           messages={agentState.messages}
+          todos={agentState.todos}
           systemPrompt={systemPrompt}
           tools={harness.tools}
+          skills={harness.skills || []}
           setShowContextInspector={setShowContextInspector}
           thinkingEnabled={thinkingEnabled}
           compactionEnabled={harness.features?.context_compaction !== false}
           currentTokens={agentState.currentTokens}
+          modelConfig={selectedModel}
         />
       )}
     </div>
