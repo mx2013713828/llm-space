@@ -6,6 +6,7 @@ export function ContextInspector({
   systemPrompt, 
   tools, 
   skills = [],
+  availableSkills = [],
   setShowContextInspector, 
   thinkingEnabled, 
   compactionEnabled = true, 
@@ -31,13 +32,21 @@ export function ContextInspector({
     }
   }));
 
-  // 4. 调用对齐逻辑生成最终请求 payload
+  // 4. 将选中的技能 ID 映射为带 assets 的丰富元数据结构
+  const richSkills = skills.map(id => {
+    const found = availableSkills.find(s => s.id === id);
+    if (found) return found;
+    // 兜底退回
+    return { id, file: `skills/${id}/SKILL.md`, assets: { scripts: [], references: [] } };
+  });
+
+  // 调用对齐逻辑生成最终请求 payload
   const aligned = alignRequestPayload(
     systemPrompt || '',
     toolSchemas,
     messagesWithTodos,
     modelConfig,
-    skills
+    richSkills
   );
 
   const fullContext = {

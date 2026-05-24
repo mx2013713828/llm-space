@@ -26,6 +26,15 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState(harness.systemPrompt);
 
+  const [allSkills, setAllSkills] = useState([]);
+  useEffect(() => {
+    const isGlobal = harness?.features?.enable_global_skills === true;
+    fetch(`http://localhost:3001/api/skills?global=${isGlobal}`)
+      .then(r => r.json())
+      .then(data => setAllSkills(data))
+      .catch(console.error);
+  }, [harness]);
+
   // 监听 harness 的变化，实时同步最新配置，避免 React state 缓存导致的与文件不一致问题
   useEffect(() => {
     if (harness) {
@@ -157,6 +166,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           systemPrompt={systemPrompt}
           tools={harness.tools}
           skills={harness.skills || []}
+          availableSkills={allSkills}
           setShowContextInspector={setShowContextInspector}
           thinkingEnabled={thinkingEnabled}
           compactionEnabled={harness.features?.context_compaction !== false}
