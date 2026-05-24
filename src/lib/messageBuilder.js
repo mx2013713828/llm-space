@@ -366,13 +366,13 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
   let finalSystemText = staticSystem;
 
   if (skills && skills.length > 0) {
-    const skillsPrompt = `\n\n<available_skills>\n当前会话为您挂载了以下专业技能 (Skills)。如果您需要执行与这些技能相关的复杂任务，请务必直接使用 \`read_file\` 工具读取其对应的 \`SKILL.md\` 技能指南，以获取精确的业务知识与规范约束：\n\n${skills.map(s => {
-      // 兼容可能传入的纯字符串 ID
+    const skillsPrompt = `\n\n<available_skills>\nThe following professional skills (Skills) are available in the current session. If you need to perform complex tasks related to these skills, you must use the \`read_file\` tool to read the corresponding \`SKILL.md\` guide to acquire precise domain knowledge and constraints:\n\n${skills.map(s => {
+      // Compatible with legacy pure string IDs
       const skillId = typeof s === 'string' ? s : s.id;
       const skillFilePath = typeof s === 'string' ? `skills/${s}/SKILL.md` : s.file;
-      const description = typeof s === 'string' ? '专业技能说明' : (s.description || s.desc || '专业技能说明');
+      const description = typeof s === 'string' ? 'Professional skill description' : (s.description || s.desc || 'Professional skill description');
       
-      return `- **${skillId}** (读取 \`${skillFilePath}\` 以激活): ${description}`;
+      return `- **${skillId}** (read \`${skillFilePath}\` to activate): ${description}`;
     }).join('\n')}\n</available_skills>`;
     finalSystemText += skillsPrompt;
   }

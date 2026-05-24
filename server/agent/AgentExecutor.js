@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 
-/** 辅助函数：解析 Markdown 的 YAML frontmatter */
+/** Helper function: parse Markdown YAML frontmatter */
 function parseFrontmatter(content) {
   const meta = { name: '', description: '' };
   const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
@@ -299,6 +299,7 @@ export class AgentExecutor {
 
       if (exists) {
         try {
+          // Read SKILL.md to parse metadata
           const content = await fs.readFile(skillMdPath, 'utf-8');
           const meta = parseFrontmatter(content);
 
@@ -311,7 +312,7 @@ export class AgentExecutor {
           richSkills.push({
             id: skillId,
             name: meta.name || skillId,
-            description: meta.description || '专业技能说明',
+            description: meta.description || 'Professional skill description',
             file: isGlobal ? skillMdPath : path.relative(process.cwd(), skillMdPath),
             assets: { scripts, references }
           });
@@ -319,17 +320,17 @@ export class AgentExecutor {
           richSkills.push({
             id: skillId,
             name: skillId,
-            description: '专业技能说明',
+            description: 'Professional skill description',
             file: `skills/${skillId}/SKILL.md`,
             assets: { scripts: [], references: [] }
           });
         }
       } else {
-        // 找不到时的安全退回
+        // Safe fallback if not found
         richSkills.push({
           id: skillId,
           name: skillId,
-          description: '专业技能说明',
+          description: 'Professional skill description',
           file: `skills/${skillId}/SKILL.md`,
           assets: { scripts: [], references: [] }
         });
