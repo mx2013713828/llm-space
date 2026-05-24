@@ -154,11 +154,11 @@ export function PromptLabPage({ harness, onSave }) {
       }}>
         {[
           { key: 'editor', label: '✍️ Prompt 编辑器' },
-          { key: 'skills', label: '✨ Skills 配置' },
+          (features.enable_skills !== false) && { key: 'skills', label: '✨ Skills 配置' },
           { key: 'tools-edit', label: '🔧 Tools 挂载' },
           { key: 'features', label: '🔬 实验特性' },
           { key: 'templates', label: '📄 模板库' },
-        ].map(tab => (
+        ].filter(Boolean).map(tab => (
           <button
             key={tab.key}
             className={`topbar-tab ${activeTab === tab.key ? 'active' : ''}`}
@@ -341,6 +341,55 @@ export function PromptLabPage({ harness, onSave }) {
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
                 <input 
                   type="checkbox" 
+                  checked={features.enable_skills !== false}
+                  onChange={e => {
+                    const nextVal = e.target.checked;
+                    setFeatures(prev => ({ ...prev, enable_skills: nextVal }));
+                    if (!nextVal && activeTab === 'skills') {
+                      setActiveTab('editor');
+                    }
+                  }}
+                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>启用技能框架 (Enable Skills)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    开启后，工作台将启用 Skills 配置与对齐注入功能。关闭则隐藏 Skills Tab，且不对大模型注入任何技能提示词。
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div className="card" style={{ padding: 16, opacity: features.enable_skills === false ? 0.5 : 1, pointerEvents: features.enable_skills === false ? 'none' : 'auto' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: features.enable_skills === false ? 'not-allowed' : 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  disabled={features.enable_skills === false}
+                  checked={features.enable_global_skills === true && features.enable_skills !== false}
+                  onChange={e => {
+                    const nextVal = e.target.checked;
+                    setFeatures(prev => ({ ...prev, enable_global_skills: nextVal }));
+                    // 动态更新技能加载列表
+                    fetch(`http://localhost:3001/api/skills?global=${nextVal}`)
+                      .then(r => r.json())
+                      .then(data => setAvailableSkills(data))
+                      .catch(console.error);
+                  }}
+                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>启用全局技能库挂载 (Enable Global Skills)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    开启后，工作台将有条件地扫描本地全局技能目录（`~/.agents/skills/`）并动态融入当前项目技能池中，供直接勾选和调试（项目同名技能优先）。关闭则退回纯项目级技能。
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div className="card" style={{ padding: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
                   checked={features.parallel_tool_execution || false}
                   onChange={e => setFeatures({ ...features, parallel_tool_execution: e.target.checked })}
                   style={{ transform: 'scale(1.2)', marginTop: 4 }}
@@ -366,31 +415,6 @@ export function PromptLabPage({ harness, onSave }) {
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段二：上下文压缩与实时折叠 (Context Compaction)</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
                     开启后，当上下文长度或回合数超过阈值时，底层 Harness 会将已结算的思维链 (thinking block) 替换为固定的占位符 `[Thinking folded]`，以保证前缀一致，友好兼容 Prompt Cache 并节省大量 Token 消耗。同时对旧历史中的冗余数据进行清洗折叠。关闭则保留完整思维链与数据上下文。
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="card" style={{ padding: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={features.enable_global_skills === true}
-                  onChange={e => {
-                    const nextVal = e.target.checked;
-                    setFeatures(prev => ({ ...prev, enable_global_skills: nextVal }));
-                    // 动态更新技能加载列表
-                    fetch(`http://localhost:3001/api/skills?global=${nextVal}`)
-                      .then(r => r.json())
-                      .then(data => setAvailableSkills(data))
-                      .catch(console.error);
-                  }}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>启用全局技能库挂载 (Enable Global Skills)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，工作台将有条件地扫描本地全局技能目录（`~/.agents/skills/`）并动态融入当前项目技能池中，供直接勾选和调试（项目同名技能优先）。关闭则退回纯项目级技能。
                   </div>
                 </div>
               </label>

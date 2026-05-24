@@ -282,41 +282,52 @@ export class AgentExecutor {
       return files;
     };
 
-    for (const skillId of (this.skills || [])) {
-      // 优先从项目本地查找
-      let skillDir = path.join(SKILLS_DIR, skillId);
-      let skillMdPath = path.join(skillDir, 'SKILL.md');
-      let isGlobal = false;
-      let exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
+    if (this.features?.enable_skills !== false) {
+      for (const skillId of (this.skills || [])) {
+        // 优先从项目本地查找
+        let skillDir = path.join(SKILLS_DIR, skillId);
+        let skillMdPath = path.join(skillDir, 'SKILL.md');
+        let isGlobal = false;
+        let exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
 
-      if (!exists && includeGlobal) {
-        // 如果本地没有且开启了全局，尝试从全局 ~/.agents/skills 查找
-        skillDir = path.join(os.homedir(), '.agents', 'skills', skillId);
-        skillMdPath = path.join(skillDir, 'SKILL.md');
-        exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
-        isGlobal = true;
-      }
+        if (!exists && includeGlobal) {
+          // 如果本地没有且开启了全局，尝试从全局 ~/.agents/skills 查找
+          skillDir = path.join(os.homedir(), '.agents', 'skills', skillId);
+          skillMdPath = path.join(skillDir, 'SKILL.md');
+          exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
+          isGlobal = true;
+        }
 
-      if (exists) {
-        try {
-          // Read SKILL.md to parse metadata
-          const content = await fs.readFile(skillMdPath, 'utf-8');
-          const meta = parseFrontmatter(content);
+        if (exists) {
+          try {
+            // Read SKILL.md to parse metadata
+            const content = await fs.readFile(skillMdPath, 'utf-8');
+            const meta = parseFrontmatter(content);
 
-          const rawScripts = await scanDirFilesSync(path.join(skillDir, 'scripts'));
-          const rawRefs = await scanDirFilesSync(path.join(skillDir, 'references'));
-          
-          const scripts = rawScripts.map(p => isGlobal ? p : path.relative(process.cwd(), p));
-          const references = rawRefs.map(p => isGlobal ? p : path.relative(process.cwd(), p));
+            const rawScripts = await scanDirFilesSync(path.join(skillDir, 'scripts'));
+            const rawRefs = await scanDirFilesSync(path.join(skillDir, 'references'));
+            
+            const scripts = rawScripts.map(p => isGlobal ? p : path.relative(process.cwd(), p));
+            const references = rawRefs.map(p => isGlobal ? p : path.relative(process.cwd(), p));
 
-          richSkills.push({
-            id: skillId,
-            name: meta.name || skillId,
-            description: meta.description || 'Professional skill description',
-            file: isGlobal ? skillMdPath : path.relative(process.cwd(), skillMdPath),
-            assets: { scripts, references }
-          });
-        } catch (e) {
+            richSkills.push({
+              id: skillId,
+              name: meta.name || skillId,
+              description: meta.description || 'Professional skill description',
+              file: isGlobal ? skillMdPath : path.relative(process.cwd(), skillMdPath),
+              assets: { scripts, references }
+            });
+          } catch (e) {
+            richSkills.push({
+              id: skillId,
+              name: skillId,
+              description: 'Professional skill description',
+              file: `skills/${skillId}/SKILL.md`,
+              assets: { scripts: [], references: [] }
+            });
+          }
+        } else {
+          // Safe fallback if not found
           richSkills.push({
             id: skillId,
             name: skillId,
@@ -325,15 +336,6 @@ export class AgentExecutor {
             assets: { scripts: [], references: [] }
           });
         }
-      } else {
-        // Safe fallback if not found
-        richSkills.push({
-          id: skillId,
-          name: skillId,
-          description: 'Professional skill description',
-          file: `skills/${skillId}/SKILL.md`,
-          assets: { scripts: [], references: [] }
-        });
       }
     }
 

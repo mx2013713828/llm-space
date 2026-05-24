@@ -28,6 +28,10 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
   const [allSkills, setAllSkills] = useState([]);
   useEffect(() => {
+    if (harness?.features?.enable_skills === false) {
+      setAllSkills([]);
+      return;
+    }
     const isGlobal = harness?.features?.enable_global_skills === true;
     fetch(`http://localhost:3001/api/skills?global=${isGlobal}`)
       .then(r => r.json())
