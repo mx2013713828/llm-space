@@ -4,6 +4,28 @@ import { promises as fs } from 'fs';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 
+/** 辅助函数：解析 Markdown 的 YAML frontmatter */
+function parseFrontmatter(content) {
+  const meta = { name: '', description: '' };
+  const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
+  if (match) {
+    const yamlText = match[1];
+    yamlText.split('\n').forEach(line => {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let val = parts.slice(1).join(':').trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1).trim();
+        }
+        if (key === 'name') meta.name = val;
+        if (key === 'description') meta.description = val;
+      }
+    });
+  }
+  return meta;
+}
+
 /**
  * AgentExecutor — 后端 Agent 循环执行器
  * 负责在后端维护 ReAct 循环，流式调用大模型 API，解析并分发工具执行事件。
@@ -277,6 +299,9 @@ export class AgentExecutor {
 
       if (exists) {
         try {
+          const content = await fs.readFile(skillMdPath, 'utf-8');
+          const meta = parseFrontmatter(content);
+
           const rawScripts = await scanDirFilesSync(path.join(skillDir, 'scripts'));
           const rawRefs = await scanDirFilesSync(path.join(skillDir, 'references'));
           
@@ -285,15 +310,29 @@ export class AgentExecutor {
 
           richSkills.push({
             id: skillId,
+            name: meta.name || skillId,
+            description: meta.description || '专业技能说明',
             file: isGlobal ? skillMdPath : path.relative(process.cwd(), skillMdPath),
             assets: { scripts, references }
           });
         } catch (e) {
-          richSkills.push({ id: skillId, file: `skills/${skillId}/SKILL.md`, assets: { scripts: [], references: [] } });
+          richSkills.push({
+            id: skillId,
+            name: skillId,
+            description: '专业技能说明',
+            file: `skills/${skillId}/SKILL.md`,
+            assets: { scripts: [], references: [] }
+          });
         }
       } else {
         // 找不到时的安全退回
-        richSkills.push({ id: skillId, file: `skills/${skillId}/SKILL.md`, assets: { scripts: [], references: [] } });
+        richSkills.push({
+          id: skillId,
+          name: skillId,
+          description: '专业技能说明',
+          file: `skills/${skillId}/SKILL.md`,
+          assets: { scripts: [], references: [] }
+        });
       }
     }
 

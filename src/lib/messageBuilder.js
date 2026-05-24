@@ -370,22 +370,9 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
       // 兼容可能传入的纯字符串 ID
       const skillId = typeof s === 'string' ? s : s.id;
       const skillFilePath = typeof s === 'string' ? `skills/${s}/SKILL.md` : s.file;
+      const description = typeof s === 'string' ? '专业技能说明' : (s.description || s.desc || '专业技能说明');
       
-      let promptStr = `- ${skillId}: 读取 \`${skillFilePath}\` 来激活该技能`;
-      
-      const hasScripts = s.assets?.scripts && s.assets.scripts.length > 0;
-      const hasRefs = s.assets?.references && s.assets.references.length > 0;
-      
-      if (hasScripts || hasRefs) {
-        promptStr += `\n  此技能包含以下专有脚本与参考资源（如需使用，请以列出的物理路径为准）：`;
-        if (hasScripts) {
-          promptStr += `\n  * 脚本 (运行它以执行特定操作)：${s.assets.scripts.map(p => `\`${p}\``).join(', ')}`;
-        }
-        if (hasRefs) {
-          promptStr += `\n  * 参考文档 (读取它以获取深入的规范说明)：${s.assets.references.map(p => `\`${p}\``).join(', ')}`;
-        }
-      }
-      return promptStr;
+      return `- **${skillId}** (读取 \`${skillFilePath}\` 以激活): ${description}`;
     }).join('\n')}\n</available_skills>`;
     finalSystemText += skillsPrompt;
   }
