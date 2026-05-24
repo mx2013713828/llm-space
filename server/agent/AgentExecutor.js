@@ -1,3 +1,6 @@
+import os from 'os';
+import path from 'path';
+import { promises as fs } from 'fs';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 
@@ -233,13 +236,74 @@ export class AgentExecutor {
     const enabledToolNames = this.tools.map(t => typeof t === 'string' ? t : t.name);
     const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
 
+    // 1. 动态对齐装配带资产的技能树
+    const SKILLS_DIR = path.join(process.cwd(), 'skills');
+    const includeGlobal = this.features?.enable_global_skills === true;
+    
+    const richSkills = [];
+    
+    // 递归函数辅助
+    const scanDirFilesSync = async (dirPath) => {
+      const files = [];
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          if (item.isDirectory()) {
+            const sub = await scanDirFilesSync(fullPath);
+            files.push(...sub);
+          } else {
+            files.push(fullPath);
+          }
+        }
+      } catch (e) {}
+      return files;
+    };
+
+    for (const skillId of (this.skills || [])) {
+      // 优先从项目本地查找
+      let skillDir = path.join(SKILLS_DIR, skillId);
+      let skillMdPath = path.join(skillDir, 'SKILL.md');
+      let isGlobal = false;
+      let exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
+
+      if (!exists && includeGlobal) {
+        // 如果本地没有且开启了全局，尝试从全局 ~/.agents/skills 查找
+        skillDir = path.join(os.homedir(), '.agents', 'skills', skillId);
+        skillMdPath = path.join(skillDir, 'SKILL.md');
+        exists = await fs.access(skillMdPath).then(() => true).catch(() => false);
+        isGlobal = true;
+      }
+
+      if (exists) {
+        try {
+          const rawScripts = await scanDirFilesSync(path.join(skillDir, 'scripts'));
+          const rawRefs = await scanDirFilesSync(path.join(skillDir, 'references'));
+          
+          const scripts = rawScripts.map(p => isGlobal ? p : path.relative(process.cwd(), p));
+          const references = rawRefs.map(p => isGlobal ? p : path.relative(process.cwd(), p));
+
+          richSkills.push({
+            id: skillId,
+            file: isGlobal ? skillMdPath : path.relative(process.cwd(), skillMdPath),
+            assets: { scripts, references }
+          });
+        } catch (e) {
+          richSkills.push({ id: skillId, file: `skills/${skillId}/SKILL.md`, assets: { scripts: [], references: [] } });
+        }
+      } else {
+        // 找不到时的安全退回
+        richSkills.push({ id: skillId, file: `skills/${skillId}/SKILL.md`, assets: { scripts: [], references: [] } });
+      }
+    }
+
     // 使用 alignRequestPayload 进行对齐 and 重排
     const aligned = alignRequestPayload(
       this.systemPrompt || '',
       toolSchemas,
       apiMessages,
       this.model,
-      this.skills
+      richSkills
     );
 
     // 准备大模型 API 请求体

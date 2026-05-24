@@ -366,7 +366,27 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
   let finalSystemText = staticSystem;
 
   if (skills && skills.length > 0) {
-    const skillsPrompt = `\n\n<available_skills>\n当前会话为您挂载了以下专业技能 (Skills)。它们以子文件夹格式保存在您工作区的只读目录 \`skills/\` 下。\n如果您需要执行与这些技能相关的复杂任务，请务必直接使用 \`read_file\` 工具读取其对应的 \`SKILL.md\` 技能指南，以获取精确的业务知识与规范约束：\n\n${skills.map(s => `- ${s}: 读取 \`skills/${s}/SKILL.md\` 来激活该技能`).join('\n')}\n</available_skills>`;
+    const skillsPrompt = `\n\n<available_skills>\n当前会话为您挂载了以下专业技能 (Skills)。如果您需要执行与这些技能相关的复杂任务，请务必直接使用 \`read_file\` 工具读取其对应的 \`SKILL.md\` 技能指南，以获取精确的业务知识与规范约束：\n\n${skills.map(s => {
+      // 兼容可能传入的纯字符串 ID
+      const skillId = typeof s === 'string' ? s : s.id;
+      const skillFilePath = typeof s === 'string' ? `skills/${s}/SKILL.md` : s.file;
+      
+      let promptStr = `- ${skillId}: 读取 \`${skillFilePath}\` 来激活该技能`;
+      
+      const hasScripts = s.assets?.scripts && s.assets.scripts.length > 0;
+      const hasRefs = s.assets?.references && s.assets.references.length > 0;
+      
+      if (hasScripts || hasRefs) {
+        promptStr += `\n  此技能包含以下专有脚本与参考资源（如需使用，请以列出的物理路径为准）：`;
+        if (hasScripts) {
+          promptStr += `\n  * 脚本 (运行它以执行特定操作)：${s.assets.scripts.map(p => `\`${p}\``).join(', ')}`;
+        }
+        if (hasRefs) {
+          promptStr += `\n  * 参考文档 (读取它以获取深入的规范说明)：${s.assets.references.map(p => `\`${p}\``).join(', ')}`;
+        }
+      }
+      return promptStr;
+    }).join('\n')}\n</available_skills>`;
     finalSystemText += skillsPrompt;
   }
 
