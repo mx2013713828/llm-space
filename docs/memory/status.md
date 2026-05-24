@@ -56,12 +56,12 @@
 - 上游 API 请求失败时自动重试 3 次（间隔 1s）。
 - 错误日志包含 endpoint URL 和具体 cause 信息。
 
-### 2.7 渐进式技能加载与缓存友好型 System 提示词暴露 (Progressive Skills & Cache-Aligned Alignment)
-- **只读物理技能库 (`skills/`)**：在根目录下创建只读技能库，内置有常规 Conventional Commit 提交规范、Jest 测试用例规范及代码质量评审指南等专业技能的 Markdown 指引。
-- **元数据暴露接口 (`GET /api/skills`)**：后端读取技能目录并自动解析提取 Markdown 首行标题（`# Title`）及段落摘要（去语法符号），动态向前端提供可勾选的技能配置。
-- **缓存友好型 System 注入**：修改 API 消息对齐层 `alignRequestPayload`，若 Harness 挂载了技能，则在静态 System Prompt 最末端注入 `<available_skills>` 块和 `read_file` 的调用引导。对于 Anthropic 模型，此块连同静态 Prompt 整体被打上 `cache_control` ephemeral 标识以最大化保护 Prompt Cache；对于其他模型（如 DeepSeek）仅做字符串拼接，避开非兼容参数导致接口报错。
-- **ReAct 自动按需拉取**：大模型接收任务时，仅需付出极小的 `<available_skills>` 引导 token 开销，大模型在需要具体业务知识时能够完全自动触发 `read_file("skills/xxx.md")` 去按需加载技能正文，彻底防范了由于全量加载技能正文到 System 导致 Context 撑爆的问题。
-- **上下文可观测性与穿透**：前端 TrajectoryPage 与 ContextInspector 全面适配，在调试“查看上下文”面板时，能够直观看到被自动注入并拼装妥当的 `<available_skills>` XML 静态区域，提供所见即所得的可视化调试。
+### 2.7 先进技能体系与缓存友好型 System 提示词暴露 (Progressive Skills & Cache-Aligned Alignment)
+- **全局与本地技能池双挂载**：在“实验特性”中引入 `features.enable_global_skills` 开关（默认关闭）。后端 `/api/skills` 支持 `?global=true` 动态合并项目本地 `skills/` 与全局用户技能目录 `/Users/mayufeng/.agents/skills`。若技能 ID 冲突，本地优先覆盖全局，实现零拷贝共享全局技能包。
+- **元数据暴露与 YAML Frontmatter 解析**：标准技能以子文件夹形式组织，包含 `SKILL.md` 指引。后端使用轻量级 `parseFrontmatter` 解析 YAML 头部，提取技能名（`name`）与简介（`description`），全局技能卡片在前端被渲染 “🌐 全局” 标识。
+- **技能物理资产 (Assets) 自动解构**：后端自动扫描技能文件夹下的 `scripts/`（脚本）与 `references/`（参考说明）子目录下的文件，并映射为具体的物理路径。本地技能返回项目相对路径，全局技能返回宿主机绝对路径。
+- **资产精准映射与 Cache 友好注入**：API 发包对齐层 `alignRequestPayload` 支持将 richSkills 包含的 scripts 及 references 路径树自动拼装入 System Prompt 最末尾的 `<available_skills>` 块中。这使大模型对该技能配套的可执行脚本及附带参考文档一目了然，用 `read_file` 和 `bash` 调用时能 100% 准确定位，消除路径查找盲区。对于 Anthropic 架构仍整体附加 `cache_control` 保护前缀缓存。
+- **上下文可观测性与穿透**：前端 TrajectoryPage 与 ContextInspector 深度适配，能够直观展现解构出 scripts/references 资产路径树后的 XML 预览，提供纯净透明的可视化调试。
 
 ## 3. UI/UX 体验
 - **终端体验 (Terminal Emulation)**：前端渲染器支持 `\r` 原地覆盖，完美展示进度条。后端通过 TTY 伪装环境变量强制工具彩色输出。
@@ -93,3 +93,4 @@
 15. **二级路由多智能体流式穿透**：子代理的调度现在完全在后端并发/递归独立执行。通过统一控制信道配合 `parentToolCallId` 的二级路由协议，将子代理内部的思考和工具执行流原汁原味地在中途透传给前端，实现了嵌套 UI 的完美复现与轻量化数据隔离。
 16. **严格模式 Immutable 状态更新与 tool_end 对齐**：修复了在 React 开发严格模式（StrictMode）下流式叠字输出的 Mutation 副作用，重构事件解析为纯不可变更新；并且增加了对 `tool_end` 结束事件的监听，保障在工具输入流结束时强行将完整的输入参数同步到前端，彻底解决了因流式 JSON 片段解析不完整而导致工具参数在 UI 呈现上卡在 `{}` 空对象的问题。
 17. **渐进式技能加载与前缀缓存对齐**：实现了与 Claude Code 类似的渐进式技能加载（Skill Loading）。在 System Prompt 静态区末尾仅挂载技能元数据 XML，在多轮 ReAct 运行中大模型根据说明自主发起 `read_file` 动态拉取技能 Markdown 原文；前端调试面板与发包重排全面打通，支持技能勾选、保存和所见即所得的可视化缓存对齐预览。
+18. **先进技能体系 (A+B 方案) 落地**：支持有条件加载本地全局技能池（`~/.agents/skills`）与本地优先覆盖机制，提供前端 `enable_global_skills` 一键开关；后端自动深度扫描技能目录，解构其下的 `scripts/`（脚本）与 `references/`（参考资料）等附属资产，将其与主 `SKILL.md` 融合为 richSkills。大模型发包对齐层全量支持物理资产树注入及 XML 路径披露，实现 100% 物理寻址与前缀缓存对齐。
