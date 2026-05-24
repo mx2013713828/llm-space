@@ -424,42 +424,56 @@ app.post('/api/harnesses/:id/copy', async (req, res) => {
 
 const SKILLS_DIR = path.join(process.cwd(), 'skills');
 
+/** 辅助函数：解析 Markdown 的 YAML frontmatter */
+function parseFrontmatter(content) {
+  const meta = { name: '', description: '' };
+  const match = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
+  if (match) {
+    const yamlText = match[1];
+    yamlText.split('\n').forEach(line => {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let val = parts.slice(1).join(':').trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1).trim();
+        }
+        if (key === 'name') meta.name = val;
+        if (key === 'description') meta.description = val;
+      }
+    });
+  }
+  return meta;
+}
+
 /** 获取所有 Skill 元数据 */
 app.get('/api/skills', async (req, res) => {
   try {
     await fs.mkdir(SKILLS_DIR, { recursive: true });
-    const files = await fs.readdir(SKILLS_DIR);
+    const items = await fs.readdir(SKILLS_DIR, { withFileTypes: true });
     const skills = [];
 
-    for (const file of files) {
-      if (!file.endsWith('.md')) continue;
-      const id = file.replace(/\.md$/, '');
-      const content = await fs.readFile(path.join(SKILLS_DIR, file), 'utf-8');
+    for (const item of items) {
+      if (!item.isDirectory()) continue;
       
-      // 提取首行 Markdown 作为名字
-      const lines = content.split('\n');
-      let name = id;
-      const firstLine = lines.find(l => l.trim().startsWith('#'));
-      if (firstLine) {
-        name = firstLine.replace(/^#\s*/, '').trim();
+      const skillId = item.name;
+      const skillMdPath = path.join(SKILLS_DIR, skillId, 'SKILL.md');
+      
+      try {
+        const content = await fs.readFile(skillMdPath, 'utf-8');
+        const meta = parseFrontmatter(content);
+        
+        skills.push({
+          id: skillId,
+          name: meta.name || skillId,
+          desc: meta.description || '专业技能说明',
+          file: `skills/${skillId}/SKILL.md`
+        });
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          console.error(`解析技能 ${skillId} 失败:`, err);
+        }
       }
-
-      // 提取首行后面的非空行作为简短描述
-      let desc = '专业技能说明';
-      const firstDescLine = lines.find(l => {
-        const t = l.trim();
-        return t && !t.startsWith('#') && !t.startsWith('*') && !t.startsWith('-');
-      });
-      if (firstDescLine) {
-        desc = firstDescLine.trim();
-      }
-
-      skills.push({
-        id,
-        name,
-        desc,
-        file: `skills/${file}`
-      });
     }
 
     res.json(skills);

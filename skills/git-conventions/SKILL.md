@@ -1,3 +1,8 @@
+---
+name: Git 提交与分支约定 (Git Conventions)
+description: 本指南规范了项目中的分支命名及 Commit 提交消息格式，Agent 在执行 Git 提交时必须严格遵守。
+---
+
 # Git 提交与分支约定 (Git Conventions)
 
 本指南规范了项目中的分支命名及 Commit 提交消息格式，Agent 在执行 Git 提交时必须严格遵守。
