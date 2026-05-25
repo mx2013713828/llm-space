@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useModels } from '../hooks/useModels';
 import { useAgentLoop } from '../hooks/useAgentLoop';
 import { useAutoScroll } from '../hooks/useAutoScroll';
@@ -54,8 +54,18 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     }
   }, [harness]);
 
+  // Keep stable refs to harness and onHarnessUpdate so the debounce effect can
+  // read the latest values without adding them to the dependency array
+  // (which would cause the effect to fire on every harness prop update)
+  const harnessRef = useRef(harness);
+  const onHarnessUpdateRef = useRef(onHarnessUpdate);
+  useEffect(() => { harnessRef.current = harness; });
+  useEffect(() => { onHarnessUpdateRef.current = onHarnessUpdate; });
+
   // 防抖自动保存本地修改的参数到后端配置文件中
+  // Uses harnessRef/onHarnessUpdateRef to read latest values without triggering re-runs
   useEffect(() => {
+    const harness = harnessRef.current;
     if (!harness) return;
 
     const hasChanges = 
@@ -66,32 +76,34 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     if (!hasChanges) return;
 
     const timer = setTimeout(() => {
+      const h = harnessRef.current;
+      if (!h) return;
       const updatedHarness = {
-        ...harness,
+        ...h,
         model: {
-          ...harness.model,
+          ...h.model,
           max_tokens: maxTokens,
           temperature: temperature
         },
         systemPrompt: systemPrompt
       };
 
-      fetch(`http://localhost:3001/api/harnesses/${harness.id}`, {
+      fetch(`http://localhost:3001/api/harnesses/${h.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedHarness)
       })
       .then(res => {
-        if (res.ok && onHarnessUpdate) {
-          onHarnessUpdate(updatedHarness);
-          console.log(`💾 自动保存配置到 ${harness.id}.json 成功`);
+        if (res.ok && onHarnessUpdateRef.current) {
+          onHarnessUpdateRef.current(updatedHarness);
+          console.log(`💾 自动保存配置到 ${h.id}.json 成功`);
         }
       })
       .catch(err => console.error("自动保存 harness 配置失败:", err));
     }, 1000); // 1秒防抖，防止拖拽 range 或是连续输入时频繁写盘
 
     return () => clearTimeout(timer);
-  }, [maxTokens, temperature, systemPrompt, harness, onHarnessUpdate]);
+  }, [maxTokens, temperature, systemPrompt]); // intentionally omit harness/onHarnessUpdate - read via refs
 
   // 3. UI 状态
   const [activeRightTab, setActiveRightTab] = useState('trajectory');

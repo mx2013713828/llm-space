@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import './index.css';
 import './App.css';
@@ -148,6 +148,7 @@ function AppContent() {
   // 加载特定文件及常驻 Session
   useEffect(() => {
     if (!activeHarnessId) return;
+    console.log('[DEBUG C] harness load effect triggered', activeHarnessId);
     setHarness(null); // Clear harness first to avoid stale state initialization in child components
     
     Promise.all([
@@ -161,6 +162,7 @@ function AppContent() {
       })
     ])
     .then(([harnessData, sessionData]) => {
+      console.log('[DEBUG D] harness load done', { hasSession: !!sessionData, sessionMsgLen: sessionData?.messages?.length });
       setHarness(harnessData);
       if (sessionData) {
         setSessions(prev => ({
@@ -188,6 +190,36 @@ function AppContent() {
   }, [activeHarnessId, navigate]);
 
   const currentSession = sessions[activeHarnessId] || null;
+
+  // Stable callback refs — prevents TrajectoryPage's internal effects from re-firing
+  // just because App.jsx re-renders due to sessions/harness state updates
+  const handleSessionUpdate = useCallback((messages, todos) => {
+    console.log('[DEBUG E] onSessionUpdate called from TrajectoryPage', { msgLen: messages.length });
+    setSessions(prev => ({
+      ...prev,
+      [activeHarnessId]: { messages, todos }
+    }));
+    saveSessionToBackend(activeHarnessId, messages, todos);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHarnessId]);
+
+  const handleSessionReset = useCallback(() => {
+    setSessions(prev => ({
+      ...prev,
+      [activeHarnessId]: null
+    }));
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`, {
+      method: 'DELETE'
+    }).catch(err => console.error("清空后端 Session 失败:", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHarnessId]);
+
+  const handleHarnessUpdate = useCallback((updatedHarness) => {
+    setHarness(updatedHarness);
+  }, []);
 
   return (
     <div id="app" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', height: '100%' }}>
@@ -359,28 +391,9 @@ function AppContent() {
               key={activeHarnessId} 
               harness={harness} 
               savedSession={currentSession}
-              onSessionUpdate={(messages, todos) => {
-                setSessions(prev => ({
-                  ...prev,
-                  [activeHarnessId]: { messages, todos }
-                }));
-                saveSessionToBackend(activeHarnessId, messages, todos);
-              }}
-              onSessionReset={() => {
-                setSessions(prev => ({
-                  ...prev,
-                  [activeHarnessId]: null
-                }));
-                if (syncTimeoutRef.current) {
-                  clearTimeout(syncTimeoutRef.current);
-                }
-                fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`, {
-                  method: 'DELETE'
-                }).catch(err => console.error("清空后端 Session 失败:", err));
-              }}
-              onHarnessUpdate={(updatedHarness) => {
-                setHarness(updatedHarness);
-              }}
+              onSessionUpdate={handleSessionUpdate}
+              onSessionReset={handleSessionReset}
+              onHarnessUpdate={handleHarnessUpdate}
             />
           )}
           {activeTab === 'prompt-lab' && harness && (
