@@ -282,7 +282,11 @@ function broadcastEvent(harnessId, type, data) {
   const job = activeJobs.get(harnessId);
   if (job) {
     for (const client of job.clients) {
-      sendEvent(client, type, data);
+      try {
+        sendEvent(client, type, data);
+      } catch (err) {
+        // Safe check for closed stream
+      }
     }
   }
 }
@@ -613,9 +617,12 @@ app.post('/api/agent/run', async (req, res) => {
     sendEvent(res, 'messages_update', { messages: job.executor.messages });
     sendEvent(res, 'todo_update', { todos: job.executor.todos });
 
-    // Listen to connection close and only remove client from set without aborting job
-    req.on('close', () => {
-      job.clients.delete(res);
+    // Keep the request handler pending until client disconnects
+    await new Promise((resolve) => {
+      res.on('close', () => {
+        job.clients.delete(res);
+        resolve();
+      });
     });
     return;
   }
@@ -642,7 +649,7 @@ app.post('/api/agent/run', async (req, res) => {
   activeJobs.set(harnessId, job);
 
   // Listen to connection close and remove client, but keep the job running in background
-  req.on('close', () => {
+  res.on('close', () => {
     job.clients.delete(res);
   });
 
