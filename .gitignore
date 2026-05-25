@@ -36,3 +36,4 @@ docs/superpowers/*
 harnesses/*
 .task_outputs/
 .transcripts/
+.offloaded/

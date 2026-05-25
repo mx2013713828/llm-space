@@ -33,6 +33,30 @@ try {
 setGlobalDispatcher(new EnvHttpProxyAgent());
 console.log('  🔁 代理 agent 已全局启用（自动检测 HTTPS_PROXY / NO_PROXY）');
 
+// 确保 .offloaded/ 被加入 .gitignore
+async function ensureOffloadedGitignored() {
+  try {
+    const gitignorePath = path.join(process.cwd(), '.gitignore');
+    let content = '';
+    try {
+      content = await fs.readFile(gitignorePath, 'utf-8');
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+
+    if (!content.includes('.offloaded/') && !content.includes('.offloaded')) {
+      const separator = content.endsWith('\n') || content === '' ? '' : '\n';
+      const newContent = `${content}${separator}.offloaded/\n`;
+      await fs.writeFile(gitignorePath, newContent, 'utf-8');
+      console.log('  ✅ 已自动向 .gitignore 追加 .offloaded/');
+    }
+  } catch (err) {
+    console.error('  ⚠️ 确保 .gitignore 包含 .offloaded/ 时发生错误:', err);
+  }
+}
+
+await ensureOffloadedGitignored();
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 

@@ -4,6 +4,12 @@ import { promises as fs } from 'fs';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 
+// 物理常量配置
+export const OFFLOAD_THRESHOLD_BYTES = 20000;
+export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
+export const SOFT_COMPACT_TOKEN_THRESHOLD = 120000;
+export const HARD_COMPACT_TOKEN_THRESHOLD = 160000;
+
 /** Helper function: parse Markdown YAML frontmatter */
 function parseFrontmatter(content) {
   const meta = { name: '', description: '' };
@@ -223,7 +229,7 @@ export class AgentExecutor {
 
         // 阶段三：全量语义总结与记忆重建 (Hard Compact Stage 2)
         const tokensAfterSoft = this.contextTokens > 0 ? this.contextTokens : this.estimateCurrentTokens();
-        if (this.compactionEnabled && tokensAfterSoft > 160000 && !this.hardCompactTriggered && this.messages.length > 10) {
+        if (this.compactionEnabled && tokensAfterSoft > HARD_COMPACT_TOKEN_THRESHOLD && !this.hardCompactTriggered && this.messages.length > 10) {
           try {
             console.log(`🌊 触发 Hard-Compact 全量语义总结，当前 Token 估算：${tokensAfterSoft}...`);
 
