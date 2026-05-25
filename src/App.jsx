@@ -148,7 +148,6 @@ function AppContent() {
   // 加载特定文件及常驻 Session
   useEffect(() => {
     if (!activeHarnessId) return;
-    console.log('[DEBUG C] harness load effect triggered', activeHarnessId);
     setHarness(null); // Clear harness first to avoid stale state initialization in child components
     
     Promise.all([
@@ -162,7 +161,6 @@ function AppContent() {
       })
     ])
     .then(([harnessData, sessionData]) => {
-      console.log('[DEBUG D] harness load done', { hasSession: !!sessionData, sessionMsgLen: sessionData?.messages?.length });
       setHarness(harnessData);
       if (sessionData) {
         setSessions(prev => ({
@@ -194,7 +192,6 @@ function AppContent() {
   // Stable callback refs — prevents TrajectoryPage's internal effects from re-firing
   // just because App.jsx re-renders due to sessions/harness state updates
   const handleSessionUpdate = useCallback((messages, todos) => {
-    console.log('[DEBUG E] onSessionUpdate called from TrajectoryPage', { msgLen: messages.length });
     setSessions(prev => ({
       ...prev,
       [activeHarnessId]: { messages, todos }

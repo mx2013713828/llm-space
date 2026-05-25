@@ -47,7 +47,6 @@ export function useAgentLoop({
     const newMsgStr = JSON.stringify(messages);
     const newTodoStr = JSON.stringify(todos);
     const same = lastReportedRef.current.messages === newMsgStr && lastReportedRef.current.todos === newTodoStr;
-    console.log('[DEBUG A] onSessionUpdate effect', { msgLen: messages.length, same });
     if (same) {
       return; // Skip if content is identical to last report
     }
@@ -71,7 +70,6 @@ export function useAgentLoop({
 
     const incomingStr = JSON.stringify(incoming);
     const same = lastSavedSessionRef.current === incomingStr;
-    console.log('[DEBUG B] savedSession sync effect', { hasSaved: !!savedSession, msgLen: incoming.messages.length, same });
     if (same) return; // No actual change
     lastSavedSessionRef.current = incomingStr;
 
