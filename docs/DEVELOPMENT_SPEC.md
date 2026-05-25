@@ -62,3 +62,21 @@ Agent 的物理生命周期与前端页面生命周期是解耦的。
 ### 2. Fail-Closed 权限控制
 - 任何能够修改物理磁盘、执行系统命令的工具，在设计上默认都是危险的。
 - 未来的演进中，对于高危操作（如 `bash`），Harness 应具备挂起执行、强制要求用户 `Manual Review` 的拦截能力，将破坏范围锁死在沙箱之内。
+
+---
+
+## 五、 编码与架构规范 (Coding & Architecture Specs)
+
+### 1. 模块化与可拆卸性 (Modular & Detachable)
+- **高内聚低耦合**：新增加的 Harness 特性（如上下文压缩、子代理管理、状态落盘）必须被封装在独立的函数或模块中（例如 `messageBuilder.js` 中的纯函数），避免将数千行逻辑全部堆砌在 `AgentExecutor` 类中。
+- **纯函数优先**：像 Token 估算、Payload 装配、软压缩等逻辑，必须设计为零副作用的**纯函数 (Pure Functions)**，方便独立进行单元测试，也确保这些过程不会意外污染对象的状态。
+- **可选配 (Feature Flags)**：任何改变核心运行逻辑的新特性，在初期必须通过 `features.xxx_enabled` 的开关来控制，确保如果不开启该特性，代码逻辑能 100% 走经典 ReAct 路径。
+
+### 2. Agent-Loop 生命周期插入顺序 (Lifecycle Order)
+在 `AgentExecutor` 的主循环（ReAct Loop）中插入新逻辑时，必须严格遵守以下生命周期顺序，绝不能乱序：
+1. **防呆与兜底检测**：循环开始前的第一步，永远是 Token 检查、轮次防爆检查，确保上一步的操作没有导致物理内存溢出。
+2. **状态拦截与压缩 (Compaction Stage)**：在向 API 发送请求前，先进行 Soft Compact / Hard Compact。只有在这个阶段压缩，才能保证发送给 API 的永远是最新鲜且合规的 Payload。
+3. **Payload 组装与对齐 (Message Building)**：进行动静分离（将 Skills 放在末尾）、注入任务看板 `<current_tasks_status>` 以及系统催促 `<system_reminder>`。必须在向大模型发送请求的最后一刻进行，防止被早期的压缩逻辑破坏。
+4. **LLM 网络请求 (API Call)**：发起网络请求，并在 `try-catch` 中妥善处理所有的 `timeout`、`502`、解析错误。如果网络挂了，必须向消息序列中写入系统错误提示 `role: 'assistant', type: 'text'` 并 break，而不是直接抛错崩溃。
+5. **工具并发调度 (Tool Execution)**：解析到 `tool_use` 时，优先检查 `features.parallel_tool_execution`，并利用 `Promise.all` 发起并发工具调用。
+6. **副作用结算 (State Persist)**：每个循环周期的最后，必定是持久化落盘（`saveSession`）和向前端发送 SSE 广播更新。绝不能在循环中间的断点随意落盘，以免保存了半脏的数据。
