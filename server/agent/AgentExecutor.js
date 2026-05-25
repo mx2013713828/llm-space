@@ -114,6 +114,43 @@ export class AgentExecutor {
   }
 
   /**
+   * Clean up physically expired offloaded files
+   * @returns {Promise<void>}
+   */
+  async cleanupOffloadedFiles() {
+    try {
+      const offloadedDir = path.join(process.cwd(), '.offloaded');
+      try {
+        await fs.access(offloadedDir);
+      } catch {
+        // Directory does not exist, return early
+        return;
+      }
+
+      const files = await fs.readdir(offloadedDir);
+      for (const file of files) {
+        if (!file.startsWith('offload-') || !file.endsWith('.txt')) {
+          continue;
+        }
+
+        const filePath = path.join(offloadedDir, file);
+        try {
+          const stat = await fs.stat(filePath);
+          if (Date.now() - stat.mtime.getTime() > OFFLOAD_CLEANUP_AGE_MS) {
+            await fs.unlink(filePath);
+          }
+        } catch (statOrUnlinkErr) {
+          if (statOrUnlinkErr.code !== 'ENOENT') {
+            console.error(`[AgentExecutor] Failed to process/delete file ${file}:`, statOrUnlinkErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[AgentExecutor] Failed during offload cleanup:', err);
+    }
+  }
+
+  /**
    * 估算当前占用的 Token 数量
    * @returns {number}
    */
@@ -438,6 +475,8 @@ ${tailPreview}
     } finally {
       // Save session on exit
       await this.saveSession();
+      // Clean up physically expired offloaded files before exit
+      this.cleanupOffloadedFiles().catch(err => console.error('[AgentExecutor] Failed to cleanup offloaded files:', err));
       // 5. 循环决策结束，发送 done
       this.onEvent('done', {});
     }
