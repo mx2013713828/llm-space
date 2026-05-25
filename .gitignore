@@ -34,3 +34,5 @@ __pycache__/
 server/sessions/*
 docs/superpowers/*
 harnesses/*
+.task_outputs/
+.transcripts/

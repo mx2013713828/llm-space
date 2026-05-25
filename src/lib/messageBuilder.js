@@ -161,8 +161,8 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
 
-  // 触发条件：Token 超过 160000 且至少聊了 5 轮以上
-  if (currentTokens <= 160000 || turnIndex <= 5) {
+  // 触发条件：Token 超过 120000 且至少聊了 5 轮以上
+  if (currentTokens <= 120000 || turnIndex <= 5) {
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
 

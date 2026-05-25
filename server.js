@@ -274,6 +274,19 @@ fs.mkdir(SESSIONS_DIR, { recursive: true }).catch(err => {
   console.error('[server.js] 自动创建 sessions 目录失败:', err);
 });
 
+// Active jobs memory registry for background running and client attachments
+const activeJobs = new Map(); // harnessId -> { executor, clients: Set<res> }
+
+// Push SSE event to all clients listening to a specific harness
+function broadcastEvent(harnessId, type, data) {
+  const job = activeJobs.get(harnessId);
+  if (job) {
+    for (const client of job.clients) {
+      sendEvent(client, type, data);
+    }
+  }
+}
+
 /** 获取所有 Harness 文件列表 */
 app.get('/api/harnesses', async (req, res) => {
   try {
@@ -561,9 +574,10 @@ app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
 });
 
-/** Agent 运行端点 (单路 SSE 控制流) */
+/** Agent 运行端点 (支持后台运行和多客户端订阅广播) */
 app.post('/api/agent/run', async (req, res) => {
   const {
+    harnessId,
     messages,
     todos,
     systemPrompt,
@@ -576,6 +590,10 @@ app.post('/api/agent/run', async (req, res) => {
     skills
   } = req.body;
 
+  if (!harnessId) {
+    return res.status(400).json({ error: '缺少 harnessId' });
+  }
+
   if (!model?.key) {
     return res.status(400).json({ error: '缺少 API Key' });
   }
@@ -586,7 +604,25 @@ app.post('/api/agent/run', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  // Branch 1: The job is already running
+  if (activeJobs.has(harnessId)) {
+    const job = activeJobs.get(harnessId);
+    job.clients.add(res);
+
+    // Synchronize current state to newly attached client
+    sendEvent(res, 'messages_update', { messages: job.executor.messages });
+    sendEvent(res, 'todo_update', { todos: job.executor.todos });
+
+    // Listen to connection close and only remove client from set without aborting job
+    req.on('close', () => {
+      job.clients.delete(res);
+    });
+    return;
+  }
+
+  // Branch 2: The job is not running yet
   const executor = new AgentExecutor({
+    harnessId,
     messages,
     todos,
     systemPrompt,
@@ -598,18 +634,43 @@ app.post('/api/agent/run', async (req, res) => {
     thinkingEnabled,
     skills,
     onEvent: (type, data) => {
-      sendEvent(res, type, data);
+      broadcastEvent(harnessId, type, data);
     }
+  });
+
+  const job = { executor, clients: new Set([res]) };
+  activeJobs.set(harnessId, job);
+
+  // Listen to connection close and remove client, but keep the job running in background
+  req.on('close', () => {
+    job.clients.delete(res);
   });
 
   try {
     await executor.run();
   } catch (err) {
     console.error('[server.js /api/agent/run] 运行异常:', err);
-    sendEvent(res, 'error', { message: err.message });
+    broadcastEvent(harnessId, 'error', { message: err.message });
   } finally {
-    res.end();
+    // Notify all clients of completion
+    broadcastEvent(harnessId, 'done', {});
+
+    // Close connections for all remaining clients
+    const currentJob = activeJobs.get(harnessId);
+    if (currentJob) {
+      for (const client of currentJob.clients) {
+        client.end();
+      }
+      activeJobs.delete(harnessId);
+    }
   }
+});
+
+/** 查询任务运行状态 */
+app.get('/api/agent/status/:harnessId', (req, res) => {
+  const harnessId = req.params.harnessId;
+  const isRunning = activeJobs.has(harnessId);
+  res.json({ isRunning });
 });
 
 /** 健康检查 */
