@@ -284,64 +284,7 @@ export function checkIfAnthropic(modelConfig) {
   return false;
 }
 
-/**
- * 对 System Prompt 进行结构拆分，提取动态信息（如今天的时间或知识库截止设定）后置
- *
- * @param {string} systemPrompt 原始 System Prompt 文本
- * @returns {{ staticSystem: string, dynamicSystem: string }}
- */
-export function separateSystemPrompt(systemPrompt) {
-  if (!systemPrompt) return { staticSystem: '', dynamicSystem: '' };
 
-  const dynamicBlocks = [];
-  let cleanedSystem = systemPrompt;
-
-  // 1. 提取带 XML 标记的动态块
-  const xmlTags = ['knowledge-cut-off', 'current_time', 'current_directory', 'dynamic_context'];
-  xmlTags.forEach(tag => {
-    const regex = new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'g');
-    let match;
-    while ((match = regex.exec(systemPrompt)) !== null) {
-      dynamicBlocks.push(match[0].trim());
-    }
-    cleanedSystem = cleanedSystem.replace(regex, '');
-  });
-
-  // 2. 提取不带 XML 标记但具有典型时间/环境特征的单行信息
-  const lines = cleanedSystem.split('\n');
-  const staticLines = [];
-  const dynamicLines = [];
-
-  const dynamicPatterns = [
-    /today\s+is\s+/i,
-    /current\s+time\s+is/i,
-    /current\s+date\s+is/i,
-    /current\s+directory\s+is/i,
-    /current\s+workspace\s+is/i,
-    /current\s+git\s+branch\s+is/i
-  ];
-
-  lines.forEach(line => {
-    const isDynamic = dynamicPatterns.some(pattern => pattern.test(line));
-    if (isDynamic) {
-      dynamicLines.push(line.trim());
-    } else {
-      staticLines.push(line);
-    }
-  });
-
-  cleanedSystem = staticLines.join('\n');
-
-  const allDynamic = [
-    ...dynamicBlocks,
-    ...dynamicLines
-  ].filter(Boolean).join('\n\n');
-
-  return {
-    staticSystem: cleanedSystem.replace(/\n{3,}/g, '\n\n').trim(),
-    dynamicSystem: allDynamic.trim()
-  };
-}
 
 /**
  * 核心对齐处理函数 (普适型接口，所有模型通用，cache_control 仅对 Anthropic 生效)
@@ -363,9 +306,8 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
     alignedTools.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // 2. System Prompt 动静重排与 Skills 动态目录注入
-  const { staticSystem, dynamicSystem } = separateSystemPrompt(systemPrompt);
-  let finalSystemText = staticSystem;
+  // 2. System Prompt 处理：保持用户原始输入，仅在尾部追加按需加载的 Skills 目录
+  let finalSystemText = systemPrompt || '';
 
   if (skills && skills.length > 0) {
     const skillsPrompt = `\n\n<available_skills>\nThe following professional skills (Skills) are available in the current session. If you need to perform complex tasks related to these skills, you must use the \`read_file\` tool to read the corresponding \`SKILL.md\` guide to acquire precise domain knowledge and constraints:\n\n${skills.map(s => {
@@ -377,10 +319,6 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
       return `- **${skillId}** (read \`${skillFilePath}\` to activate): ${description}`;
     }).join('\n')}\n</available_skills>`;
     finalSystemText += skillsPrompt;
-  }
-
-  if (dynamicSystem) {
-    finalSystemText += `\n\n<dynamic_context>\n${dynamicSystem}\n</dynamic_context>`;
   }
 
   // 3. 浅拷贝 apiMessages 以免直接 Mutation 影响外部原始数据
@@ -435,7 +373,7 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
     };
   }
 
-  // 5. 针对非 Anthropic 模型 (DeepSeek/Gemini 等)，仅提供排序与动静分离的头部优化，避免 cache_control 引起校验报错
+  // 5. 针对非 Anthropic 模型 (DeepSeek/Gemini 等)，保留原始 Prompt 结构，避免 cache_control 引起校验报错
   return {
     system: finalSystemText,
     tools: alignedTools,
