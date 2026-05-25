@@ -180,7 +180,7 @@ function AppContent() {
         navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
       }
     });
-  }, [activeHarnessId, harnessFiles, activeTab, navigate]);
+  }, [activeHarnessId, harnessFiles, navigate]);
 
   const currentSession = sessions[activeHarnessId] || null;
 
