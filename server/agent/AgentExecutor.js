@@ -369,24 +369,38 @@ Do not output any introductory text; start directly with the markdown summary li
                   this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
                 });
                 tool.toolOutput = String(finalOutput);
-
-                // Auto-persist large outputs (>10KB) to disk, except for read_file
-                if (tool.toolName !== 'read_file' && tool.toolOutput.length > 10000) {
-                  try {
-                    const outputDir = path.join(process.cwd(), '.task_outputs');
-                    await fs.mkdir(outputDir, { recursive: true });
-                    const outFilePath = path.join(outputDir, `output-${tool.id}.md`);
-                    await fs.writeFile(outFilePath, tool.toolOutput, 'utf-8');
-
-                    const preview = tool.toolOutput.slice(0, 2000);
-                    const relativePath = path.relative(process.cwd(), outFilePath);
-                    tool.toolOutput = `[Warning: The tool output was too large and has been persisted to disk to save your context window. You can read the complete content via: read_file("${relativePath}")]\n\n--- Tool Output Preview (First 2000 chars) ---\n${preview}`;
-                  } catch (writeErr) {
-                    console.error('[AgentExecutor] Failed to persist large tool output:', writeErr);
-                  }
-                }
               } catch (err) {
                 tool.toolOutput = `[工具执行错误]\n${err.message}`;
+              }
+            }
+
+            // 大结果实时落盘拦截
+            if (
+              tool.toolName !== 'read_file' &&
+              typeof tool.toolOutput === 'string' &&
+              Buffer.byteLength(tool.toolOutput, 'utf-8') > OFFLOAD_THRESHOLD_BYTES
+            ) {
+              try {
+                const offloadedDir = path.join(process.cwd(), '.offloaded');
+                await fs.mkdir(offloadedDir, { recursive: true });
+                const offloadedFileName = `offload-${this.harnessId}-${tool.id}.txt`;
+                const offloadedFilePath = path.join(offloadedDir, offloadedFileName);
+                await fs.writeFile(offloadedFilePath, tool.toolOutput, 'utf-8');
+
+                const originalSize = Buffer.byteLength(tool.toolOutput, 'utf-8');
+                const headPreview = tool.toolOutput.slice(0, 1500);
+                const tailPreview = tool.toolOutput.slice(-500);
+
+                tool.toolOutput = `[OUTPUT OFFLOADED TO FILE: .offloaded/offload-${this.harnessId}-${tool.id}.txt (size: ${originalSize} bytes).
+--- PREVIEW START (First 1500 chars) ---
+${headPreview}
+--- PREVIEW END ---
+...[OUTPUT OFFLOADED - If you need the full content, use read_file tool on the offloaded path above]...
+--- TAIL PREVIEW (Last 500 chars) ---
+${tailPreview}
+--- TAIL END ---]`;
+              } catch (offloadErr) {
+                console.error('[AgentExecutor] Failed to offload large tool output:', offloadErr);
               }
             }
 
