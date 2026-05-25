@@ -182,10 +182,12 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         newMsg.toolInputRaw = JSON.stringify(newMsg.toolInput);
         compactedCount++;
       } else if (['ls', 'grep', 'web_search', 'web_fetch'].includes(newMsg.toolName) && newMsg.toolOutput && newMsg.toolOutput.length > 2000) {
-        // 机制 B：对旧的 ls/grep/web_search/web_fetch 输出，越过阈值（2000）则截断折叠
-        const head = newMsg.toolOutput.slice(0, 1000);
-        newMsg.toolOutput = `${head}\n\n...[已折叠旧的工具输出结果]...`;
-        compactedCount++;
+        // Skip secondary compaction if this tool call has already been offloaded to disk
+        if (!newMsg.toolOutput.includes('OUTPUT OFFLOADED TO FILE:')) {
+          const head = newMsg.toolOutput.slice(0, 1000);
+          newMsg.toolOutput = `${head}\n\n...[已折叠旧的工具输出结果]...`;
+          compactedCount++;
+        }
       }
     }
     return newMsg;

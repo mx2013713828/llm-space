@@ -3,6 +3,7 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
+import { COMPACT_PROMPT } from './compactPrompt.js';
 
 // 物理常量配置
 export const OFFLOAD_THRESHOLD_BYTES = 20000;
@@ -290,30 +291,41 @@ export class AgentExecutor {
             const messagesToSummarize = this.messages.filter(m => m.type !== 'system_alert');
             const summaryMessages = buildApiMessages(messagesToSummarize, false, false);
 
-            const summarySystemPrompt = `You are a master summary assistant. Your task is to summarize the ongoing conversational history between the user and the agent coding assistant.
-Provide a highly dense, professional project status update and memory manifest containing:
-1. Current Goal: What is the user's ultimate request?
-2. Progress Made: What files have been modified or created? What was investigated?
-3. Key Discoveries/Blockers: What did the agent find out?
-4. Current Status: What is the next immediate task? What items are left?
-5. Critical Constraints: Any absolute rules or constraints the user defined.
-Make sure to keep this summary extremely concise but packed with precise details (line ranges, file paths, variables).
-Do not output any introductory text; start directly with the markdown summary list.`;
+            const summaryRaw = await this._callLLMNonStream(summaryMessages, COMPACT_PROMPT);
+            
+            let summary = summaryRaw;
+            // Remove <analysis>...</analysis> tags and contents if present (handling unclosed analysis tags dynamically)
+            summary = summary.replace(/<analysis>[\s\S]*?(?:<\/analysis>|$)/gi, '').trim();
+            // Try to extract the summary content inside <summary>...</summary>
+            const summaryMatch = /<summary>([\s\S]*?)<\/summary>/i.exec(summary);
+            if (summaryMatch) {
+              summary = summaryMatch[1].trim();
+            } else {
+              // Strip leftover tags as fallback
+              summary = summary.replace(/<\/?summary>/gi, '').trim();
+            }
 
-            const summary = await this._callLLMNonStream(summaryMessages, summarySystemPrompt);
             console.log('✅ Hard-Compact 语义摘要生成成功，长度为:', summary.length);
 
             // 4. 重建 messages 消息队列 (保留最近 3 轮的活跃对话)
             const activeMessages = this.messages.filter(msg => turnIndex - (msg.turn || 1) < 3);
 
             const summaryMsg = {
-              role: 'system',
+              role: 'user',
               type: 'system_alert',
               turn: turnIndex,
               content: `[System Memory Compacted]\nHere is the summarized history of the project so far:\n\n${summary}\n\nThe complete historical transcript has been persisted to disk.`
             };
 
-            this.messages = [summaryMsg, ...activeMessages];
+            // 注入恢复工作的 Prompt 指令
+            const resumeMsg = {
+              role: 'user',
+              type: 'system_alert',
+              turn: turnIndex,
+              content: `Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.`
+            };
+
+            this.messages = [summaryMsg, ...activeMessages, resumeMsg];
             this.contextTokens = 0; // 重置 token 估算缓存
             this.hardCompactTriggered = true; // 确保单次循环内不重复触发
 
