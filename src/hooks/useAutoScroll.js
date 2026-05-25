@@ -12,12 +12,25 @@ import { useRef, useEffect } from 'react';
 export function useAutoScroll(messages, activeRightTab) {
   const chatEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const prevLengthRef = useRef(messages.length);
 
   useEffect(() => {
     if (activeRightTab === 'trajectory') {
-      setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      // Check if user is already near the bottom (within 150px)
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 150;
+      // Check if the last message is a new message sent by user
+      const isNewUserMessage = messages.length > prevLengthRef.current && messages[messages.length - 1]?.role === 'user';
+      
+      prevLengthRef.current = messages.length;
+
+      if (isNearBottom || isNewUserMessage) {
+        setTimeout(() => {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 50);
+      }
     }
   }, [messages, activeRightTab]);
 
