@@ -407,9 +407,9 @@ export function useAgentLoop({
     setMessages(currentMessages);
     setContextTokens(0);
 
-    await runAgentLoop(currentMessages, nextTurn);
-
-    setIsRunning(false);
+    // Pass current todos as second arg (was incorrectly passing nextTurn number before)
+    await runAgentLoop(currentMessages, todos);
+    // Note: setIsRunning(false) is handled in runAgentLoop's finally block
   };
 
   /** 处理输入框变化 */

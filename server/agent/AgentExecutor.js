@@ -67,8 +67,8 @@ export class AgentExecutor {
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
-    this.messages = [...messages];
-    this.todos = [...todos];
+    this.messages = [...(Array.isArray(messages) ? messages : [])];
+    this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.systemPrompt = systemPrompt;
     this.tools = tools;
     this.features = features;
