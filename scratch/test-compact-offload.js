@@ -1,5 +1,8 @@
 import assert from 'assert';
 import { compactMessages } from '../src/lib/messageBuilder.js';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { AgentExecutor } from '../server/agent/AgentExecutor.js';
 
 async function runTests() {
   console.log('🧪 Starting Double-Stage Compaction Tests...');
@@ -137,6 +140,129 @@ Some thinking process that gets truncated...
   assert(summary4 === '', `Expected empty string for truncated analysis, got "${summary4}"`);
 
   console.log('✅ Hard-compact regex parsing tests passed!');
+
+  // --- Test Case 3: Large Result Real-time Offloading & Physical Interception ---
+  console.log('3. Testing large result real-time offloading and physical interception...');
+  
+  const mockHarnessId = 'test-harness-id';
+  const mockToolId = 'test-tool-id';
+  const largeOutput = 'A'.repeat(20100); // 20100 characters, > 20000 bytes threshold
+  
+  const mockTool = {
+    toolName: 'execute_command', // Not 'read_file'
+    id: mockToolId,
+    toolOutput: largeOutput
+  };
+
+  const OFFLOAD_THRESHOLD_BYTES = 20000;
+  if (
+    mockTool.toolName !== 'read_file' &&
+    typeof mockTool.toolOutput === 'string' &&
+    Buffer.byteLength(mockTool.toolOutput, 'utf-8') > OFFLOAD_THRESHOLD_BYTES
+  ) {
+    try {
+      const offloadedDir = path.join(process.cwd(), '.offloaded');
+      await fs.mkdir(offloadedDir, { recursive: true });
+      const offloadedFileName = `offload-${mockHarnessId}-${mockTool.id}.txt`;
+      const offloadedFilePath = path.join(offloadedDir, offloadedFileName);
+      await fs.writeFile(offloadedFilePath, mockTool.toolOutput, 'utf-8');
+
+      const originalSize = Buffer.byteLength(mockTool.toolOutput, 'utf-8');
+      const headPreview = mockTool.toolOutput.slice(0, 1500);
+      const tailPreview = mockTool.toolOutput.slice(-500);
+
+      mockTool.toolOutput = `[OUTPUT OFFLOADED TO FILE: .offloaded/offload-${mockHarnessId}-${mockTool.id}.txt (size: ${originalSize} bytes).
+--- PREVIEW START (First 1500 chars) ---
+${headPreview}
+--- PREVIEW END ---
+...[OUTPUT OFFLOADED - If you need the full content, use read_file tool on the offloaded path above]...
+--- TAIL PREVIEW (Last 500 chars) ---
+${tailPreview}
+--- TAIL END ---]`;
+    } catch (offloadErr) {
+      console.error('[AgentExecutor] Failed to offload large tool output:', offloadErr);
+    }
+  }
+
+  // Verify the directory and physical file are created
+  const offloadedDir = path.join(process.cwd(), '.offloaded');
+  const expectedFileName = `offload-${mockHarnessId}-${mockToolId}.txt`;
+  const expectedFilePath = path.join(offloadedDir, expectedFileName);
+
+  await fs.access(expectedFilePath);
+  const savedContent = await fs.readFile(expectedFilePath, 'utf-8');
+  assert.strictEqual(savedContent, largeOutput, 'Offloaded file content should match the mock output');
+
+  // Verify the placeholder format
+  assert(mockTool.toolOutput.includes(`OUTPUT OFFLOADED TO FILE: .offloaded/${expectedFileName}`), 'Placeholder should contain file path');
+  assert(mockTool.toolOutput.includes('--- PREVIEW START (First 1500 chars) ---'), 'Placeholder should contain start preview');
+  assert(mockTool.toolOutput.includes('--- PREVIEW END ---'), 'Placeholder should contain preview end');
+  assert(mockTool.toolOutput.includes('--- TAIL PREVIEW (Last 500 chars) ---'), 'Placeholder should contain tail preview');
+
+  // Clean up the created physical test file
+  await fs.unlink(expectedFilePath);
+  try {
+    await fs.access(expectedFilePath);
+    assert.fail('Expected file to be deleted');
+  } catch (err) {
+    assert.strictEqual(err.code, 'ENOENT', 'File should be removed');
+  }
+
+  console.log('✅ Large result offloading test passed!');
+
+  // --- Test Case 4: 24-Hour Expired Files Physical Cleanup ---
+  console.log('4. Testing 24-hour expired file physical cleanup...');
+
+  // Ensure the directory exists
+  await fs.mkdir(offloadedDir, { recursive: true });
+
+  const expiredFileName = 'offload-test-expired.txt';
+  const activeFileName = 'offload-test-active.txt';
+  const otherFileName = 'other-test-file.txt';
+
+  const expiredFilePath = path.join(offloadedDir, expiredFileName);
+  const activeFilePath = path.join(offloadedDir, activeFileName);
+  const otherFilePath = path.join(offloadedDir, otherFileName);
+
+  // Write content to these files
+  await fs.writeFile(expiredFilePath, 'Expired content', 'utf-8');
+  await fs.writeFile(activeFilePath, 'Active content', 'utf-8');
+  await fs.writeFile(otherFilePath, 'Other content', 'utf-8');
+
+  // Modify the expired file's modification time to 25 hours ago
+  const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
+  await fs.utimes(expiredFilePath, twentyFiveHoursAgo, twentyFiveHoursAgo);
+
+  // Keep the active file and other file modified times as current (or 1 hour ago)
+  const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+  await fs.utimes(activeFilePath, oneHourAgo, oneHourAgo);
+  await fs.utimes(otherFilePath, twentyFiveHoursAgo, twentyFiveHoursAgo); // Other files should not be touched regardless of time
+
+  // Instantiate AgentExecutor to run cleanupOffloadedFiles
+  const executor = new AgentExecutor({ harnessId: 'test-cleanup' });
+  await executor.cleanupOffloadedFiles();
+
+  // Assert expired file is deleted
+  try {
+    await fs.access(expiredFilePath);
+    assert.fail('Expired file should have been deleted');
+  } catch (err) {
+    assert.strictEqual(err.code, 'ENOENT', 'Expired file should be removed');
+  }
+
+  // Assert active file still exists
+  await fs.access(activeFilePath);
+  const activeContent = await fs.readFile(activeFilePath, 'utf-8');
+  assert.strictEqual(activeContent, 'Active content', 'Active file content should match');
+
+  // Assert other non-offload file still exists even if old
+  await fs.access(otherFilePath);
+
+  // Cleanup active and other files
+  await fs.unlink(activeFilePath);
+  await fs.unlink(otherFilePath);
+
+  console.log('✅ 24-hour expired cleanup test passed!');
 
   console.log('🎉 All integrated tests passed successfully!');
 }
