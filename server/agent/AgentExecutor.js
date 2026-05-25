@@ -46,6 +46,7 @@ export class AgentExecutor {
    * @param {Function} params.onEvent - SSE 事件广播回调 (type, data)
    */
   constructor({
+    harnessId = '',
     messages = [],
     todos = [],
     systemPrompt = '',
@@ -58,6 +59,7 @@ export class AgentExecutor {
     skills = [],
     onEvent = () => {}
   }) {
+    this.harnessId = harnessId;
     this.messages = [...messages];
     this.todos = [...todos];
     this.systemPrompt = systemPrompt;
@@ -74,6 +76,35 @@ export class AgentExecutor {
     this.compactionEnabled = this.features.context_compaction !== false;
     this.contextTokens = 0;
     this._lastInputTokens = 0;
+    this.hardCompactTriggered = false;
+  }
+
+  /**
+   * Save session state to disk
+   * @returns {Promise<void>}
+   */
+  async saveSession() {
+    // Check if harnessId exists, return if empty
+    if (!this.harnessId) {
+      return;
+    }
+
+    try {
+      const sessionPath = path.join(process.cwd(), 'server', 'sessions', `${this.harnessId}.json`);
+      const sessionsDir = path.dirname(sessionPath);
+
+      // Ensure that server/sessions/ directory exists
+      await fs.mkdir(sessionsDir, { recursive: true });
+
+      // Auto-save agent messages and todos state to session file
+      await fs.writeFile(
+        sessionPath,
+        JSON.stringify({ messages: this.messages, todos: this.todos }, null, 2),
+        'utf-8'
+      );
+    } catch (err) {
+      console.error('[AgentExecutor] Failed to save session:', err);
+    }
   }
 
   /**
@@ -92,156 +123,304 @@ export class AgentExecutor {
   }
 
   /**
+   * 后台非流式大模型调用，用于生成语义历史摘要
+   * @param {Array} apiMessages 
+   * @param {string} systemPrompt 
+   * @returns {Promise<string>}
+   */
+  async _callLLMNonStream(apiMessages, systemPrompt) {
+    const endpoint = `${(this.model.url || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
+    const isDeepSeek = endpoint.includes('deepseek.com');
+
+    const requestBody = {
+      model: this.model.modelId || 'claude-sonnet-4-5',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: apiMessages,
+      stream: false
+    };
+
+    const reqHeaders = {
+      'Content-Type': 'application/json',
+      'x-api-key': this.model.key || '',
+      'anthropic-version': '2023-06-01',
+    };
+
+    if (this.thinkingEnabled && !isDeepSeek) {
+      requestBody.thinking = { 
+        type: 'enabled', 
+        budget_tokens: 1024
+      };
+      requestBody.temperature = 1;
+      reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: reqHeaders,
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Summary API error ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+    let text = '';
+    if (data.content && Array.isArray(data.content)) {
+      for (const block of data.content) {
+        if (block.type === 'text') {
+          text += block.text;
+        }
+      }
+    }
+    return text.trim();
+  }
+
+  /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
   async run() {
-    // 1. 根据当前消息历史，计算出主循环的起始轮次
-    const turns = {};
-    this.messages.forEach(msg => {
-      const t = msg.turn || 1;
-      if (!turns[t]) turns[t] = [];
-      turns[t].push(msg);
-    });
-    let turnIndex = Object.keys(turns).length || 1;
+    try {
+      // 1. 根据当前消息历史，计算出主循环的起始轮次
+      const turns = {};
+      this.messages.forEach(msg => {
+        const t = msg.turn || 1;
+        if (!turns[t]) turns[t] = [];
+        turns[t].push(msg);
+      });
+      let turnIndex = Object.keys(turns).length || 1;
 
-    // 2. 开启 ReAct 循环，限制最大 15 轮
-    for (let cycle = 0; cycle < 15; cycle++) {
-      const currentTokens = this.estimateCurrentTokens();
+      // 2. 开启 ReAct 循环，限制最大 15 轮
+      // Save session before loop starts to persist the initial user request
+      await this.saveSession();
+      for (let cycle = 0; cycle < 15; cycle++) {
+        const currentTokens = this.estimateCurrentTokens();
 
-      // 阶段二：进行上下文软清洗 (Soft Compact Epoch)
-      const compactResult = compactMessages(
-        this.messages,
-        turnIndex,
-        currentTokens,
-        this.systemPrompt,
-        this.tools,
-        this.thinkingEnabled,
-        this.compactionEnabled
-      );
+        // 阶段二：进行上下文软清洗 (Soft Compact Epoch)
+        const compactResult = compactMessages(
+          this.messages,
+          turnIndex,
+          currentTokens,
+          this.systemPrompt,
+          this.tools,
+          this.thinkingEnabled,
+          this.compactionEnabled
+        );
 
-      if (compactResult.compactedCount > 0) {
-        this.messages = compactResult.messages;
-        if (compactResult.estimatedTokens != null) {
-          this.contextTokens = compactResult.estimatedTokens;
+        if (compactResult.compactedCount > 0) {
+          this.messages = compactResult.messages;
+          if (compactResult.estimatedTokens != null) {
+            this.contextTokens = compactResult.estimatedTokens;
+          }
+          // 当发生软压缩时，主动向前端广播 messages_update 事件，使前端同步轨迹
+          this.onEvent('messages_update', { messages: this.messages });
+          // Save session after soft compaction
+          await this.saveSession();
         }
-        // 当发生软压缩时，主动向前端广播 messages_update 事件，使前端同步轨迹
-        this.onEvent('messages_update', { messages: this.messages });
-      }
 
-      // 3. 构建待发送给 API 的消息历史结构
-      let apiMessages = buildApiMessages(this.messages, this.thinkingEnabled, this.compactionEnabled);
+        // 阶段三：全量语义总结与记忆重建 (Hard Compact Stage 2)
+        const tokensAfterSoft = this.contextTokens > 0 ? this.contextTokens : this.estimateCurrentTokens();
+        if (this.compactionEnabled && tokensAfterSoft > 160000 && !this.hardCompactTriggered && this.messages.length > 10) {
+          try {
+            console.log(`🌊 触发 Hard-Compact 全量语义总结，当前 Token 估算：${tokensAfterSoft}...`);
 
-      // 注入 TODO 状态与催促机制
-      apiMessages = injectTodoState(apiMessages, this.todos, this.roundsSinceTodo);
+            // 1. 广播系统提示给前端
+            this.messages.push({
+              role: 'system',
+              type: 'system_alert',
+              turn: turnIndex,
+              content: '⚠️ 上下文即将溢出！正在使用大模型生成历史战局摘要并重建记忆...'
+            });
+            this.onEvent('messages_update', { messages: this.messages });
 
-      let stopReason = null;
-      let hasUpdatedTodoThisTurn = false;
+            // 2. 备份完整历史对话到磁盘 (.transcripts)
+            const transcriptsDir = path.join(process.cwd(), '.transcripts');
+            await fs.mkdir(transcriptsDir, { recursive: true });
+            const transcriptFile = path.join(transcriptsDir, `transcript-${Date.now()}-${turnIndex}.jsonl`);
+            const jsonlData = this.messages.map(m => JSON.stringify(m)).join('\n');
+            await fs.writeFile(transcriptFile, jsonlData, 'utf-8');
 
-      try {
-        // 调用大模型
-        stopReason = await this._callLLM(apiMessages, turnIndex);
-      } catch (err) {
-        console.error('[AgentExecutor] 调用大模型失败:', err);
-        const errMsg = `❌ **大模型请求失败**: ${err.message}`;
-        this.messages.push({
-          role: 'assistant',
-          type: 'text',
-          turn: turnIndex,
-          content: errMsg
-        });
-        this.onEvent('error', { message: err.message });
-        break;
-      }
+            // 3. 构建发送给 LLM 摘要的消息包
+            const messagesToSummarize = this.messages.filter(m => m.type !== 'system_alert');
+            const summaryMessages = buildApiMessages(messagesToSummarize, false, false);
 
-      // 4. 判断是否需要执行工具
-      if (stopReason === 'tool_use') {
-        // 收集这一轮大模型发起的全部工具调用
-        const toolsToRun = this.messages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
+            const summarySystemPrompt = `You are a master summary assistant. Your task is to summarize the ongoing conversational history between the user and the agent coding assistant.
+Provide a highly dense, professional project status update and memory manifest containing:
+1. Current Goal: What is the user's ultimate request?
+2. Progress Made: What files have been modified or created? What was investigated?
+3. Key Discoveries/Blockers: What did the agent find out?
+4. Current Status: What is the next immediate task? What items are left?
+5. Critical Constraints: Any absolute rules or constraints the user defined.
+Make sure to keep this summary extremely concise but packed with precise details (line ranges, file paths, variables).
+Do not output any introductory text; start directly with the markdown summary list.`;
 
-        const executeToolCall = async (tool) => {
-          // 发送工具准备开始执行事件
-          this.onEvent('tool_exec_start', { id: tool.id, toolName: tool.toolName });
+            const summary = await this._callLLMNonStream(summaryMessages, summarySystemPrompt);
+            console.log('✅ Hard-Compact 语义摘要生成成功，长度为:', summary.length);
 
-          if (tool.toolName === 'sub_agent' && tool.toolInput?.prompt) {
-            try {
-              // 实例化子代理：继承主配置，但过滤掉 sub_agent 工具防套娃
-              const subExecutor = new AgentExecutor({
-                messages: [{ role: 'user', content: tool.toolInput.prompt }],
-                systemPrompt: '你是一个子代理（Sub-agent）。请根据用户的具体任务，利用工具完成研究或操作。完成任务后，请输出最终的总结报告。请尽力而为，如果尝试多次失败也请如实报告。',
-                tools: this.tools.filter(t => t.name !== 'sub_agent'),
-                features: this.features,
-                model: this.model,
-                temperature: this.temperature,
-                maxTokens: this.maxTokens,
-                thinkingEnabled: this.thinkingEnabled,
-                onEvent: (subType, subPayload) => {
-                  // 将子代理的事件透传给前端，但带上 parentToolCallId 以便前端在 UI 中渲染二级轨迹
-                  this.onEvent(subType, { ...subPayload, parentToolCallId: tool.id });
+            // 4. 重建 messages 消息队列 (保留最近 3 轮的活跃对话)
+            const activeMessages = this.messages.filter(msg => turnIndex - (msg.turn || 1) < 3);
+
+            const summaryMsg = {
+              role: 'system',
+              type: 'system_alert',
+              turn: turnIndex,
+              content: `[System Memory Compacted]\nHere is the summarized history of the project so far:\n\n${summary}\n\nThe complete historical transcript has been persisted to disk.`
+            };
+
+            this.messages = [summaryMsg, ...activeMessages];
+            this.contextTokens = 0; // 重置 token 估算缓存
+            this.hardCompactTriggered = true; // 确保单次循环内不重复触发
+
+            // 广播更新
+            this.onEvent('messages_update', { messages: this.messages });
+            // Save session after hard compaction
+            await this.saveSession();
+          } catch (compactErr) {
+            console.error('[AgentExecutor] Failed to perform Hard-Compact:', compactErr);
+          }
+        }
+
+        // 3. 构建待发送给 API 的消息历史结构
+        let apiMessages = buildApiMessages(this.messages, this.thinkingEnabled, this.compactionEnabled);
+
+        // 注入 TODO 状态与催促机制
+        apiMessages = injectTodoState(apiMessages, this.todos, this.roundsSinceTodo);
+
+        let stopReason = null;
+        let hasUpdatedTodoThisTurn = false;
+
+        try {
+          // 调用大模型
+          stopReason = await this._callLLM(apiMessages, turnIndex);
+        } catch (err) {
+          console.error('[AgentExecutor] 调用大模型失败:', err);
+          const errMsg = `❌ **大模型请求失败**: ${err.message}`;
+          this.messages.push({
+            role: 'assistant',
+            type: 'text',
+            turn: turnIndex,
+            content: errMsg
+          });
+          this.onEvent('error', { message: err.message });
+          break;
+        }
+
+        // 4. 判断是否需要执行工具
+        if (stopReason === 'tool_use') {
+          // 收集这一轮大模型发起的全部工具调用
+          const toolsToRun = this.messages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
+
+          const executeToolCall = async (tool) => {
+            // 发送工具准备开始执行事件
+            this.onEvent('tool_exec_start', { id: tool.id, toolName: tool.toolName });
+
+            if (tool.toolName === 'sub_agent' && tool.toolInput?.prompt) {
+              try {
+                // 实例化子代理：继承主配置，但过滤掉 sub_agent 工具防套娃
+                const subExecutor = new AgentExecutor({
+                  messages: [{ role: 'user', content: tool.toolInput.prompt }],
+                  systemPrompt: '你是一个子代理（Sub-agent）。请根据用户的具体任务，利用工具完成研究或操作。完成任务后，请输出最终的总结报告。请尽力而为，如果尝试多次失败也请如实报告。',
+                  tools: this.tools.filter(t => t.name !== 'sub_agent'),
+                  features: this.features,
+                  model: this.model,
+                  temperature: this.temperature,
+                  maxTokens: this.maxTokens,
+                  thinkingEnabled: this.thinkingEnabled,
+                  onEvent: (subType, subPayload) => {
+                    // 将子代理的事件透传给前端，但带上 parentToolCallId 以便前端在 UI 中渲染二级轨迹
+                    this.onEvent(subType, { ...subPayload, parentToolCallId: tool.id });
+                  }
+                });
+
+                // 子代理执行
+                await subExecutor.run();
+
+                // 从子代理最终产生的内容中，提炼文字总结
+                const textBlocks = subExecutor.messages.filter(m => m.type === 'text').map(m => m.content);
+                tool.toolOutput = textBlocks.length > 0 ? textBlocks.join('') : '(子代理运行完毕，未返回任何文字总结)';
+              } catch (err) {
+                tool.toolOutput = `[子代理异常崩溃]\n${err.message}`;
+              }
+            } else if (tool.toolName === 'write_todos') {
+              // 系统级拦截 write_todos
+              this.todos = tool.toolInput?.todos || [];
+              hasUpdatedTodoThisTurn = true;
+
+              const completedCount = this.todos.filter(t => t.status === 'completed').length;
+              tool.toolOutput = `[系统] 已更新看板。当前进度: ${completedCount}/${this.todos.length} 已完成。`;
+
+              // 触发 todo_update 事件，使前端实时渲染看板
+              this.onEvent('todo_update', { todos: this.todos });
+            } else {
+              try {
+                // 执行常规的本地工具，并传入流式输出回调
+                const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
+                  tool.toolOutput = (tool.toolOutput || '') + chunk;
+                  // 推送工具流式日志 chunk 到前端
+                  this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
+                });
+                tool.toolOutput = String(finalOutput);
+
+                // Auto-persist large outputs (>10KB) to disk, except for read_file
+                if (tool.toolName !== 'read_file' && tool.toolOutput.length > 10000) {
+                  try {
+                    const outputDir = path.join(process.cwd(), '.task_outputs');
+                    await fs.mkdir(outputDir, { recursive: true });
+                    const outFilePath = path.join(outputDir, `output-${tool.id}.md`);
+                    await fs.writeFile(outFilePath, tool.toolOutput, 'utf-8');
+
+                    const preview = tool.toolOutput.slice(0, 2000);
+                    const relativePath = path.relative(process.cwd(), outFilePath);
+                    tool.toolOutput = `[Warning: The tool output was too large and has been persisted to disk to save your context window. You can read the complete content via: read_file("${relativePath}")]\n\n--- Tool Output Preview (First 2000 chars) ---\n${preview}`;
+                  } catch (writeErr) {
+                    console.error('[AgentExecutor] Failed to persist large tool output:', writeErr);
+                  }
                 }
-              });
-
-              // 子代理执行
-              await subExecutor.run();
-
-              // 从子代理最终产生的内容中，提炼文字总结
-              const textBlocks = subExecutor.messages.filter(m => m.type === 'text').map(m => m.content);
-              tool.toolOutput = textBlocks.length > 0 ? textBlocks.join('') : '(子代理运行完毕，未返回任何文字总结)';
-            } catch (err) {
-              tool.toolOutput = `[子代理异常崩溃]\n${err.message}`;
+              } catch (err) {
+                tool.toolOutput = `[工具执行错误]\n${err.message}`;
+              }
             }
-          } else if (tool.toolName === 'write_todos') {
-            // 系统级拦截 write_todos
-            this.todos = tool.toolInput?.todos || [];
-            hasUpdatedTodoThisTurn = true;
 
-            const completedCount = this.todos.filter(t => t.status === 'completed').length;
-            tool.toolOutput = `[系统] 已更新看板。当前进度: ${completedCount}/${this.todos.length} 已完成。`;
+            // 工具执行完毕，重置 contextTokens 缓存并广播 tool_exec_done
+            this.contextTokens = 0;
+            this.onEvent('tool_exec_done', { id: tool.id, output: tool.toolOutput });
+            // Save session after tool execution is complete
+            await this.saveSession();
+          };
 
-            // 触发 todo_update 事件，使前端实时渲染看板
-            this.onEvent('todo_update', { todos: this.todos });
+          const isParallel = this.features?.parallel_tool_execution === true;
+
+          if (isParallel) {
+            await Promise.all(toolsToRun.map(executeToolCall));
           } else {
-            try {
-              // 执行常规的本地工具，并传入流式输出回调
-              const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
-                tool.toolOutput = (tool.toolOutput || '') + chunk;
-                // 推送工具流式日志 chunk 到前端
-                this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
-              });
-              tool.toolOutput = String(finalOutput);
-            } catch (err) {
-              tool.toolOutput = `[工具执行错误]\n${err.message}`;
+            for (const tool of toolsToRun) {
+              await executeToolCall(tool);
             }
           }
 
-          // 工具执行完毕，重置 contextTokens 缓存并广播 tool_exec_done
-          this.contextTokens = 0;
-          this.onEvent('tool_exec_done', { id: tool.id, output: tool.toolOutput });
-        };
+          // 看板轮数累加计数器更新
+          this.roundsSinceTodo = hasUpdatedTodoThisTurn ? 0 : this.roundsSinceTodo + 1;
+          turnIndex++;
+          
+          // 轮询间隙，给予极短的缓冲时间
+          await new Promise(r => setTimeout(r, 500));
 
-        const isParallel = this.features?.parallel_tool_execution === true;
-
-        if (isParallel) {
-          await Promise.all(toolsToRun.map(executeToolCall));
+          // Save session at the end of each ReAct cycle
+          await this.saveSession();
         } else {
-          for (const tool of toolsToRun) {
-            await executeToolCall(tool);
-          }
+          // 完成文字回复，主动退出 ReAct 循环
+          break;
         }
-
-        // 看板轮数累加计数器更新
-        this.roundsSinceTodo = hasUpdatedTodoThisTurn ? 0 : this.roundsSinceTodo + 1;
-        turnIndex++;
-        
-        // 轮询间隙，给予极短的缓冲时间
-        await new Promise(r => setTimeout(r, 500));
-      } else {
-        // 完成文字回复，主动退出 ReAct 循环
-        break;
       }
+    } finally {
+      // Save session on exit
+      await this.saveSession();
+      // 5. 循环决策结束，发送 done
+      this.onEvent('done', {});
     }
-
-    // 5. 循环决策结束，发送 done
-    this.onEvent('done', {});
   }
 
   /**
