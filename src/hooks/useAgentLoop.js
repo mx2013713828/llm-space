@@ -57,8 +57,10 @@ export function useAgentLoop({
   }, [messages, todos]);
 
   // Synchronize local messages and todos state when external savedSession changes.
-  // Guard with content comparison to prevent triggering a re-render loop:
-  // savedSession changes → setMessages → onSessionUpdate → setSessions → savedSession changes → ...
+  // After updating local state, pre-populate lastReportedRef so that the A effect
+  // (onSessionUpdate reporter) treats this as "already reported" and skips the
+  // onSessionUpdate call — this breaks the cycle:
+  //   B sets messages → A fires → onSessionUpdate → setSessions → savedSession ref changes → B fires...
   const lastSavedSessionRef = useRef(null);
   useEffect(() => {
     if (isRunning) return; // Skip updating during active run to avoid race condition with stream delta
@@ -72,6 +74,13 @@ export function useAgentLoop({
     console.log('[DEBUG B] savedSession sync effect', { hasSaved: !!savedSession, msgLen: incoming.messages.length, same });
     if (same) return; // No actual change
     lastSavedSessionRef.current = incomingStr;
+
+    // Pre-fill lastReportedRef BEFORE calling setMessages/setTodos.
+    // This prevents the A effect from seeing these state changes as "new user-generated
+    // content" and calling onSessionUpdate, which would trigger setSessions → savedSession
+    // ref changes → this effect again → infinite loop.
+    lastReportedRef.current.messages = JSON.stringify(incoming.messages);
+    lastReportedRef.current.todos = JSON.stringify(incoming.todos);
 
     setMessages(incoming.messages);
     setTodos(incoming.todos);
