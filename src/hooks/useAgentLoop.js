@@ -29,8 +29,8 @@ export function useAgentLoop({
   onSessionUpdate,
   onSessionReset,
 }) {
-  const [messages, setMessages] = useState(savedSession?.messages || harness.trajectory || []);
-  const [todos, setTodos] = useState(savedSession?.todos || harness.todos || []);
+  const [messages, setMessages] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [cacheStats, setCacheStats] = useState({ hitTokens: 0, missTokens: 0 });
   const [contextTokens, setContextTokens] = useState(0);
@@ -44,6 +44,18 @@ export function useAgentLoop({
       onSessionUpdate(messages, todos);
     }
   }, [messages, todos]);
+
+  // Synchronize local messages and todos state when external savedSession changes
+  useEffect(() => {
+    if (isRunning) return; // Skip updating during active run to avoid race condition with stream delta
+    if (savedSession) {
+      setMessages(savedSession.messages || []);
+      setTodos(savedSession.todos || []);
+    } else {
+      setMessages(harness?.trajectory || []);
+      setTodos(harness?.todos || []);
+    }
+  }, [savedSession, harness, isRunning]);
 
   // 按 turn 分组
   const turns = {};
@@ -59,14 +71,15 @@ export function useAgentLoop({
   const currentTokens = estimateTokens(messages, thinkingEnabled, systemPrompt, harness.tools, contextTokens, compactionEnabled);
 
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
-  const runAgentLoop = async (currentMessages) => {
+  const runAgentLoop = async (currentMessages, currentTodos = todos) => {
     try {
       const res = await fetch('http://localhost:3001/api/agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          harnessId: harness?.id,
           messages: currentMessages,
-          todos,
+          todos: currentTodos,
           systemPrompt,
           tools: harness.tools,
           features: harness.features || {},
@@ -327,8 +340,28 @@ export function useAgentLoop({
           content: `❌ **网络或运行异常**\n\n${err.message}`
         }
       ]);
+    } finally {
+      setIsRunning(false);
     }
   };
+
+  // Detect background task state and auto-attach SSE stream
+  useEffect(() => {
+    if (!harness?.id) return;
+    
+    fetch(`http://localhost:3001/api/agent/status/${harness.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.isRunning) {
+          console.log(`🔌 Background task found for ${harness.id}, auto attaching...`);
+          setIsRunning(true);
+          const latestMessages = savedSession?.messages || harness?.trajectory || [];
+          const latestTodos = savedSession?.todos || harness?.todos || [];
+          runAgentLoop(latestMessages, latestTodos);
+        }
+      })
+      .catch(err => console.error("Failed to fetch running status:", err));
+  }, [harness?.id]);
 
   /** 处理发送消息 */
   const handleSend = async () => {
