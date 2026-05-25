@@ -84,6 +84,7 @@ export class AgentExecutor {
     this.contextTokens = 0;
     this._lastInputTokens = 0;
     this.hardCompactTriggered = false;
+    this.saveQueue = Promise.resolve();
   }
 
   /**
@@ -96,22 +97,31 @@ export class AgentExecutor {
       return;
     }
 
-    try {
-      const sessionPath = path.join(process.cwd(), 'server', 'sessions', `${this.harnessId}.json`);
-      const sessionsDir = path.dirname(sessionPath);
-
-      // Ensure that server/sessions/ directory exists
-      await fs.mkdir(sessionsDir, { recursive: true });
-
-      // Auto-save agent messages and todos state to session file
-      await fs.writeFile(
-        sessionPath,
-        JSON.stringify({ messages: this.messages, todos: this.todos }, null, 2),
-        'utf-8'
-      );
-    } catch (err) {
-      console.error('[AgentExecutor] Failed to save session:', err);
+    if (!this.saveQueue) {
+      this.saveQueue = Promise.resolve();
     }
+
+    // Queue up the save operation to prevent concurrent writes corruption
+    this.saveQueue = this.saveQueue.then(async () => {
+      try {
+        const sessionPath = path.join(process.cwd(), 'server', 'sessions', `${this.harnessId}.json`);
+        const sessionsDir = path.dirname(sessionPath);
+
+        // Ensure that server/sessions/ directory exists
+        await fs.mkdir(sessionsDir, { recursive: true });
+
+        // Auto-save agent messages and todos state to session file
+        await fs.writeFile(
+          sessionPath,
+          JSON.stringify({ messages: this.messages, todos: this.todos }, null, 2),
+          'utf-8'
+        );
+      } catch (err) {
+        console.error('[AgentExecutor] Failed to save session:', err);
+      }
+    });
+
+    await this.saveQueue;
   }
 
   /**
@@ -178,7 +188,7 @@ export class AgentExecutor {
 
     const requestBody = {
       model: this.model.modelId || 'claude-sonnet-4-5',
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: systemPrompt,
       messages: apiMessages,
       stream: false
