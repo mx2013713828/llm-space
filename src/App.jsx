@@ -176,11 +176,16 @@ function AppContent() {
     })
     .catch(err => {
       console.error("加载 Harness 详情或 Session 失败:", err);
-      if (harnessFiles.length > 0) {
-        navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
-      }
+      fetch('http://localhost:3001/api/harnesses')
+        .then(res => res.json())
+        .then(files => {
+          if (files.length > 0) {
+            navigate(`/${files[0].id}/${activeTab}`, { replace: true });
+          }
+        })
+        .catch(console.error);
     });
-  }, [activeHarnessId, harnessFiles, navigate]);
+  }, [activeHarnessId, navigate, activeTab]);
 
   const currentSession = sessions[activeHarnessId] || null;
 
