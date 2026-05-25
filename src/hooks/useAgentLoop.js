@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState } from '../lib/messageBuilder.js';
 
 /**
@@ -38,23 +38,42 @@ export function useAgentLoop({
   const textareaRef = useRef(null);
   const [inputText, setInputText] = useState('');
 
-  // 同步状态到上层
+  // Track last reported content to avoid triggering onSessionUpdate unnecessarily
+  const lastReportedRef = useRef({ messages: null, todos: null });
+
+  // Sync local state up to parent — only when content actually changes
   useEffect(() => {
-    if (onSessionUpdate) {
-      onSessionUpdate(messages, todos);
+    if (!onSessionUpdate) return;
+    const newMsgStr = JSON.stringify(messages);
+    const newTodoStr = JSON.stringify(todos);
+    if (
+      lastReportedRef.current.messages === newMsgStr &&
+      lastReportedRef.current.todos === newTodoStr
+    ) {
+      return; // Skip if content is identical to last report
     }
+    lastReportedRef.current.messages = newMsgStr;
+    lastReportedRef.current.todos = newTodoStr;
+    onSessionUpdate(messages, todos);
   }, [messages, todos]);
 
-  // Synchronize local messages and todos state when external savedSession changes
+  // Synchronize local messages and todos state when external savedSession changes.
+  // Guard with content comparison to prevent triggering a re-render loop:
+  // savedSession changes → setMessages → onSessionUpdate → setSessions → savedSession changes → ...
+  const lastSavedSessionRef = useRef(null);
   useEffect(() => {
     if (isRunning) return; // Skip updating during active run to avoid race condition with stream delta
-    if (savedSession) {
-      setMessages(savedSession.messages || []);
-      setTodos(savedSession.todos || []);
-    } else {
-      setMessages(harness?.trajectory || []);
-      setTodos(harness?.todos || []);
-    }
+
+    const incoming = savedSession
+      ? { messages: savedSession.messages || [], todos: savedSession.todos || [] }
+      : { messages: harness?.trajectory || [], todos: harness?.todos || [] };
+
+    const incomingStr = JSON.stringify(incoming);
+    if (lastSavedSessionRef.current === incomingStr) return; // No actual change
+    lastSavedSessionRef.current = incomingStr;
+
+    setMessages(incoming.messages);
+    setTodos(incoming.todos);
   }, [savedSession, harness, isRunning]);
 
   // 按 turn 分组

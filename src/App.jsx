@@ -185,7 +185,7 @@ function AppContent() {
         })
         .catch(console.error);
     });
-  }, [activeHarnessId, navigate, activeTab]);
+  }, [activeHarnessId, navigate]);
 
   const currentSession = sessions[activeHarnessId] || null;
 
