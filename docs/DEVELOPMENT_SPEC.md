@@ -72,11 +72,37 @@ Agent 的物理生命周期与前端页面生命周期是解耦的。
 - **纯函数优先**：像 Token 估算、Payload 装配、软压缩等逻辑，必须设计为零副作用的**纯函数 (Pure Functions)**，方便独立进行单元测试，也确保这些过程不会意外污染对象的状态。
 - **可选配 (Feature Flags)**：任何改变核心运行逻辑的新特性，在初期必须通过 `features.xxx_enabled` 的开关来控制，确保如果不开启该特性，代码逻辑能 100% 走经典 ReAct 路径。
 
-### 2. Agent-Loop 生命周期插入顺序 (Lifecycle Order)
-在 `AgentExecutor` 的主循环（ReAct Loop）中插入新逻辑时，必须严格遵守以下生命周期顺序，绝不能乱序：
-1. **防呆与兜底检测**：循环开始前的第一步，永远是 Token 检查、轮次防爆检查，确保上一步的操作没有导致物理内存溢出。
-2. **状态拦截与压缩 (Compaction Stage)**：在向 API 发送请求前，先进行 Soft Compact / Hard Compact。只有在这个阶段压缩，才能保证发送给 API 的永远是最新鲜且合规的 Payload。
-3. **Payload 组装与对齐 (Message Building)**：进行动静分离（将 Skills 放在末尾）、注入任务看板 `<current_tasks_status>` 以及系统催促 `<system_reminder>`。必须在向大模型发送请求的最后一刻进行，防止被早期的压缩逻辑破坏。
-4. **LLM 网络请求 (API Call)**：发起网络请求，并在 `try-catch` 中妥善处理所有的 `timeout`、`502`、解析错误。如果网络挂了，必须向消息序列中写入系统错误提示 `role: 'assistant', type: 'text'` 并 break，而不是直接抛错崩溃。
-5. **工具并发调度 (Tool Execution)**：解析到 `tool_use` 时，优先检查 `features.parallel_tool_execution`，并利用 `Promise.all` 发起并发工具调用。
-6. **副作用结算 (State Persist)**：每个循环周期的最后，必定是持久化落盘（`saveSession`）和向前端发送 SSE 广播更新。绝不能在循环中间的断点随意落盘，以免保存了半脏的数据。
+### 2. Hook-Based Agent Loop 架构 (生命周期规范)
+参考业界成熟的 Agent 设计理念（如 Claude Code），在 `AgentExecutor` 的主循环（ReAct Loop）中插入新特性或功能时，必须严格遵守基于 Hook（生命周期钩子） 的流转顺序。
+我们应该避免把所有的 `if-else` 堆砌在主循环中，未来的扩展应遵循以下标准化执行流水线：
+
+1. **`UserPromptSubmit` (用户输入处理)**：
+   - 作用：记录、注入、审计用户输入。
+   - 时机：循环开始前。例如初始的 Token 检查、防暴走检测。
+
+2. **`PreLLM / State Assembly` (大模型调用前)**：
+   - 作用：组装上下文与记忆。
+   - 机制：
+     - **cron / background**：注入后台任务的完成通知（`<task_notification>`）。
+     - **Compaction**：触发上下文软清洗（Soft Compact）或纪元重建（Hard Compact）。
+     - **Prompt Builder**：动静分离、注入按需加载的 Skills 列表、合并 `todos` 看板状态（`<current_tasks_status>`）。
+
+3. **`LLM Call` (网络请求层)**：
+   - 作用：发起模型请求，处理超时、502 重试、Fallback 降级。
+   - 错误恢复：如遇请求失败，不应直接崩溃，而是记录 Error Message 并结束当前轮次，等待人类干预或自动重试。
+
+4. **`PreToolUse` (工具执行前防线)**：
+   - 作用：拦截与权限审查。
+   - 机制：当解析到 `tool_use` 块时，在此处验证是否是危险命令。未授权的写入或高危 Bash 可以在此挂起，并请求前端提供手动审批（Manual Review）。
+
+5. **`Tool Dispatch` (工具调度与执行)**：
+   - 作用：真正的物理层执行。
+   - 机制：并发调度（基于 `features.parallel_tool_execution`），或者将慢速的 Bash 任务派发到后台 daemon 线程，主循环先返回占位结果。
+
+6. **`PostToolUse` (工具后处理)**：
+   - 作用：结果审计与落盘。
+   - 机制：大输出文本的自动物理截断与卸载（Offload），向前端发送实时的 `tool_exec_done` 广播。
+
+7. **`Stop` (循环退出)**：
+   - 作用：统计、清理与状态结算。
+   - 机制：如果本轮没有 `tool_use`（模型输出纯文本），则触发 `saveSession` 持久化，并向前端广播回合结束，等待下一轮用户输入。
