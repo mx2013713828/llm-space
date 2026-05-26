@@ -293,10 +293,9 @@ export function checkIfAnthropic(modelConfig) {
  * @param {Array} tools 原始 Tools 数组 (API 标准 Schema 格式)
  * @param {Array} apiMessages 已经过 buildApiMessages 与看板注入的最终 messages 数组
  * @param {Object} modelConfig 模型配置
- * @param {Array} skills 启用的技能 ID 列表
  * @returns {{ system: string|Array, tools: Array, messages: Array }} 转换后的大模型请求 payload
  */
-export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfig, skills = []) {
+export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfig) {
   const isAnthropic = checkIfAnthropic(modelConfig);
 
   // 1. Tools 列表进行字母排序 (按 name 排序对齐)
@@ -306,20 +305,8 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
     alignedTools.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // 2. System Prompt 处理：保持用户原始输入，仅在尾部追加按需加载的 Skills 目录
+  // 2. System Prompt 处理：保持用户原始输入
   let finalSystemText = systemPrompt || '';
-
-  if (skills && skills.length > 0) {
-    const skillsPrompt = `\n\n<available_skills>\nThe following professional skills (Skills) are available in the current session. If you need to perform complex tasks related to these skills, you must use the \`read_file\` tool to read the corresponding \`SKILL.md\` guide to acquire precise domain knowledge and constraints:\n\n${skills.map(s => {
-      // Compatible with legacy pure string IDs
-      const skillId = typeof s === 'string' ? s : s.id;
-      const skillFilePath = typeof s === 'string' ? `skills/${s}/SKILL.md` : s.file;
-      const description = typeof s === 'string' ? 'Professional skill description' : (s.description || s.desc || 'Professional skill description');
-      
-      return `- **${skillId}** (read \`${skillFilePath}\` to activate): ${description}`;
-    }).join('\n')}\n</available_skills>`;
-    finalSystemText += skillsPrompt;
-  }
 
   // 3. 浅拷贝 apiMessages 以免直接 Mutation 影响外部原始数据
   let alignedMessages = (apiMessages || []).map(msg => ({
