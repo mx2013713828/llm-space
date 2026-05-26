@@ -37,4 +37,4 @@ harnesses/*
 .task_outputs/
 .transcripts/
 .offloaded/
-docs/DEVELOPMENT_SPEC.en.md
+docs/
