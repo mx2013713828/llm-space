@@ -20,6 +20,10 @@ export const CompactionPlugin = {
       console.log(`[CompactionPlugin] 距离上次软清洗不到 ${cooldown} 轮 (当前: ${turnIndex}, 上次: ${executor.lastSoftCompactTurn})，跳过软清洗。`);
     }
 
+    if (!executor.features?.context_compaction?.soft_compact) {
+      shouldTrySoft = false;
+    }
+
     if (shouldTrySoft) {
       // 1. Soft Compact Epoch
       const compactResult = compactMessages(
@@ -49,7 +53,7 @@ export const CompactionPlugin = {
 
     // 2. Hard Compact Stage 2
     const tokensAfterSoft = executor.contextTokens > 0 ? executor.contextTokens : executor.estimateCurrentTokens();
-    if (executor.compactionEnabled && tokensAfterSoft > HARD_COMPACT_TOKEN_THRESHOLD && !executor.hardCompactTriggered && executor.messages.length > 10) {
+    if (executor.compactionEnabled && executor.features?.context_compaction?.hard_compact && tokensAfterSoft > HARD_COMPACT_TOKEN_THRESHOLD && !executor.hardCompactTriggered && executor.messages.length > 10) {
       try {
         console.log(`🌊 触发 Hard-Compact 全量语义总结，当前 Token 估算：${tokensAfterSoft}...`);
 

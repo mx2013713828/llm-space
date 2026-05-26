@@ -11,6 +11,7 @@ import { OutputOffloadPlugin } from './plugins/OutputOffloadPlugin.js';
 import { SubAgentPlugin } from './plugins/SubAgentPlugin.js';
 import { SkillsPlugin } from './plugins/SkillsPlugin.js';
 import { SecurityPlugin } from './plugins/SecurityPlugin.js';
+import { parseFeatures } from './FeatureParser.js';
 
 
 // 物理常量配置
@@ -59,7 +60,7 @@ export class AgentExecutor {
     this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.systemPrompt = systemPrompt;
     this.tools = tools;
-    this.features = features;
+    this.features = parseFeatures(features);
     this.model = model;
     this.temperature = temperature;
     this.maxTokens = maxTokens;
@@ -68,7 +69,7 @@ export class AgentExecutor {
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
-    this.compactionEnabled = this.features.context_compaction !== false;
+    this.compactionEnabled = !!(this.features.context_compaction && this.features.context_compaction.enabled);
     this.contextTokens = 0;
     this._lastInputTokens = 0;
     this.hardCompactTriggered = false;
@@ -86,13 +87,13 @@ export class AgentExecutor {
     // Skills 插件默认开启（它内部会判断 this.features.enable_skills）
     this.hooks.register(SkillsPlugin);
     
-    if (this.features.context_compaction !== false) {
+    if (this.features.context_compaction && this.features.context_compaction.enabled) {
       this.hooks.register(CompactionPlugin);
     }
     if (this.features.todo_nag !== false) {
       this.hooks.register(TodoNagPlugin);
     }
-    if (this.features.output_offload !== false) {
+    if (this.features.context_compaction && this.features.context_compaction.enabled && this.features.context_compaction.output_offload) {
       this.hooks.register(OutputOffloadPlugin);
     }
     this.hooks.register(SubAgentPlugin);
@@ -148,7 +149,7 @@ export class AgentExecutor {
       this.systemPrompt,
       this.tools,
       this.contextTokens,
-      this.compactionEnabled
+      this.features.context_compaction
     );
   }
 
@@ -229,7 +230,7 @@ export class AgentExecutor {
         const context = {
           executor: this,
           messages: this.messages,
-          apiMessages: buildApiMessages(this.messages, this.thinkingEnabled, this.compactionEnabled),
+          apiMessages: buildApiMessages(this.messages, this.thinkingEnabled, this.features.context_compaction),
           systemPrompt: this.systemPrompt || '',
           tools: this.tools,
           turnIndex,

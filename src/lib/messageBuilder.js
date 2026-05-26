@@ -73,8 +73,12 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
         currentAssistantContent.push({ type: 'text', text: msg.content });
       } else if (msg.type === 'thinking' && thinkingEnabled) {
         let thinkingContent = msg.content;
-        // 实时精准折叠：如果开启了压缩，且不是正在等待结果的工具周期内的 Thinking，立刻折叠为占位符
-        if (compactionEnabled && !shouldKeepThinking(msg, idx)) {
+        // compactionEnabled 可以是一个布尔值（向下兼容），也可以是一个配置对象
+        const isThinkingCompactionEnabled = (compactionEnabled && typeof compactionEnabled === 'object')
+          ? (compactionEnabled.enabled && compactionEnabled.thinking_compaction)
+          : !!compactionEnabled;
+
+        if (isThinkingCompactionEnabled && !shouldKeepThinking(msg, idx)) {
           thinkingContent = '[Thinking folded]';
         }
         const b = { type: 'thinking', thinking: thinkingContent };

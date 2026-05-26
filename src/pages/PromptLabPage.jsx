@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FEATURE_SCHEMA, parseFeatures } from '../lib/FeatureSchema.js';
 
 /**
  * Prompt Lab 页面
@@ -11,8 +12,9 @@ export function PromptLabPage({ harness, onSave }) {
   const [availableTools, setAvailableTools] = useState([]);
   const [availableSkills, setAvailableSkills] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
-  const [features, setFeatures] = useState(harness.features || {});
+  const [features, setFeatures] = useState(() => parseFeatures(harness.features));
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+
 
   useEffect(() => {
     let active = true;
@@ -79,6 +81,51 @@ export function PromptLabPage({ harness, onSave }) {
         return [...prev, tool];
       }
     });
+  };
+
+  const handleFeatureChange = (key, val) => {
+    setFeatures(prev => {
+      const updated = { ...prev };
+      const meta = FEATURE_SCHEMA[key];
+      
+      if (meta.type === 'boolean') {
+        updated[key] = val;
+      } else if (meta.type === 'group') {
+        updated[key] = {
+          enabled: val,
+          ...Object.keys(meta.children).reduce((acc, subKey) => {
+            // 如果是重新开启父开关，且上一次父开关不是开启状态 (说明是从关闭变为开启)，直接重置为 defaultValue 确保体验干净
+            acc[subKey] = val
+              ? (prev[key]?.enabled ? (prev[key]?.[subKey] ?? meta.children[subKey].defaultValue) : meta.children[subKey].defaultValue)
+              : meta.children[subKey].defaultValue;
+            return acc;
+          }, {})
+        };
+      }
+      return updated;
+    });
+
+    // 触发联动特性的前端生命周期与副作用
+    if (key === 'enable_skills') {
+      if (!val && activeTab === 'skills') {
+        setActiveTab('editor');
+      }
+    } else if (key === 'enable_global_skills') {
+      fetch(`http://localhost:3001/api/skills?global=${val}`)
+        .then(r => r.json())
+        .then(data => setAvailableSkills(data))
+        .catch(console.error);
+    }
+  };
+
+  const handleSubFeatureChange = (parentKey, subKey, val) => {
+    setFeatures(prev => ({
+      ...prev,
+      [parentKey]: {
+        ...prev[parentKey],
+        [subKey]: val
+      }
+    }));
   };
 
   useEffect(() => {
@@ -336,108 +383,89 @@ export function PromptLabPage({ harness, onSave }) {
             <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
               🔬 这里是 Agent 架构互动实验室的高级特性开关。你可以在这里自由开启或关闭各项底层架构能力。
             </div>
-            
-            <div className="card" style={{ padding: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={features.enable_skills !== false}
-                  onChange={e => {
-                    const nextVal = e.target.checked;
-                    setFeatures(prev => ({ ...prev, enable_skills: nextVal }));
-                    if (!nextVal && activeTab === 'skills') {
-                      setActiveTab('editor');
-                    }
-                  }}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>启用技能框架 (Enable Skills)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，工作台将启用 Skills 配置与对齐注入功能。关闭则隐藏 Skills Tab，且不对大模型注入任何技能提示词。
-                  </div>
-                </div>
-              </label>
-            </div>
 
-            <div className="card" style={{ padding: 16, opacity: features.enable_skills === false ? 0.5 : 1, pointerEvents: features.enable_skills === false ? 'none' : 'auto' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: features.enable_skills === false ? 'not-allowed' : 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  disabled={features.enable_skills === false}
-                  checked={features.enable_global_skills === true && features.enable_skills !== false}
-                  onChange={e => {
-                    const nextVal = e.target.checked;
-                    setFeatures(prev => ({ ...prev, enable_global_skills: nextVal }));
-                    // 动态更新技能加载列表
-                    fetch(`http://localhost:3001/api/skills?global=${nextVal}`)
-                      .then(r => r.json())
-                      .then(data => setAvailableSkills(data))
-                      .catch(console.error);
-                  }}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>启用全局技能库挂载 (Enable Global Skills)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，工作台将有条件地扫描本地全局技能目录（`~/.agents/skills/`）并动态融入当前项目技能池中，供直接勾选和调试（项目同名技能优先）。关闭则退回纯项目级技能。
+            {Object.entries(FEATURE_SCHEMA).map(([key, meta]) => {
+              if (meta.type === 'boolean') {
+                return (
+                  <div key={key} className="card" style={{ padding: 16 }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!features[key]}
+                        onChange={(e) => handleFeatureChange(key, e.target.checked)}
+                        style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                          {meta.description}
+                        </div>
+                      </div>
+                    </label>
                   </div>
-                </div>
-              </label>
-            </div>
+                );
+              } else if (meta.type === 'group') {
+                const isParentEnabled = !!(features[key]?.enabled ?? features[key]);
+                return (
+                  <div key={key} className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={isParentEnabled}
+                        onChange={(e) => handleFeatureChange(key, e.target.checked)}
+                        style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                          {meta.description}
+                        </div>
+                      </div>
+                    </label>
 
-            <div className="card" style={{ padding: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={features.parallel_tool_execution || false}
-                  onChange={e => setFeatures({ ...features, parallel_tool_execution: e.target.checked })}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段一：并行工具执行 (Parallel Tool Execution)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，如果大模型在同一回合输出了多个 tool call（如同时查寻多个网页或读多个文件），底层 Harness 将使用并发（Promise.all）执行，大幅缩短等待时间。关闭则退回传统的串行等待。
+                    {/* 二级配置：父开关开启时显现，关闭时置灰且锁定交互 */}
+                    <div
+                      style={{
+                        paddingLeft: 24,
+                        marginTop: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 14,
+                        borderLeft: '2px solid var(--border)',
+                        opacity: isParentEnabled ? 1 : 0.4,
+                        pointerEvents: isParentEnabled ? 'auto' : 'none',
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                    >
+                      {Object.entries(meta.children).map(([subKey, subMeta]) => {
+                        const isSubEnabled = isParentEnabled && !!features[key]?.[subKey];
+                        return (
+                          <label key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>
+                            <input
+                              type="checkbox"
+                              disabled={!isParentEnabled}
+                              checked={isSubEnabled}
+                              onChange={(e) => handleSubFeatureChange(key, subKey, e.target.checked)}
+                              style={{ transform: 'scale(1.1)', marginTop: 3 }}
+                            />
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
+                                {subMeta.description}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="card" style={{ padding: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={features.context_compaction !== false}
-                  onChange={e => setFeatures({ ...features, context_compaction: e.target.checked })}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段二：上下文压缩与实时折叠 (Context Compaction)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，当上下文长度或回合数超过阈值时，底层 Harness 会将已结算的思维链 (thinking block) 替换为固定的占位符 `[Thinking folded]`，以保证前缀一致，友好兼容 Prompt Cache 并节省大量 Token 消耗。同时对旧历史中的冗余数据进行清洗折叠。关闭则保留完整思维链与数据上下文。
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="card" style={{ padding: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={features.enable_security || false}
-                  onChange={e => setFeatures({ ...features, enable_security: e.target.checked })}
-                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
-                />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段七：安全防护与规则审批防线 (Security & Defense)</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    开启后，系统将启用基于 Hook 的物理安全防线。拦截执行工作区外写操作以及高危 Bash 命令，遇到可疑操作会暂停 ReAct 循环，并在前端弹出审核窗口等待用户授权；同时对高危命令提供永久硬拒绝列表（Deny List）。关闭则直接执行。
-                  </div>
-                </div>
-              </label>
-            </div>
+                );
+              }
+              return null;
+            })}
           </div>
         )}
+
 
         {/* 模板库 */}
         {activeTab === 'templates' && (

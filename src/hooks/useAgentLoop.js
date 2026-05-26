@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { buildApiMessages, compactMessages, estimateTokens, injectTodoState } from '../lib/messageBuilder.js';
+import { useState, useEffect, useRef } from 'react';
+import { estimateTokens } from '../lib/messageBuilder.js';
+import { parseFeatures } from '../lib/FeatureSchema.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -129,7 +130,9 @@ export function useAgentLoop({
         try {
           const errData = await res.json();
           errorMsg = errData.error || errorMsg;
-        } catch (e) { }
+        } catch {
+          /* ignore */
+        }
         throw new Error(errorMsg);
       }
 
@@ -286,7 +289,7 @@ export function useAgentLoop({
                   if (idx === targetIdx) {
                     const newRaw = item.toolInputRaw + evt.partial;
                     let parsed = { ...item.toolInput };
-                    try { parsed = JSON.parse(newRaw); } catch { }
+                    try { parsed = JSON.parse(newRaw); } catch { /* ignore */ }
                     return { ...item, toolInputRaw: newRaw, toolInput: parsed };
                   }
                   return item;
@@ -517,3 +520,7 @@ export function useAgentLoop({
     handlePermissionDecision,
   };
 }
+
+export const getInitialFeatures = () => {
+  return parseFeatures(undefined);
+};
