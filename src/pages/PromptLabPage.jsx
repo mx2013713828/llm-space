@@ -419,6 +419,23 @@ export function PromptLabPage({ harness, onSave }) {
                 </div>
               </label>
             </div>
+
+            <div className="card" style={{ padding: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={features.enable_security || false}
+                  onChange={e => setFeatures({ ...features, enable_security: e.target.checked })}
+                  style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>阶段七：安全防护与规则审批防线 (Security & Defense)</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    开启后，系统将启用基于 Hook 的物理安全防线。拦截执行工作区外写操作以及高危 Bash 命令，遇到可疑操作会暂停 ReAct 循环，并在前端弹出审核窗口等待用户授权；同时对高危命令提供永久硬拒绝列表（Deny List）。关闭则直接执行。
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 

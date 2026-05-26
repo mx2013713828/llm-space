@@ -20,7 +20,9 @@ export function TrajectoryView({
   setShowContextInspector,
   handleResetSession,
   handleRetryTurn,
-  loopCount
+  loopCount,
+  pendingPermission,
+  handlePermissionDecision
 }) {
   const maxTokens = 200000;
   const tokenPercent = Math.min(100, (currentTokens / maxTokens) * 100);
@@ -36,7 +38,7 @@ export function TrajectoryView({
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
       {/* 右侧 Tab 栏 */}
       <div style={{
         display: 'flex', gap: 4, padding: '8px 16px', flexShrink: 0,
@@ -173,6 +175,149 @@ export function TrajectoryView({
           </button>
         </div>
       </div>
+
+      {/* 安全拦截审批弹窗 */}
+      {pendingPermission && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 24,
+          boxSizing: 'border-box'
+        }}>
+          <div className="card animate-fade-in" style={{
+            width: '100%',
+            maxWidth: 520,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* 警告头部 */}
+            <div style={{
+              padding: '16px 20px',
+              background: 'linear-gradient(90deg, #d97706, #b45309)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-pulse">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.05em' }}>安全防护：敏感操作等待授权</div>
+            </div>
+
+            {/* 内容区 */}
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                Agent 代理试图在后台触发敏感系统行为。根据工作台安全卫士策略，当前 ReAct 循环已被挂起，请您审查该行为以防潜在危险：
+              </div>
+
+              {/* 规则命中说明 */}
+              <div style={{
+                padding: '12px 14px',
+                background: 'rgba(217, 119, 6, 0.06)',
+                border: '1px solid rgba(217, 119, 6, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 12,
+                color: '#d97706',
+                lineHeight: 1.5,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8
+              }}>
+                <span style={{ fontSize: 14 }}>⚠️</span>
+                <div>{pendingPermission.reason}</div>
+              </div>
+
+              {/* 代码与命令行高亮 */}
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>工具及参数调用</div>
+                <div style={{
+                  background: 'var(--bg-base)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: 14,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--text-primary)',
+                  maxHeight: 180,
+                  overflowY: 'auto'
+                }}>
+                  <div style={{ color: 'var(--blue)', fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🔧</span> {pendingPermission.toolName}
+                  </div>
+                  <pre style={{
+                    margin: 0,
+                    padding: 0,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    lineHeight: 1.6,
+                    fontSize: 11,
+                    color: 'var(--text-secondary)'
+                  }}>
+                    {JSON.stringify(pendingPermission.toolInput, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* 动作按钮栏 */}
+            <div style={{
+              padding: '14px 20px',
+              background: 'var(--bg-surface)',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12
+            }}>
+              <button
+                className="btn btn-ghost"
+                style={{
+                  borderColor: 'var(--red)',
+                  color: 'var(--red)',
+                  padding: '6px 18px',
+                  fontSize: 12,
+                  fontWeight: 600
+                }}
+                onClick={() => handlePermissionDecision(pendingPermission.toolCallId, 'deny')}
+              >
+                拒绝执行 (Deny)
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '6px 22px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+                onClick={() => handlePermissionDecision(pendingPermission.toolCallId, 'allow')}
+              >
+                允许执行 (Allow)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

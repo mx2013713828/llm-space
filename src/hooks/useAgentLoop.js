@@ -34,6 +34,7 @@ export function useAgentLoop({
   const [isRunning, setIsRunning] = useState(false);
   const [cacheStats, setCacheStats] = useState({ hitTokens: 0, missTokens: 0 });
   const [contextTokens, setContextTokens] = useState(0);
+  const [pendingPermission, setPendingPermission] = useState(null);
 
   const textareaRef = useRef(null);
   const [inputText, setInputText] = useState('');
@@ -165,6 +166,15 @@ export function useAgentLoop({
           try { evt = JSON.parse(raw); } catch { continue; }
 
           switch (evt.type) {
+            case 'permission_request':
+              setPendingPermission({
+                toolCallId: evt.toolCallId,
+                toolName: evt.toolName,
+                toolInput: evt.toolInput,
+                reason: evt.reason
+              });
+              break;
+
             case 'messages_update':
               // 接收后端触发的上下文压缩或历史变更
               setMessages(evt.messages);
@@ -379,6 +389,11 @@ export function useAgentLoop({
     fetch(`http://localhost:3001/api/agent/status/${harness.id}`)
       .then(res => res.json())
       .then(data => {
+        if (data.pendingPermission) {
+          setPendingPermission(data.pendingPermission);
+        } else {
+          setPendingPermission(null);
+        }
         if (data.isRunning) {
           console.log(`🔌 Background task found for ${harness.id}, auto attaching...`);
           setIsRunning(true);
@@ -429,6 +444,7 @@ export function useAgentLoop({
     if (window.confirm('确定要重置当前 Harness 的 Session（清空对话与 TODO 状态）吗？')) {
       setMessages([]);
       setTodos([]);
+      setPendingPermission(null);
       setContextTokens(0);
       if (onSessionReset) onSessionReset();
     }
@@ -451,6 +467,28 @@ export function useAgentLoop({
     }
   };
 
+  /** 提交审批决定 */
+  const handlePermissionDecision = async (toolCallId, decision) => {
+    try {
+      const res = await fetch('http://localhost:3001/api/agent/permission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toolCallId,
+          decision
+        })
+      });
+      if (res.ok) {
+        setPendingPermission(null);
+      } else {
+        const data = await res.json();
+        alert(`安全审批处理失败: ${data.error || '未知错误'}`);
+      }
+    } catch (err) {
+      alert(`审批网络异常: ${err.message}`);
+    }
+  };
+
   return {
     // 消息和状态
     messages,
@@ -463,6 +501,7 @@ export function useAgentLoop({
     currentTokens,
     cacheStats,
     contextTokens,
+    pendingPermission,
 
     // 输入控制
     inputText,
@@ -475,5 +514,6 @@ export function useAgentLoop({
     // Session 管理
     handleResetSession,
     handleRetryTurn,
+    handlePermissionDecision,
   };
 }

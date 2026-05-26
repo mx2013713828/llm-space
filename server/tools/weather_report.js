@@ -41,7 +41,7 @@ export default {
 风速: ${current.wind_speed_10m} km/h`;
 
     } catch (error) {
-      return `获取天气失败: ${error.message}`;
+      return `获取天气失败: ${error.message}。\n💡 提示：此工具需要访问境外 Open-Meteo 气象服务。如果您处于国内网络环境，请在根目录的 '.env' 文件中配置本地代理（例如追加：HTTPS_PROXY=http://127.0.0.1:你的代理端口），然后重新启动项目。`;
     }
   }
 };

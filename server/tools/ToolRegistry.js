@@ -30,8 +30,8 @@ class ToolRegistry {
    * @param {Array<string>} enabledToolNames 启用的工具名列表，若为空则返回全部
    * @returns {Array<Object>}
    */
-  getSchemas(enabledToolNames = []) {
-    const targetTools = enabledToolNames.length > 0
+  getSchemas(enabledToolNames) {
+    const targetTools = Array.isArray(enabledToolNames)
       ? enabledToolNames.map(name => this.tools[name]).filter(Boolean)
       : Object.values(this.tools);
 

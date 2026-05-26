@@ -157,6 +157,7 @@
     "parallel_tool_execution": true,
     "context_compaction": true,
     "enable_global_skills": true,
-    "enable_skills": true
+    "enable_skills": true,
+    "enable_security": true
   }
 }

@@ -3,6 +3,9 @@
  * 转发请求到 Anthropic 兼容 API，解决浏览器 CORS 限制
  * 支持 SSE 流式输出、extended thinking、工具调用
  */
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
@@ -12,6 +15,7 @@ import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { getToolSchemas } from './server/tools/index.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
 import { alignRequestPayload } from './server/agent/messageBuilder.js';
+import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -622,18 +626,13 @@ app.post('/api/agent/run', async (req, res) => {
     return res.status(400).json({ error: '缺少 harnessId' });
   }
 
-  if (!model?.key) {
-    return res.status(400).json({ error: '缺少 API Key' });
-  }
-
-  // 设置 SSE 响应头
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
   // Branch 1: The job is already running
   if (activeJobs.has(harnessId)) {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
     const job = activeJobs.get(harnessId);
     job.clients.add(res);
 
@@ -650,6 +649,17 @@ app.post('/api/agent/run', async (req, res) => {
     });
     return;
   }
+
+  // Branch 2: The job is not running yet - requires API Key
+  if (!model?.key) {
+    return res.status(400).json({ error: '缺少 API Key' });
+  }
+
+  // 设置 SSE 响应头 (启动新运行任务)
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
   // Branch 2: The job is not running yet
   const executor = new AgentExecutor({
@@ -697,11 +707,31 @@ app.post('/api/agent/run', async (req, res) => {
   }
 });
 
+/** 提交安全审批决定 */
+app.post('/api/agent/permission', (req, res) => {
+  const { toolCallId, decision } = req.body;
+  if (!toolCallId || !['allow', 'deny'].includes(decision)) {
+    return res.status(400).json({ error: '缺少有效的 toolCallId 或 decision' });
+  }
+
+  const success = SecurityPlugin.resolvePermission(toolCallId, decision);
+  if (success) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: '未找到对应处于挂起状态的权限申请' });
+  }
+});
+
 /** 查询任务运行状态 */
 app.get('/api/agent/status/:harnessId', (req, res) => {
   const harnessId = req.params.harnessId;
-  const isRunning = activeJobs.has(harnessId);
-  res.json({ isRunning });
+  const job = activeJobs.get(harnessId);
+  const isRunning = !!job;
+  let pendingPermission = null;
+  if (job && job.executor) {
+    pendingPermission = job.executor.pendingPermission || null;
+  }
+  res.json({ isRunning, pendingPermission });
 });
 
 /** 健康检查 */

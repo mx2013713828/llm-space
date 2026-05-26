@@ -41,33 +41,9 @@ ${tailPreview}
   },
 
   async onLoopEnd(context) {
-    // 静默执行过期 offload 文件清理
-    try {
-      const offloadedDir = path.join(process.cwd(), '.offloaded');
-      try {
-        await fs.access(offloadedDir);
-      } catch {
-        return; // Directory does not exist
-      }
-
-      const files = await fs.readdir(offloadedDir);
-      for (const file of files) {
-        if (!file.startsWith('offload-') || !file.endsWith('.txt')) continue;
-
-        const filePath = path.join(offloadedDir, file);
-        try {
-          const stat = await fs.stat(filePath);
-          if (Date.now() - stat.mtime.getTime() > OFFLOAD_CLEANUP_AGE_MS) {
-            await fs.unlink(filePath);
-          }
-        } catch (err) {
-          if (err.code !== 'ENOENT') {
-            console.error(`[OutputOffloadPlugin] Failed to process/delete file ${file}:`, err);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('[OutputOffloadPlugin] Failed during offload cleanup:', err);
+    // 委托给 executor 执行过期 offload 文件清理
+    if (context?.executor?.cleanupOffloadedFiles) {
+      await context.executor.cleanupOffloadedFiles();
     }
   }
 };

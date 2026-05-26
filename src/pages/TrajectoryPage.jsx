@@ -172,6 +172,8 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         handleResetSession={agentState.handleResetSession}
         handleRetryTurn={agentState.handleRetryTurn}
         loopCount={agentState.loopCount}
+        pendingPermission={agentState.pendingPermission}
+        handlePermissionDecision={agentState.handlePermissionDecision}
       />
 
       {/* 上下文检查器模态框 */}

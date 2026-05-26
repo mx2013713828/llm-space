@@ -10,25 +10,41 @@ export const CompactionPlugin = {
   async preLLM(context) {
     const { executor, turnIndex } = context;
 
-    // 1. Soft Compact Epoch
-    const compactResult = compactMessages(
-      executor.messages,
-      turnIndex,
-      executor.estimateCurrentTokens(),
-      executor.systemPrompt,
-      executor.tools,
-      executor.thinkingEnabled,
-      executor.compactionEnabled
-    );
+    // 获取可配置的参数入口，提供默认值
+    const cooldown = executor.features?.soft_compact_cooldown ?? 10;
+    const minSaving = executor.features?.soft_compact_min_saving ?? 10000;
 
-    if (compactResult.compactedCount > 0) {
-      // 通过直接更新 executor 属性使改变生效
-      executor.messages.splice(0, executor.messages.length, ...compactResult.messages);
-      if (compactResult.estimatedTokens != null) {
-        executor.contextTokens = compactResult.estimatedTokens;
+    let shouldTrySoft = true;
+    if (executor.lastSoftCompactTurn !== undefined && (turnIndex - executor.lastSoftCompactTurn) < cooldown) {
+      shouldTrySoft = false;
+      console.log(`[CompactionPlugin] 距离上次软清洗不到 ${cooldown} 轮 (当前: ${turnIndex}, 上次: ${executor.lastSoftCompactTurn})，跳过软清洗。`);
+    }
+
+    if (shouldTrySoft) {
+      // 1. Soft Compact Epoch
+      const compactResult = compactMessages(
+        executor.messages,
+        turnIndex,
+        executor.estimateCurrentTokens(),
+        executor.systemPrompt,
+        executor.tools,
+        executor.thinkingEnabled,
+        executor.compactionEnabled,
+        minSaving
+      );
+
+      if (compactResult.compactedCount > 0) {
+        // 记录实际发生 soft-compact 的轮次
+        executor.lastSoftCompactTurn = turnIndex;
+
+        // 通过直接更新 executor 属性使改变生效
+        executor.messages.splice(0, executor.messages.length, ...compactResult.messages);
+        if (compactResult.estimatedTokens != null) {
+          executor.contextTokens = compactResult.estimatedTokens;
+        }
+        executor.onEvent('messages_update', { messages: executor.messages });
+        await executor.saveSession();
       }
-      executor.onEvent('messages_update', { messages: executor.messages });
-      await executor.saveSession();
     }
 
     // 2. Hard Compact Stage 2

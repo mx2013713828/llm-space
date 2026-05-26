@@ -12,38 +12,6 @@
   },
   "tools": [
     {
-      "name": "bash",
-      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "command": {
-            "type": "string",
-            "description": "The bash command to execute"
-          }
-        },
-        "required": [
-          "command"
-        ]
-      }
-    },
-    {
-      "name": "sub_agent",
-      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "prompt": {
-            "type": "string",
-            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
-          }
-        },
-        "required": [
-          "prompt"
-        ]
-      }
-    },
-    {
       "name": "weather_report",
       "description": "获取指定城市的天气信息",
       "input_schema": {
@@ -58,11 +26,30 @@
           "city"
         ]
       }
+    },
+    {
+      "name": "bash",
+      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The bash command to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
     }
   ],
   "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n当用户搜索互联网信息时，请：\n1. 分析用户提到的关键词。\n2. 调用web_search 工具获取信息。\n3. 将结果整理后回复给用户。\n",
   "skills": [],
   "features": {
-    "parallel_tool_execution": true
+    "parallel_tool_execution": false,
+    "enable_skills": false,
+    "enable_security": true,
+    "context_compaction": false
   }
 }

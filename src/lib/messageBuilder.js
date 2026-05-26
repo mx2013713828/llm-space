@@ -155,7 +155,7 @@ export function estimateTokens(messages, thinkingEnabled, systemPrompt, tools, c
  * @param {boolean} thinkingEnabled - 是否启用思维链
  * @returns {{ messages: Array, compactedCount: number, estimatedTokens: number|null }}
  */
-export function compactMessages(messages, turnIndex, currentTokens, systemPrompt, tools, thinkingEnabled, compactionEnabled = true) {
+export function compactMessages(messages, turnIndex, currentTokens, systemPrompt, tools, thinkingEnabled, compactionEnabled = true, minSaving = 10000) {
   // 如果未启用压缩，直接返回
   if (!compactionEnabled) {
     return { messages, compactedCount: 0, estimatedTokens: null };
@@ -181,7 +181,7 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         newMsg.toolInput = { ...newMsg.toolInput, content: '[Content written to disk]' };
         newMsg.toolInputRaw = JSON.stringify(newMsg.toolInput);
         compactedCount++;
-      } else if (['ls', 'grep', 'web_search', 'web_fetch'].includes(newMsg.toolName) && newMsg.toolOutput && newMsg.toolOutput.length > 2000) {
+      } else if (['ls', 'grep', 'web_search', 'web_fetch', 'bash'].includes(newMsg.toolName) && newMsg.toolOutput && newMsg.toolOutput.length > 2000) {
         // Skip secondary compaction if this tool call has already been offloaded to disk
         if (!newMsg.toolOutput.includes('OUTPUT OFFLOADED TO FILE:')) {
           const head = newMsg.toolOutput.slice(0, 1000);
@@ -196,8 +196,8 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
   let estimatedTokens = null;
 
   if (compactedCount > 0) {
-    // 向消息历史中追加一条 system_alert，以提供可视化的清洗通知
-    compactedMessages = [
+    // 临时组合消息列表用于计算压缩后的 Token
+    const tempMessages = [
       ...compactedMessages,
       {
         role: 'system',
@@ -206,12 +206,24 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         content: `触发上下文软清洗 (Soft Compact Epoch)：成功对 ${compactedCount} 处历史冗余数据进行了折叠或重写，从而释放 Context 空间，最大化保护 Prompt Cache。`
       }
     ];
+
     // 就地重新估算压缩后的 Token 数
     estimatedTokens = Math.round((
-      JSON.stringify(buildApiMessages(compactedMessages, thinkingEnabled, compactionEnabled)).length +
+      JSON.stringify(buildApiMessages(tempMessages, thinkingEnabled, compactionEnabled)).length +
       (systemPrompt || '').length +
       JSON.stringify(tools || []).length
     ) / 4);
+
+    // 计算精简了多少 token
+    const tokenSaving = currentTokens - estimatedTokens;
+    if (tokenSaving < minSaving) {
+      console.log(`[Soft Compact] 压缩预期节省 ${tokenSaving} tokens，小于设定的最小精简值 ${minSaving}，放弃执行本次软压缩。`);
+      return { messages, compactedCount: 0, estimatedTokens: null };
+    }
+
+    // 满足精简阈值，应用 tempMessages 作为最终压缩后的消息列表
+    compactedMessages = tempMessages;
+    console.log(`[Soft Compact] 压缩成功！节省了 ${tokenSaving} tokens (当前估算: ${estimatedTokens})`);
   }
 
   return { messages: compactedMessages, compactedCount, estimatedTokens };

@@ -10,6 +10,7 @@ import { TodoNagPlugin } from './plugins/TodoNagPlugin.js';
 import { OutputOffloadPlugin } from './plugins/OutputOffloadPlugin.js';
 import { SubAgentPlugin } from './plugins/SubAgentPlugin.js';
 import { SkillsPlugin } from './plugins/SkillsPlugin.js';
+import { SecurityPlugin } from './plugins/SecurityPlugin.js';
 
 
 // 物理常量配置
@@ -76,6 +77,11 @@ export class AgentExecutor {
 
     // 初始化 Hook 管理器并按需挂载插件
     this.hooks = new HookManager();
+    
+    // 如果启用了安全防护机制，挂载 SecurityPlugin
+    if (this.features.enable_security === true) {
+      this.hooks.register(SecurityPlugin);
+    }
     
     // Skills 插件默认开启（它内部会判断 this.features.enable_skills）
     this.hooks.register(SkillsPlugin);
@@ -309,6 +315,7 @@ export class AgentExecutor {
       // 触发最终清理和保存
       await this.hooks.dispatch('onLoopEnd', { executor: this });
       await this.saveSession();
+      SecurityPlugin.clearExecutorPending(this);
       this.onEvent('done', {});
     }
   }
@@ -540,5 +547,38 @@ export class AgentExecutor {
     }
 
     return stopReason;
+  }
+
+  /**
+   * 清理超期的 Offload 大工具输出临时文件
+   */
+  async cleanupOffloadedFiles() {
+    try {
+      const offloadedDir = path.join(process.cwd(), '.offloaded');
+      try {
+        await fs.access(offloadedDir);
+      } catch {
+        return; // 目录不存在
+      }
+
+      const files = await fs.readdir(offloadedDir);
+      for (const file of files) {
+        if (!file.startsWith('offload-') || !file.endsWith('.txt')) continue;
+
+        const filePath = path.join(offloadedDir, file);
+        try {
+          const stat = await fs.stat(filePath);
+          if (Date.now() - stat.mtime.getTime() > OFFLOAD_CLEANUP_AGE_MS) {
+            await fs.unlink(filePath);
+          }
+        } catch (err) {
+          if (err.code !== 'ENOENT') {
+            console.error(`[AgentExecutor] Failed to process/delete file ${file}:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[AgentExecutor] Failed during offload cleanup:', err);
+    }
   }
 }
