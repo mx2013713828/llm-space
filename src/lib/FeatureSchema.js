@@ -13,31 +13,40 @@ export const FEATURE_SCHEMA = {
     defaultValue: true,
     failSafeValue: false, // 辅助特性：异常时 Fail-Open 关闭，避免干扰正常执行
     children: {
-      soft_compact: {
-        type: 'boolean',
-        label: '软清洗老历史文件 (Soft-Compact)',
-        description: '对 5 轮前的 read_file/write_file/ls/grep/bash 内容进行静默掏空折叠。',
-        defaultValue: true,
-        failSafeValue: false,
-      },
-      hard_compact: {
-        type: 'boolean',
-        label: '大模型语义记忆重构 (Hard-Compact)',
-        description: '在 Token 极度溢出时触发 LLM 自动生成历史记忆摘要，重建核心上下文。',
-        defaultValue: true,
-        failSafeValue: false,
-      },
+      // 子项按 agent-loop 真实执行顺序排列，分两个阶段：
+      //
+      // 【postToolUse 阶段 - 每次工具调用返回后立即触发】
+      // ① thinking_compaction：折叠已决思维链，保护 Prompt Cache 前缀
+      // ② output_offload：超大输出立即落盘，防单条撑爆上下文
+      //
+      // 【preLLM 阶段 - 下一轮 LLM 调用前，满阈值才触发】
+      // ③ soft_compact：批量清洗历史冗余工具输出
+      // ④ hard_compact：终极保底，LLM 语义摘要重构全量记忆
       thinking_compaction: {
         type: 'boolean',
         label: '实时折叠已决思维链 (Thinking Compaction)',
-        description: '在工具调用返回结果后，将冗长的 thinking 块折叠为轻量占位符 [Thinking folded]。',
+        description: '在工具调用返回结果后，将冗长的 thinking 块折叠为轻量占位符 [Thinking folded]，保护 Prompt Cache 前缀稳定性。',
         defaultValue: true,
         failSafeValue: false,
       },
       output_offload: {
         type: 'boolean',
         label: '超长工具输出物理落盘 (Large Output Offload)',
-        description: '将超过 20KB 限制的工具执行结果自动转存到本地 .offloaded 临时目录中。',
+        description: '每次工具调用后立即检查，将超过 20KB 的单条输出转存到本地 .offloaded 目录，防止单条结果撑爆上下文。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      soft_compact: {
+        type: 'boolean',
+        label: '软清洗老历史文件 (Soft-Compact)',
+        description: '在 Token 水位达到阈值后，批量掏空 5 轮前的 read_file/write_file/ls/grep/bash 工具结果，释放上下文空间。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      hard_compact: {
+        type: 'boolean',
+        label: '大模型语义记忆重构 (Hard-Compact)',
+        description: '在 Token 极度溢出时触发 LLM 自动生成历史记忆摘要，以最小代价重建核心上下文，保留最近 3 轮活跃记忆。',
         defaultValue: true,
         failSafeValue: false,
       },
@@ -51,18 +60,27 @@ export const FEATURE_SCHEMA = {
     failSafeValue: true,
   },
   enable_skills: {
-    type: 'boolean',
-    label: '启用自定义技能加载',
-    description: '允许从项目本地加载特定的 Skill 定义，从而增强大模型在该技能领域的专业能力。',
+    type: 'group',
+    label: '技能加载 (Skills)',
+    description: '向 Agent 注入特定领域的行为规则技能，增强其在对应场景下的专业能力。',
     defaultValue: true,
-    failSafeValue: true,
-  },
-  enable_global_skills: {
-    type: 'boolean',
-    label: '全局系统技能加载',
-    description: '自动全局挂载系统内置的常用超能力技能。',
-    defaultValue: true,
-    failSafeValue: false,
+    failSafeValue: true, // 技能只增强不拦截，安全降级时保持开启无害
+    children: {
+      enable_project_skills: {
+        type: 'boolean',
+        label: '加载项目本地技能',
+        description: '从当前项目目录中自动发现并加载 Skill 定义文件，注入项目专属的工作流规则。',
+        defaultValue: true,
+        failSafeValue: true,
+      },
+      enable_global_skills: {
+        type: 'boolean',
+        label: '加载全局 .agent 目录技能',
+        description: '挂载系统全局 ~/.agent（或 .agent/）目录下的通用超能力技能库。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+    },
   },
   parallel_tool_execution: {
     type: 'boolean',

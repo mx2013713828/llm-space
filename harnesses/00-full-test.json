@@ -154,10 +154,20 @@
     "skill-creator"
   ],
   "features": {
-    "parallel_tool_execution": true,
-    "context_compaction": true,
-    "enable_global_skills": true,
-    "enable_skills": true,
-    "enable_security": true
+    "enable_security": true,
+    "context_compaction": {
+      "enabled": true,
+      "thinking_compaction": true,
+      "soft_compact": true,
+      "output_offload": true,
+      "hard_compact": true
+    },
+    "todo_nag": true,
+    "enable_skills": {
+      "enabled": true,
+      "enable_project_skills": true,
+      "enable_global_skills": true
+    },
+    "parallel_tool_execution": true
   }
 }

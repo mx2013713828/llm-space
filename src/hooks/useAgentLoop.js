@@ -121,7 +121,12 @@ export function useAgentLoop({
           temperature,
           maxTokens,
           thinkingEnabled,
-          skills: harness.features?.enable_skills === false ? [] : (harness.skills || []),
+          // enable_skills 已升级为 group 类型，需读 .enabled；向后兼容旧 boolean 格式
+          skills: (() => {
+            const sf = harness.features?.enable_skills;
+            const enabled = typeof sf === 'boolean' ? sf : (sf?.enabled ?? true);
+            return enabled ? (harness.skills || []) : [];
+          })(),
         })
       });
 
@@ -449,6 +454,7 @@ export function useAgentLoop({
       setTodos([]);
       setPendingPermission(null);
       setContextTokens(0);
+      setCacheStats({ hitTokens: 0, missTokens: 0 }); // 修复：重置缓存统计，避免旧数据残留到新 session
       if (onSessionReset) onSessionReset();
     }
   };

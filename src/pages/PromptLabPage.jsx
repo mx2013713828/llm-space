@@ -14,6 +14,8 @@ export function PromptLabPage({ harness, onSave }) {
   const [activeTab, setActiveTab] = useState('editor');
   const [features, setFeatures] = useState(() => parseFeatures(harness.features));
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+  // group 类特性的二级选项展开状态（key => boolean），默认全部折叠
+  const [expandedGroups, setExpandedGroups] = useState({});
 
 
   useEffect(() => {
@@ -27,7 +29,9 @@ export function PromptLabPage({ harness, onSave }) {
       })
       .catch(console.error);
 
-    const isGlobalEnabled = harness.features?.enable_global_skills === true;
+    // 从 parseFeatures 解析后的 features state 读取，格式已统一，避免原始存档新旧格式歧义
+    const initState = parseFeatures(harness.features);
+    const isGlobalEnabled = !!(initState.enable_skills?.enabled && initState.enable_skills?.enable_global_skills);
     fetch(`http://localhost:3001/api/skills?global=${isGlobalEnabled}`)
       .then(r => r.json())
       .then(data => {
@@ -107,15 +111,29 @@ export function PromptLabPage({ harness, onSave }) {
 
     // 触发联动特性的前端生命周期与副作用
     if (key === 'enable_skills') {
+      // 父开关关闭时，收起 Skills 配置 Tab
       if (!val && activeTab === 'skills') {
         setActiveTab('editor');
       }
-    } else if (key === 'enable_global_skills') {
-      fetch(`http://localhost:3001/api/skills?global=${val}`)
-        .then(r => r.json())
-        .then(data => setAvailableSkills(data))
-        .catch(console.error);
+      // 父开关打开时，刷新 skills 列表
+      // 子开关若没有被手动切换，handleSubFeatureChange 不会 fetch，需在此补全
+      if (val) {
+        const skillsMeta = FEATURE_SCHEMA['enable_skills'];
+        // 父开关从关闭变为开启时，子开关会重置为 defaultValue（见上方 setFeatures 逻辑）
+        // 此时 features state 尚未更新（setFeatures 是异步的），直接用 defaultValue
+        const willGlobal = features['enable_skills']?.enabled
+          ? !!(features['enable_skills']?.enable_global_skills ?? skillsMeta.children.enable_global_skills.defaultValue)
+          : skillsMeta.children.enable_global_skills.defaultValue;
+        fetch(`http://localhost:3001/api/skills?global=${willGlobal}`)
+          .then(r => r.json())
+          .then(data => setAvailableSkills(data))
+          .catch(console.error);
+      }
     }
+  };
+
+  const toggleGroupExpand = (key) => {
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSubFeatureChange = (parentKey, subKey, val) => {
@@ -126,6 +144,13 @@ export function PromptLabPage({ harness, onSave }) {
         [subKey]: val
       }
     }));
+    // 联动副作用：enable_global_skills 子开关变更时重新加载 skills 列表
+    if (parentKey === 'enable_skills' && subKey === 'enable_global_skills') {
+      fetch(`http://localhost:3001/api/skills?global=${val}`)
+        .then(r => r.json())
+        .then(data => setAvailableSkills(data))
+        .catch(console.error);
+    }
   };
 
   useEffect(() => {
@@ -201,7 +226,7 @@ export function PromptLabPage({ harness, onSave }) {
       }}>
         {[
           { key: 'editor', label: '✍️ Prompt 编辑器' },
-          (features.enable_skills !== false) && { key: 'skills', label: '✨ Skills 配置' },
+          (features.enable_skills?.enabled !== false) && { key: 'skills', label: '✨ Skills 配置' },
           { key: 'tools-edit', label: '🔧 Tools 挂载' },
           { key: 'features', label: '🔬 实验特性' },
           { key: 'templates', label: '📄 模板库' },
@@ -406,58 +431,81 @@ export function PromptLabPage({ harness, onSave }) {
                 );
               } else if (meta.type === 'group') {
                 const isParentEnabled = !!(features[key]?.enabled ?? features[key]);
+                const isExpanded = !!expandedGroups[key];
                 return (
-                  <div key={key} className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                  <div key={key} className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {/* 一级行：开关 + 标签 + 展开箭头 */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                       <input
                         type="checkbox"
                         checked={isParentEnabled}
                         onChange={(e) => handleFeatureChange(key, e.target.checked)}
-                        style={{ transform: 'scale(1.2)', marginTop: 4 }}
+                        style={{ transform: 'scale(1.2)', marginTop: 4, cursor: 'pointer', flexShrink: 0 }}
                       />
-                      <div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
                           {meta.description}
                         </div>
                       </div>
-                    </label>
-
-                    {/* 二级配置：父开关开启时显现，关闭时置灰且锁定交互 */}
-                    <div
-                      style={{
-                        paddingLeft: 24,
-                        marginTop: 4,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 14,
-                        borderLeft: '2px solid var(--border)',
-                        opacity: isParentEnabled ? 1 : 0.4,
-                        pointerEvents: isParentEnabled ? 'auto' : 'none',
-                        transition: 'all 0.2s ease-in-out'
-                      }}
-                    >
-                      {Object.entries(meta.children).map(([subKey, subMeta]) => {
-                        const isSubEnabled = isParentEnabled && !!features[key]?.[subKey];
-                        return (
-                          <label key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>
-                            <input
-                              type="checkbox"
-                              disabled={!isParentEnabled}
-                              checked={isSubEnabled}
-                              onChange={(e) => handleSubFeatureChange(key, subKey, e.target.checked)}
-                              style={{ transform: 'scale(1.1)', marginTop: 3 }}
-                            />
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
-                                {subMeta.description}
-                              </div>
-                            </div>
-                          </label>
-                        );
-                      })}
+                      {/* 展开/折叠切换按钮 */}
+                      <button
+                        onClick={() => toggleGroupExpand(key)}
+                        title={isExpanded ? '收起子选项' : '展开子选项'}
+                        style={{
+                          flexShrink: 0,
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-muted)', fontSize: 12,
+                          padding: '2px 6px', borderRadius: 4,
+                          display: 'flex', alignItems: 'center', gap: 3,
+                          marginTop: 2,
+                          transition: 'color 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                      >
+                        <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
+                        <span>{isExpanded ? '收起' : `${Object.keys(meta.children).length} 项`}</span>
+                      </button>
                     </div>
+
+                    {/* 二级配置：默认折叠，展开后才显示；父开关关闭时置灰锁定 */}
+                    {isExpanded && (
+                      <div
+                        style={{
+                          paddingLeft: 24,
+                          marginTop: 14,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 14,
+                          borderLeft: '2px solid var(--border)',
+                          opacity: isParentEnabled ? 1 : 0.4,
+                          pointerEvents: isParentEnabled ? 'auto' : 'none',
+                          transition: 'opacity 0.2s ease-in-out'
+                        }}
+                      >
+                        {Object.entries(meta.children).map(([subKey, subMeta]) => {
+                          const isSubEnabled = isParentEnabled && !!features[key]?.[subKey];
+                          return (
+                            <label key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>
+                              <input
+                                type="checkbox"
+                                disabled={!isParentEnabled}
+                                checked={isSubEnabled}
+                                onChange={(e) => handleSubFeatureChange(key, subKey, e.target.checked)}
+                                style={{ transform: 'scale(1.1)', marginTop: 3 }}
+                              />
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
+                                  {subMeta.description}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               }

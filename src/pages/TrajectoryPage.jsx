@@ -28,16 +28,23 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
   const [allSkills, setAllSkills] = useState([]);
   useEffect(() => {
-    if (harness?.features?.enable_skills === false) {
+    // enable_skills 现在是 group 类型，从 .enabled 读父开关；向后兼容旧的 boolean 格式
+    const skillsEnabled = harness?.features?.enable_skills?.enabled
+      ?? (harness?.features?.enable_skills !== false); // 旧格式兼容
+    if (!skillsEnabled) {
       setAllSkills([]);
       return;
     }
-    const isGlobal = harness?.features?.enable_global_skills === true;
+    // enable_global_skills 已移入 enable_skills.children，向后兼容旧扁平格式
+    const isGlobal = harness?.features?.enable_skills?.enable_global_skills
+      ?? harness?.features?.enable_global_skills
+      ?? true;
     fetch(`http://localhost:3001/api/skills?global=${isGlobal}`)
       .then(r => r.json())
       .then(data => setAllSkills(data))
       .catch(console.error);
   }, [harness]);
+
 
   // 监听 harness 的变化，实时同步最新配置，避免 React state 缓存导致的与文件不一致问题
   useEffect(() => {

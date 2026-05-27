@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
 
@@ -37,6 +38,14 @@ export function TrajectoryView({
     progressFillClass = "progress-fill-warning";
   }
 
+  // 缓存命中显示模式：false=百分比，true=详细数值
+  const [showCacheDetail, setShowCacheDetail] = useState(false);
+
+  const totalCacheTokens = cacheStats.hitTokens + cacheStats.missTokens;
+  const hitPercent = totalCacheTokens > 0
+    ? Math.round(cacheStats.hitTokens / totalCacheTokens * 100)
+    : 0;
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
       {/* 右侧 Tab 栏 */}
@@ -55,12 +64,41 @@ export function TrajectoryView({
           >{tab.label}</button>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
-          {(cacheStats.hitTokens + cacheStats.missTokens) > 0 && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
-              title={`缓存命中: ${cacheStats.hitTokens} tokens | 未命中: ${cacheStats.missTokens} tokens`}>
-              💾 {Math.round(cacheStats.hitTokens / (cacheStats.hitTokens + cacheStats.missTokens) * 100)}% 命中
+          {totalCacheTokens > 0 && (
+            <span
+              onClick={() => setShowCacheDetail(v => !v)}
+              title={showCacheDetail ? '点击查看命中率' : '点击查看详细 token 数'}
+              style={{
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+                cursor: 'pointer',
+                userSelect: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '2px 8px',
+                borderRadius: 20,
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                background: 'rgba(16, 185, 129, 0.07)',
+                color: hitPercent >= 60 ? 'var(--green)' : hitPercent >= 30 ? '#f59e0b' : 'var(--red)',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.14)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.6)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.07)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.35)'; }}
+            >
+              💾&nbsp;
+              {showCacheDetail ? (
+                <>
+                  <span style={{ color: 'var(--green)' }}>命中 {cacheStats.hitTokens.toLocaleString()}</span>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 300 }}>/</span>
+                  <span style={{ color: 'var(--text-muted)' }}>未命中 {cacheStats.missTokens.toLocaleString()}</span>
+                </>
+              ) : (
+                <span>{hitPercent}% 命中</span>
+              )}
             </span>
           )}
+
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             已产生 {loopCount} 轮对话
           </span>

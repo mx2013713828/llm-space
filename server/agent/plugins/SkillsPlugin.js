@@ -28,12 +28,21 @@ export const SkillsPlugin = {
   
   async preLLM(context) {
     const { executor } = context;
-    if (executor.features?.enable_skills === false) return;
+    // enable_skills 已升级为 group 类型，需从 .enabled 读取父开关
+    // 向后兼容旧格式：enable_skills 曾经是 boolean
+    const skillsFeature = executor.features?.enable_skills;
+    const skillsEnabled = typeof skillsFeature === 'boolean'
+      ? skillsFeature
+      : (skillsFeature?.enabled ?? true); // 默认开启
+    if (!skillsEnabled) return;
+
     const skills = executor.skills || [];
     if (skills.length === 0) return;
 
     const SKILLS_DIR = path.join(process.cwd(), 'skills');
-    const includeGlobal = executor.features?.enable_global_skills === true;
+    // enable_global_skills 已移入 enable_skills.children，向后兼容旧顶层格式
+    const includeGlobal = !!(skillsFeature?.enable_global_skills ?? executor.features?.enable_global_skills);
+
     const richSkills = [];
 
     for (const skillId of skills) {
