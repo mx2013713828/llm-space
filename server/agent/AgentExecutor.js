@@ -11,6 +11,7 @@ import { OutputOffloadPlugin } from './plugins/OutputOffloadPlugin.js';
 import { SubAgentPlugin } from './plugins/SubAgentPlugin.js';
 import { SkillsPlugin } from './plugins/SkillsPlugin.js';
 import { SecurityPlugin } from './plugins/SecurityPlugin.js';
+import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 
 
@@ -95,6 +96,10 @@ export class AgentExecutor {
     }
     if (this.features.context_compaction && this.features.context_compaction.enabled && this.features.context_compaction.output_offload) {
       this.hooks.register(OutputOffloadPlugin);
+    }
+    // 记忆系统插件（需 enable_memory 父开关开启）
+    if (this.features.enable_memory?.enabled) {
+      this.hooks.register(MemoryPlugin);
     }
     this.hooks.register(SubAgentPlugin);
 

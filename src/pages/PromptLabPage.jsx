@@ -151,7 +151,20 @@ export function PromptLabPage({ harness, onSave }) {
         .then(data => setAvailableSkills(data))
         .catch(console.error);
     }
+    // 联动约束：memory_extract 关闭时，memory_consolidate 自动静默关闭
+    // （整理依赖提取，若没有提取就不该有整理）
+    if (parentKey === 'enable_memory' && subKey === 'memory_extract' && !val) {
+      setFeatures(prev => ({
+        ...prev,
+        enable_memory: {
+          ...prev.enable_memory,
+          memory_extract: false,
+          memory_consolidate: false,
+        }
+      }));
+    }
   };
+
 
   useEffect(() => {
     let timer;

@@ -512,6 +512,35 @@ async function scanSubDirFiles(dirPath) {
   return files;
 }
 
+
+/** 获取某 harness 的记忆文件清单 */
+app.get('/api/memory/:harnessId', async (req, res) => {
+  try {
+    const { listMemoryFiles } = await import('./server/agent/memory/memoryStore.js');
+    const files = await listMemoryFiles(req.params.harnessId);
+    res.json(files.map(f => ({
+      filename: f.filename,
+      name: f.meta.name,
+      type: f.meta.type,
+      description: f.meta.description,
+      mtime: f.mtime,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** 删除某条记忆文件 */
+app.delete('/api/memory/:harnessId/:filename', async (req, res) => {
+  try {
+    const { deleteMemoryFile } = await import('./server/agent/memory/memoryStore.js');
+    await deleteMemoryFile(req.params.harnessId, req.params.filename);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** 获取所有 Skill 元数据 */
 app.get('/api/skills', async (req, res) => {
   try {

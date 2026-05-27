@@ -82,6 +82,32 @@ export const FEATURE_SCHEMA = {
       },
     },
   },
+  enable_memory: {
+    type: 'group',
+    label: '长期记忆系统 (Memory)',
+    description: '在 .memory/ 目录下持久化用户偏好和项目知识，跨会话、跨压缩保留关键信息。索引注入 system prompt（可被 Prompt Cache 缓存），相关内容按需注入当前对话。',
+    defaultValue: false,
+    failSafeValue: false, // 辅助特性，异常时 Fail-Open 关闭
+    children: {
+      // 注意子项依赖关系（UI 层需要联动约束）：
+      // memory_consolidate 依赖 memory_extract 开启（整理的前提是有提取）
+      memory_extract: {
+        type: 'boolean',
+        label: '每轮自动提取记忆 (Memory Extract)',
+        description: '每次对话结束后，用 LLM 自动从对话中提取用户偏好、工作习惯和项目事实，写入持久化文件。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      memory_consolidate: {
+        type: 'boolean',
+        label: '定期整理记忆 (Memory Consolidate)',
+        description: '记忆文件积累到 10 条以上后，触发 LLM 自动去重、合并矛盾、淘汰过时记忆（每 24 小时最多一次）。需先开启"每轮自动提取记忆"。',
+        defaultValue: false,
+        failSafeValue: false,
+        // 依赖约束：此子项须 memory_extract 开启才能生效（UI 层联动控制）
+      },
+    },
+  },
   parallel_tool_execution: {
     type: 'boolean',
     label: '并行工具执行',
