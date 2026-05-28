@@ -277,3 +277,10 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* Loading Spin 动画 */
+.animate-spin {
+  display: inline-block;
+  animation: spin 1.5s linear infinite;
+}
+

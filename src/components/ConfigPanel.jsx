@@ -18,7 +18,9 @@ export function ConfigPanel({
   setThinkingEnabled,
   
   systemPrompt,
-  setSystemPrompt
+  isPromptDirty,
+  onPromptChange,
+  onSavePrompt
 }) {
   return (
     <div className="config-panel" style={{ width: 340, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -103,13 +105,46 @@ export function ConfigPanel({
 
       {/* System Prompt */}
       <div className="card prompt-card" style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>
-        <div className="panel-title">System Prompt</div>
+        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Base System Prompt</span>
+          {isPromptDirty && (
+            <span style={{ color: 'var(--orange)', fontSize: 11, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: 4 }}>
+              ● 有未保存的改动
+            </span>
+          )}
+        </div>
         <textarea
           className="prompt-editor"
-          style={{ flex: 1, height: '100%' }}
+          style={{
+            flex: 1,
+            height: '100%',
+            border: isPromptDirty ? '1px solid var(--orange)' : '1px solid var(--border)'
+          }}
           value={systemPrompt}
-          onChange={e => setSystemPrompt(e.target.value)}
+          onChange={e => onPromptChange(e.target.value)}
         />
+        <button
+          className="btn"
+          disabled={!isPromptDirty}
+          onClick={onSavePrompt}
+          style={{
+            marginTop: 8,
+            padding: '8px 12px',
+            borderRadius: 4,
+            border: 'none',
+            backgroundColor: isPromptDirty ? 'var(--orange)' : 'var(--bg-surface)',
+            color: isPromptDirty ? '#fff' : 'var(--text-muted)',
+            cursor: isPromptDirty ? 'pointer' : 'not-allowed',
+            fontWeight: 500,
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s'
+          }}
+        >
+          保存 Prompt (Save Prompt)
+        </button>
       </div>
     </div>
   );

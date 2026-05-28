@@ -25,6 +25,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const [maxTokens, setMaxTokens] = useState(harness.model?.max_tokens || 8000);
   const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState(harness.systemPrompt);
+  const [isPromptDirty, setIsPromptDirty] = useState(false);
 
   const [allSkills, setAllSkills] = useState([]);
   useEffect(() => {
@@ -46,20 +47,81 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   }, [harness]);
 
 
-  // 监听 harness 的变化，实时同步最新配置，避免 React state 缓存导致的与文件不一致问题
+  const lastHarnessIdRef = useRef(harness?.id);
+
+  // 监听 harness 的变化，实时同步最新配置，同时利用 isPromptDirty 状态进行数据防覆盖守卫
   useEffect(() => {
     if (harness) {
+      const isSwitching = lastHarnessIdRef.current !== harness.id;
+      lastHarnessIdRef.current = harness.id;
+
       if (harness.model?.temperature !== undefined) {
         setTemperature(harness.model.temperature);
       }
       if (harness.model?.max_tokens !== undefined) {
         setMaxTokens(harness.model.max_tokens);
       }
-      if (harness.systemPrompt !== undefined) {
+
+      // 如果用户切换了 Harness 资源，则无条件同步并重置脏状态；
+      // 如果没有切换（仅更新内部参数），则只有在本地没有未保存改动的情况下才载入外部 Prompt，防止草稿被意外覆盖
+      if (isSwitching) {
+        setSystemPrompt(harness.systemPrompt || '');
+        setIsPromptDirty(false);
+      } else if (!isPromptDirty && harness.systemPrompt !== undefined) {
         setSystemPrompt(harness.systemPrompt);
       }
     }
-  }, [harness]);
+  }, [harness, isPromptDirty]);
+
+  const handlePromptChange = (val) => {
+    setSystemPrompt(val);
+    setIsPromptDirty(true);
+  };
+
+  const handleSavePrompt = () => {
+    const updatedHarness = {
+      ...harness,
+      model: {
+        ...harness.model,
+        max_tokens: maxTokens,
+        temperature: temperature
+      },
+      systemPrompt: systemPrompt
+    };
+
+    fetch(`http://localhost:3001/api/harnesses/${harness.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedHarness)
+    })
+    .then(res => {
+      if (res.ok) {
+        if (onHarnessUpdate) {
+          onHarnessUpdate(updatedHarness);
+        }
+        setIsPromptDirty(false);
+        alert('Prompt 保存成功 ✓');
+      } else {
+        alert('Prompt 保存失败 ❌');
+      }
+    })
+    .catch(err => {
+      console.error("保存 harness 配置失败:", err);
+      alert('Prompt 保存失败 ❌');
+    });
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isPromptDirty) {
+        e.preventDefault();
+        e.returnValue = '您有未保存的提示词更改，确定要离开吗？';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isPromptDirty]);
 
   // Keep stable refs to harness and onHarnessUpdate so the debounce effect can
   // read the latest values without adding them to the dependency array
@@ -77,8 +139,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
     const hasChanges = 
       maxTokens !== harness.model?.max_tokens ||
-      temperature !== harness.model?.temperature ||
-      systemPrompt !== harness.systemPrompt;
+      temperature !== harness.model?.temperature;
 
     if (!hasChanges) return;
 
@@ -92,7 +153,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           max_tokens: maxTokens,
           temperature: temperature
         },
-        systemPrompt: systemPrompt
+        systemPrompt: h.systemPrompt
       };
 
       fetch(`http://localhost:3001/api/harnesses/${h.id}`, {
@@ -101,16 +162,20 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         body: JSON.stringify(updatedHarness)
       })
       .then(res => {
-        if (res.ok && onHarnessUpdateRef.current) {
-          onHarnessUpdateRef.current(updatedHarness);
-          console.log(`💾 自动保存配置到 ${h.id}.json 成功`);
+        if (res.ok) {
+          if (onHarnessUpdateRef.current) {
+            onHarnessUpdateRef.current(updatedHarness);
+          }
+          console.log(`💾 自动保存模型参数 (maxTokens/temp) 到 ${h.id}.json 成功`);
+        } else {
+          console.error(`自动保存模型参数失败，HTTP 状态码: ${res.status}`);
         }
       })
-      .catch(err => console.error("自动保存 harness 配置失败:", err));
+      .catch(err => console.error("自动保存参数失败:", err));
     }, 1000); // 1秒防抖，防止拖拽 range 或是连续输入时频繁写盘
 
     return () => clearTimeout(timer);
-  }, [maxTokens, temperature, systemPrompt]); // intentionally omit harness/onHarnessUpdate - read via refs
+  }, [maxTokens, temperature]); // intentionally omit harness/onHarnessUpdate - read via refs
 
   // 3. UI 状态
   const [activeRightTab, setActiveRightTab] = useState('trajectory');
@@ -153,7 +218,9 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         setThinkingEnabled={setThinkingEnabled}
         
         systemPrompt={systemPrompt}
-        setSystemPrompt={setSystemPrompt}
+        isPromptDirty={isPromptDirty}
+        onPromptChange={handlePromptChange}
+        onSavePrompt={handleSavePrompt}
       />
 
       {/* 右侧轨迹视图 */}
@@ -186,6 +253,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       {/* 上下文检查器模态框 */}
       {showContextInspector && (
         <ContextInspector
+          harness={harness}
           messages={agentState.messages}
           todos={agentState.todos}
           systemPrompt={systemPrompt}

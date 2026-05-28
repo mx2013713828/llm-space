@@ -1,6 +1,7 @@
-import { buildApiMessages, injectTodoState, alignRequestPayload } from '../lib/messageBuilder.js';
+import { useState, useEffect } from 'react';
 
 export function ContextInspector({ 
+  harness,
   messages, 
   todos = [],
   systemPrompt, 
@@ -9,50 +10,106 @@ export function ContextInspector({
   availableSkills = [],
   setShowContextInspector, 
   thinkingEnabled, 
-  compactionEnabled = true, 
   currentTokens,
   modelConfig
 }) {
-  // 1. 构建基础 of API messages
-  const apiMessages = buildApiMessages(messages, thinkingEnabled, compactionEnabled);
+  const [loading, setLoading] = useState(!!harness?.id);
+  const [error, setError] = useState(null);
+  const [alignedData, setAlignedData] = useState({ system: '', tools: [], messages: [] });
 
-  // 2. 注入 TODO 状态（前端模拟催促为 0）
-  const messagesWithTodos = injectTodoState(apiMessages, todos, 0);
+  // 依赖项序列化计算以精简依赖，防范死循环
+  const toolsDeps = (tools || []).map(t => t.name).join(',');
+  const skillsDeps = (skills || []).join(',');
+  const todosDeps = JSON.stringify(todos);
+  const messagesDeps = JSON.stringify(messages); // 用于稳定侦测消息变动
+  const availableSkillsDeps = availableSkills.map(s => s.id).join(',');
 
-  // 3. 构建 Tools 的 API Schema 表达
-  const toolSchemas = (tools || []).map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.input_schema || {
-      type: 'object',
-      properties: Object.fromEntries(
-        Object.entries(t.parameters || {}).map(([k, v]) => [k, { type: v.type || 'string', description: v.description || '' }])
-      ),
-      required: Object.entries(t.parameters || {}).filter(([, v]) => v.required).map(([k]) => k),
-    }
-  }));
+  useEffect(() => {
+    if (!harness?.id) return;
 
-  // 4. 将选中的技能 ID 映射为带 assets 的丰富元数据结构
-  const richSkills = skills.map(id => {
-    const found = availableSkills.find(s => s.id === id);
-    if (found) return found;
-    // 兜底退回
-    return { id, file: `skills/${id}/SKILL.md`, assets: { scripts: [], references: [] } };
-  });
+    setLoading(true);
+    setError(null);
 
-  // 调用对齐逻辑生成最终请求 payload
-  const aligned = alignRequestPayload(
-    systemPrompt || '',
-    toolSchemas,
-    messagesWithTodos,
-    modelConfig,
-    richSkills
-  );
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    // 前端简化参数：工具只传名称即可，后端会自动匹配 Schema，避免前端做复杂的 schema 组装
+    const toolNames = (tools || []).map(t => typeof t === 'string' ? t : t.name);
+
+    fetch(`http://localhost:3001/api/harnesses/${harness.id}/dry-run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messages,
+        todos,
+        systemPrompt,
+        tools: toolNames, // 直接发送工具名称序列
+        features: harness.features || {},
+        model: modelConfig,
+        temperature: modelConfig?.temperature,
+        maxTokens: modelConfig?.max_tokens,
+        thinkingEnabled,
+        skills // 直接发送启用的 skills id 序列
+      }),
+      signal
+    })
+    .then(async res => {
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      if (!res.ok) {
+        let errorMsg = `HTTP error! status: ${res.status}`;
+        if (isJson) {
+          try {
+            const data = await res.json();
+            errorMsg = data.error || errorMsg;
+          } catch (_) {}
+        } else {
+          try {
+            const text = await res.text();
+            if (text) errorMsg = `${errorMsg} - ${text.slice(0, 100)}`;
+          } catch (_) {}
+        }
+        throw new Error(errorMsg);
+      }
+      if (!isJson) {
+        throw new Error('后端返回了非 JSON 格式响应');
+      }
+      return res.json();
+    })
+    .then(data => {
+      setAlignedData(data);
+      setLoading(false);
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') return; // 忽略组件卸载时的主动中止
+      console.error('Dry Run Alignment Error:', err);
+      setError(err.message || '向后端发起 Dry Run 静态对齐失败');
+      setLoading(false);
+    });
+
+    return () => {
+      controller.abort(); // 卸载时主动中止请求，规避 React unmounted state update 泄露警告
+    };
+  }, [
+    harness?.id,
+    JSON.stringify(harness?.features || {}),
+    messagesDeps,
+    todosDeps,
+    systemPrompt,
+    toolsDeps,
+    skillsDeps,
+    availableSkillsDeps,
+    modelConfig?.modelId || modelConfig?.name,
+    modelConfig?.temperature,
+    modelConfig?.max_tokens,
+    thinkingEnabled
+  ]);
 
   const fullContext = {
-    system: aligned.system || '(无)',
-    tools: aligned.tools || [],
-    messages: aligned.messages || [],
+    system: alignedData.system || '(无)',
+    tools: alignedData.tools || [],
+    messages: alignedData.messages || [],
   };
   const totalChars = JSON.stringify(fullContext).length;
   const displayTokens = currentTokens || Math.round(totalChars / 4);
@@ -129,15 +186,15 @@ export function ContextInspector({
 
   // 渲染 System Prompt
   const renderSystemPrompt = () => {
-    const isArray = Array.isArray(aligned.system);
-    const systemText = isArray ? aligned.system[0]?.text : aligned.system;
-    const hasCache = isArray && aligned.system[0]?.cache_control;
+    const isArray = Array.isArray(alignedData.system);
+    const systemText = isArray ? alignedData.system[0]?.text : alignedData.system;
+    const hasCache = isArray && alignedData.system[0]?.cache_control;
 
     return (
       <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(234, 179, 8, 0.05)', border: '1px solid var(--orange)', borderRadius: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--orange)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>⚙️</span> System Prompt
+            <span>⚙️</span> Assembled System Prompt (完整系统提示词)
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({String(systemText || '').length} chars)</span>
           </div>
           {hasCache && (
@@ -146,12 +203,12 @@ export function ContextInspector({
             </span>
           )}
         </div>
-        <pre style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 200, overflow: 'auto', margin: 0, color: 'var(--text-secondary)' }}>
+        <pre style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 300, overflow: 'auto', margin: 0, color: 'var(--text-secondary)' }}>
           {systemText || '(无)'}
         </pre>
         {isArray && (
           <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            发送结构: {JSON.stringify(aligned.system)}
+            发送结构: {JSON.stringify(alignedData.system)}
           </div>
         )}
       </div>
@@ -164,10 +221,10 @@ export function ContextInspector({
       <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid var(--green)', borderRadius: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--green)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>🧰</span> 工具挂载 (Tools Schema)
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({(aligned.tools || []).length} 个工具 · 按名称字母序排序)</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({(alignedData.tools || []).length} 个工具 · 按名称字母序排序)</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {(aligned.tools || []).map((t, i) => {
+          {(alignedData.tools || []).map((t, i) => {
             const hasCache = t.cache_control;
             return (
               <span 
@@ -209,69 +266,110 @@ export function ContextInspector({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 18 }}>🔍</span>
             <span style={{ fontWeight: 700, fontSize: 15 }}>上下文检查器 (Context Inspector)</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 4 }}>
-              {aligned.messages.length} 条消息 · ~{displayTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
-            </span>
+            {!loading && !error && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 4 }}>
+                {alignedData.messages.length} 条消息 · ~{displayTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
+              </span>
+            )}
           </div>
           <button onClick={() => setShowContextInspector(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px', borderRadius: 4 }} onMouseOver={e => e.target.style.color = 'var(--text-primary)'} onMouseOut={e => e.target.style.color = 'var(--text-muted)'}>✕</button>
         </div>
 
         {/* 可滚动内容区 */}
         <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-          {/* System Prompt */}
-          {renderSystemPrompt()}
+          {loading && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              padding: '60px 20px', 
+              color: 'var(--text-secondary)',
+              gap: 12
+            }}>
+              <span className="animate-spin" style={{ fontSize: 32 }}>⏳</span>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>正在向后端发起静态对齐推演 (Dry Run)...</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>这可能包含技能注入、记忆拼装及提示词处理</div>
+            </div>
+          )}
 
-          {/* Tools */}
-          {renderTools()}
-
-          {/* 分割线 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0', color: 'var(--text-muted)', fontSize: 12 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            Messages 序列 ({aligned.messages.length} 条)
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          </div>
-
-          {/* Messages 列表 */}
-          {aligned.messages.map((msg, msgIdx) => {
-            const rs = roleStyle(msg.role);
-            const contentBlocks = Array.isArray(msg.content) ? msg.content : [{ type: 'text', text: String(msg.content) }];
-            const charCount = JSON.stringify(msg.content).length;
-            const hasCache = contentBlocks.some(b => b.cache_control);
-
-            return (
-              <div key={msgIdx} style={{ 
-                marginBottom: 12, 
-                borderRadius: 8, 
-                border: hasCache ? '1px solid var(--green)' : `1px solid ${rs.border}`, 
-                overflow: 'hidden',
-                boxShadow: hasCache ? '0 0 8px rgba(16, 185, 129, 0.1)' : 'none'
-              }}>
-                {/* 消息头 */}
-                <div style={{ 
-                  padding: '8px 14px', 
-                  background: hasCache ? 'rgba(16, 185, 129, 0.08)' : rs.bg, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 8, 
-                  borderBottom: hasCache ? '1px solid var(--green)' : `1px solid ${rs.border}` 
-                }}>
-                  <span style={{ fontSize: 14 }}>{rs.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{rs.label}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>#{msgIdx + 1}</span>
-                  {hasCache && (
-                    <span style={{ fontSize: 10, background: 'var(--green)', color: '#fff', padding: '1px 6px', borderRadius: 4, fontWeight: 600, fontFamily: 'sans-serif' }}>
-                      💾 [Cache Point]
-                    </span>
-                  )}
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{contentBlocks.length} block(s) · {charCount} chars</span>
-                </div>
-                {/* 消息体 */}
-                <div style={{ padding: '8px 14px' }}>
-                  {contentBlocks.map(renderBlock)}
-                </div>
+          {error && (
+            <div style={{ 
+              padding: '16px 20px', 
+              background: 'rgba(239, 68, 68, 0.08)', 
+              border: '1px solid #ef4444', 
+              borderRadius: 8, 
+              color: '#ef4444', 
+              fontSize: 13,
+              marginBottom: 16
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>❌</span> 静态对齐推演失败
               </div>
-            );
-          })}
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                {error}
+              </pre>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {/* System Prompt */}
+              {renderSystemPrompt()}
+
+              {/* Tools */}
+              {renderTools()}
+
+              {/* 分割线 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                Messages 序列 ({alignedData.messages.length} 条)
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              </div>
+
+              {/* Messages 列表 */}
+              {alignedData.messages.map((msg, msgIdx) => {
+                const rs = roleStyle(msg.role);
+                const contentBlocks = Array.isArray(msg.content) ? msg.content : [{ type: 'text', text: String(msg.content) }];
+                const charCount = JSON.stringify(msg.content).length;
+                const hasCache = contentBlocks.some(b => b.cache_control);
+
+                return (
+                  <div key={msgIdx} style={{ 
+                    marginBottom: 12, 
+                    borderRadius: 8, 
+                    border: hasCache ? '1px solid var(--green)' : `1px solid ${rs.border}`, 
+                    overflow: 'hidden',
+                    boxShadow: hasCache ? '0 0 8px rgba(16, 185, 129, 0.1)' : 'none'
+                  }}>
+                    {/* 消息头 */}
+                    <div style={{ 
+                      padding: '8px 14px', 
+                      background: hasCache ? 'rgba(16, 185, 129, 0.08)' : rs.bg, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8, 
+                      borderBottom: hasCache ? '1px solid var(--green)' : `1px solid ${rs.border}` 
+                    }}>
+                      <span style={{ fontSize: 14 }}>{rs.icon}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{rs.label}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>#{msgIdx + 1}</span>
+                      {hasCache && (
+                        <span style={{ fontSize: 10, background: 'var(--green)', color: '#fff', padding: '1px 6px', borderRadius: 4, fontWeight: 600, fontFamily: 'sans-serif' }}>
+                          💾 [Cache Point]
+                        </span>
+                      )}
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{contentBlocks.length} block(s) · {charCount} chars</span>
+                    </div>
+                    {/* 消息体 */}
+                    <div style={{ padding: '8px 14px' }}>
+                      {contentBlocks.map(renderBlock)}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
 
         {/* 底部状态栏 */}
@@ -283,4 +381,3 @@ export function ContextInspector({
     </div>
   );
 }
-

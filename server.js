@@ -13,8 +13,9 @@ import path from 'path';
 import os from 'os';
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { getToolSchemas } from './server/tools/index.js';
+import { toolRegistry } from './server/tools/ToolRegistry.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
-import { alignRequestPayload } from './server/agent/messageBuilder.js';
+import { alignRequestPayload, buildApiMessages } from './server/agent/messageBuilder.js';
 import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
 
 // 加载 .env 文件到 process.env
@@ -302,6 +303,21 @@ fs.mkdir(SESSIONS_DIR, { recursive: true }).catch(err => {
   console.error('[server.js] 自动创建 sessions 目录失败:', err);
 });
 
+/**
+ * 安全校验：验证 harnessId 格式，防止路径穿越攻击
+ */
+function getSafeHarnessPath(harnessId) {
+  if (!harnessId || typeof harnessId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+    throw new Error('Invalid harness ID format');
+  }
+  const safePath = path.resolve(path.join(HARNESS_DIR, `${harnessId}.json`));
+  const resolvedHarnessDir = path.resolve(HARNESS_DIR);
+  if (!safePath.startsWith(resolvedHarnessDir)) {
+    throw new Error('Access denied: Path traversal detected');
+  }
+  return safePath;
+}
+
 // Active jobs memory registry for background running and client attachments
 const activeJobs = new Map(); // harnessId -> { executor, clients: Set<res> }
 
@@ -465,6 +481,103 @@ app.post('/api/harnesses/:id/copy', async (req, res) => {
     res.json({ success: true, harness });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/harnesses/:harnessId/dry-run
+ * 在内存中临时实例化 AgentExecutor 并模拟运行 preLLM 钩子，
+ * 返回最终对齐后的 { system, tools, messages } Payload，供前端显示。
+ */
+app.post('/api/harnesses/:harnessId/dry-run', async (req, res) => {
+  const { harnessId } = req.params;
+
+  // 1. 安全校验与文件存在性检查
+  let safePath;
+  try {
+    safePath = getSafeHarnessPath(harnessId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
+    await fs.access(safePath);
+  } catch (err) {
+    return res.status(404).json({ error: `Harness config for ${harnessId} not found` });
+  }
+
+  let executor;
+  try {
+    const {
+      messages,
+      todos,
+      systemPrompt,
+      tools,
+      features,
+      model,
+      temperature,
+      maxTokens,
+      thinkingEnabled,
+      skills
+    } = req.body || {};
+
+    // 2. 边界防卫：规避构造函数中的 [...skills] 崩溃隐患
+    const safeSkills = Array.isArray(skills) ? skills : [];
+
+    // 3. 实例化 AgentExecutor
+    executor = new AgentExecutor({
+      harnessId,
+      messages: messages || [],
+      todos: todos || [],
+      systemPrompt: systemPrompt || '',
+      tools: tools || [],
+      features: features || {},
+      model: model || {},
+      temperature: temperature ?? 1,
+      maxTokens: maxTokens ?? 8192,
+      thinkingEnabled: !!thinkingEnabled,
+      skills: safeSkills,
+      onEvent: () => {}
+    });
+
+    // 4. 构造 context
+    const context = {
+      executor,
+      messages: executor.messages,
+      apiMessages: buildApiMessages(executor.messages, executor.thinkingEnabled, executor.compactionEnabled),
+      systemPrompt: executor.systemPrompt || '',
+      tools: executor.tools,
+      turnIndex: 1
+    };
+
+    // 5. 运行 preLLM 钩子
+    await executor.hooks.dispatch('preLLM', context);
+
+    // 6. 获取工具 schemas 并执行 alignRequestPayload
+    const enabledToolNames = context.tools.map(t => typeof t === 'string' ? t : t.name);
+    const toolSchemas = toolRegistry.getSchemas(enabledToolNames);
+
+    const aligned = alignRequestPayload(
+      context.systemPrompt || '',
+      toolSchemas,
+      context.apiMessages || [],
+      executor.model
+    );
+
+    // 7. 将对齐后的 Payload 返回前端
+    res.json({
+      system: aligned.system,
+      tools: aligned.tools,
+      messages: aligned.messages
+    });
+  } catch (err) {
+    console.error('[server.js /api/harnesses/:harnessId/dry-run] Error:', err);
+    res.status(500).json({ error: `Dry-Run 模拟运行失败: ${err.message}` });
+  } finally {
+    // 8. 防御性编程：清理审批挂载引用，防范内存泄漏
+    if (executor) {
+      SecurityPlugin.clearExecutorPending(executor);
+    }
   }
 });
 
