@@ -304,18 +304,30 @@ fs.mkdir(SESSIONS_DIR, { recursive: true }).catch(err => {
 });
 
 /**
- * 安全校验：验证 harnessId 格式，防止路径穿越攻击
+ * 安全校验与查找：验证 harnessId 格式，并在 harnesses 目录下遍历寻找到对应的物理文件路径，防止路径穿越攻击
  */
-function getSafeHarnessPath(harnessId) {
+async function findSafeHarnessPath(harnessId) {
   if (!harnessId || typeof harnessId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
     throw new Error('Invalid harness ID format');
   }
-  const safePath = path.resolve(path.join(HARNESS_DIR, `${harnessId}.json`));
   const resolvedHarnessDir = path.resolve(HARNESS_DIR);
-  if (!safePath.startsWith(resolvedHarnessDir)) {
-    throw new Error('Access denied: Path traversal detected');
+  const files = await fs.readdir(resolvedHarnessDir);
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const filePath = path.join(resolvedHarnessDir, file);
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const data = JSON.parse(content);
+      if (data.id === harnessId) {
+        const resolvedPath = path.resolve(filePath);
+        if (!resolvedPath.startsWith(resolvedHarnessDir)) {
+          throw new Error('Access denied: Path traversal detected');
+        }
+        return resolvedPath;
+      }
+    } catch (_) {}
   }
-  return safePath;
+  return null;
 }
 
 // Active jobs memory registry for background running and client attachments
@@ -495,15 +507,12 @@ app.post('/api/harnesses/:harnessId/dry-run', async (req, res) => {
   // 1. 安全校验与文件存在性检查
   let safePath;
   try {
-    safePath = getSafeHarnessPath(harnessId);
+    safePath = await findSafeHarnessPath(harnessId);
+    if (!safePath) {
+      return res.status(404).json({ error: `Harness config for ${harnessId} not found` });
+    }
   } catch (err) {
     return res.status(400).json({ error: err.message });
-  }
-
-  try {
-    await fs.access(safePath);
-  } catch (err) {
-    return res.status(404).json({ error: `Harness config for ${harnessId} not found` });
   }
 
   let executor;

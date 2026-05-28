@@ -158,8 +158,8 @@
     "context_compaction": {
       "enabled": true,
       "thinking_compaction": true,
-      "soft_compact": true,
       "output_offload": true,
+      "soft_compact": true,
       "hard_compact": true
     },
     "todo_nag": true,
@@ -167,6 +167,11 @@
       "enabled": true,
       "enable_project_skills": true,
       "enable_global_skills": true
+    },
+    "enable_memory": {
+      "enabled": true,
+      "memory_extract": true,
+      "memory_consolidate": false
     },
     "parallel_tool_execution": true
   }
