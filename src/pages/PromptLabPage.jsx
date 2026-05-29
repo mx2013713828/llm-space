@@ -13,6 +13,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [availableSkills, setAvailableSkills] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [features, setFeatures] = useState(() => parseFeatures(harness.features));
+  const [models, setModels] = useState([]);
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
   // group 类特性的二级选项展开状态（key => boolean），默认全部折叠
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -25,6 +26,15 @@ export function PromptLabPage({ harness, onSave }) {
       .then(data => {
         if (active) {
           setAvailableTools(data);
+        }
+      })
+      .catch(console.error);
+
+    fetch('http://localhost:3001/api/models')
+      .then(r => r.json())
+      .then(data => {
+        if (active) {
+          setModels(data);
         }
       })
       .catch(console.error);
@@ -498,6 +508,31 @@ export function PromptLabPage({ harness, onSave }) {
                         }}
                       >
                         {Object.entries(meta.children).map(([subKey, subMeta]) => {
+                          if (subMeta.type === 'select') {
+                            const selectedValue = features[key]?.[subKey] || subMeta.defaultValue;
+                            return (
+                              <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, width: '100%' }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>{subMeta.description}</div>
+                                <select
+                                  disabled={!isParentEnabled || !features[key]?.fallback_model}
+                                  value={selectedValue}
+                                  onChange={(e) => handleSubFeatureChange(key, subKey, e.target.value)}
+                                  className="model-select"
+                                  style={{ width: '100%', fontSize: 11, padding: '4px 8px', height: 28 }}
+                                >
+                                  <option value="">-- 选择备用模型 --</option>
+                                  {models.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name} ({m.modelId})</option>
+                                  ))}
+                                </select>
+                                {features[key]?.fallback_model && !selectedValue && (
+                                  <div style={{ color: 'var(--orange)', fontSize: 10 }}>⚠️ 请选择一个有效的备用模型以启用故障转移</div>
+                                )}
+                              </div>
+                            );
+                          }
+
                           const isSubEnabled = isParentEnabled && !!features[key]?.[subKey];
                           return (
                             <label key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>

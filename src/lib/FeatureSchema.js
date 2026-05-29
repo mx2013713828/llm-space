@@ -108,6 +108,57 @@ export const FEATURE_SCHEMA = {
       },
     },
   },
+  error_recovery: {
+    type: 'group',
+    label: '错误自愈与容灾机制 (Error Recovery)',
+    description: '在大模型 API 调用遇到网络波动、截断、超限或过载错误时，自动尝试恢复或执行灾备方案。',
+    defaultValue: true,
+    failSafeValue: false,
+    children: {
+      max_tokens_escalation: {
+        type: 'boolean',
+        label: '临时增加 max_tokens 限制与续写',
+        description: '被 max_tokens 截断时，第一阶段无感提升 max_tokens 限制重试；第二阶段注入续写指令。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      reactive_compaction: {
+        type: 'boolean',
+        label: '反应式历史剪枝 (Reactive Compact)',
+        description: '若 API 抛出 prompt_too_long 错误，触发极限制的紧急历史语义重构并重试。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      http_retry: {
+        type: 'boolean',
+        label: 'HTTP 异常退避重试 (指数退避+抖动)',
+        description: '遭遇网络异常、429限流、529服务过载时，执行带有随机抖动的指数退避重试。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      fallback_model: {
+        type: 'boolean',
+        label: '过载模型自动故障转移 (Failover)',
+        description: '连续 3 次遭遇 529 过载错误时，自动将后续请求转移切换至备用灾备模型继续运行。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      fallback_model_id: {
+        type: 'select',
+        label: '备用故障转移模型',
+        description: '选择用于故障转移的备用模型。需先在左侧配置该模型的 API Key。',
+        defaultValue: '',
+        failSafeValue: '',
+      },
+      diminishing_returns: {
+        type: 'boolean',
+        label: '防止输出死循环与收益递减检测',
+        description: '限制最多续写 3 次，且单次续写产出的 Token 增量少于 50 时自动熔断。',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+    }
+  },
   parallel_tool_execution: {
     type: 'boolean',
     label: '并行工具执行',
@@ -146,9 +197,15 @@ export function parseFeatures(inputFeatures) {
             subVal = userVal?.[subKey];
           }
 
-          parsed[key][subKey] = isGroupEnabled
-            ? (subVal !== undefined ? !!subVal : subMeta.defaultValue)
-            : false;
+          if (subMeta.type === 'select') {
+            parsed[key][subKey] = isGroupEnabled
+              ? (subVal !== undefined ? subVal : subMeta.defaultValue)
+              : subMeta.defaultValue;
+          } else {
+            parsed[key][subKey] = isGroupEnabled
+              ? (subVal !== undefined ? !!subVal : subMeta.defaultValue)
+              : false;
+          }
         }
       }
     }

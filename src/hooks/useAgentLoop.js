@@ -174,6 +174,19 @@ export function useAgentLoop({
           try { evt = JSON.parse(raw); } catch { continue; }
 
           switch (evt.type) {
+            case 'error_recovery_attempt':
+            case 'error_recovery_fallback':
+              updateMessages(evt.parentToolCallId, (list) => [
+                ...list,
+                {
+                  role: 'system',
+                  type: 'system_alert',
+                  turn: evt.turn || 999,
+                  content: evt.message
+                }
+              ]);
+              break;
+
             case 'permission_request':
               setPendingPermission({
                 toolCallId: evt.toolCallId,
@@ -235,6 +248,9 @@ export function useAgentLoop({
               break;
 
             case 'text_start':
+              if (evt.isContinuation) {
+                break; // 续写模式：直接在原本助手消息气泡末尾追加文本流，不新增新消息气泡
+              }
               updateMessages(evt.parentToolCallId, (list) => [
                 ...list,
                 {
@@ -367,7 +383,9 @@ export function useAgentLoop({
                   role: 'assistant',
                   type: 'text',
                   turn: 999,
-                  content: `❌ **请求错误**: ${evt.message}`
+                  content: evt.suggestion 
+                    ? `❌ **请求错误**: ${evt.message}\n\n💡 **排查与调试建议**:\n${evt.suggestion}`
+                    : `❌ **请求错误**: ${evt.message}`
                 }
               ]);
               break;

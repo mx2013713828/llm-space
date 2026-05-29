@@ -15,6 +15,12 @@ import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 
 
+// 自定义异常类以精确区分错误路径
+export class RateLimitError extends Error { constructor(msg) { super(msg); this.name = "RateLimitError"; } }
+export class OverloadedError extends Error { constructor(msg) { super(msg); this.name = "OverloadedError"; } }
+export class PromptTooLongError extends Error { constructor(msg) { super(msg); this.name = "PromptTooLongError"; } }
+export class AuthError extends Error { constructor(msg) { super(msg); this.name = "AuthError"; } }
+
 // 物理常量配置
 export const OFFLOAD_THRESHOLD_BYTES = 20000;
 export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
@@ -216,9 +222,81 @@ export class AgentExecutor {
   }
 
   /**
+   * 执行 Hard-Compact (全量语义记忆重构)
+   * 可在 preLLM 阶段满阈值触发，或在遇到 PromptTooLongError 时紧急触发。
+   */
+  async performHardCompact(turnIndex) {
+    console.log(`🌊 触发 Hard-Compact 全量语义总结，当前历史消息数：${this.messages.length}...`);
+
+    this.messages.push({
+      role: 'system',
+      type: 'system_alert',
+      turn: turnIndex,
+      content: '⚠️ 上下文即将溢出！正在使用大模型生成历史战局摘要并重建记忆...'
+    });
+    this.onEvent('messages_update', { messages: this.messages });
+
+    const transcriptsDir = path.join(process.cwd(), '.transcripts');
+    await fs.mkdir(transcriptsDir, { recursive: true });
+    const transcriptFile = path.join(transcriptsDir, `transcript-${Date.now()}-${turnIndex}.jsonl`);
+    const jsonlData = this.messages.map(m => JSON.stringify(m)).join('\n');
+    await fs.writeFile(transcriptFile, jsonlData, 'utf-8');
+
+    const messagesToSummarize = this.messages.filter(m => m.type !== 'system_alert');
+    const summaryMessages = buildApiMessages(messagesToSummarize, false, false);
+
+    const summaryRaw = await this._callLLMNonStream(summaryMessages, COMPACT_PROMPT);
+    
+    let summary = summaryRaw;
+    summary = summary.replace(/<analysis>[\s\S]*?(?:<\/analysis>|$)/gi, '').trim();
+    const summaryMatch = /<summary>([\s\S]*?)<\/summary>/i.exec(summary);
+    if (summaryMatch) {
+      summary = summaryMatch[1].trim();
+    } else {
+      summary = summary.replace(/<\/?summary>/gi, '').trim();
+    }
+
+    console.log('✅ Hard-Compact 语义摘要生成成功，长度为:', summary.length);
+
+    const activeMessages = this.messages.filter(msg => turnIndex - (msg.turn || 1) < 3);
+
+    const summaryMsg = {
+      role: 'user',
+      type: 'system_alert',
+      turn: turnIndex,
+      content: `[System Memory Compacted]\nHere is the summarized history of the project so far:\n\n${summary}\n\nThe complete historical transcript has been persisted to disk.`
+    };
+
+    const resumeMsg = {
+      role: 'user',
+      type: 'system_alert',
+      turn: turnIndex,
+      content: `Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.`
+    };
+
+    // 更新 messages 并重置状态
+    this.messages.splice(0, this.messages.length, summaryMsg, ...activeMessages, resumeMsg);
+    this.contextTokens = 0;
+    this.hardCompactTriggered = true;
+
+    this.onEvent('messages_update', { messages: this.messages });
+    await this.saveSession();
+  }
+
+  /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
     async run() {
+    // 2.2 优化：单次 Turn 级自愈状态隔离，防止跨轮次/实例并发污染
+    const recoveryState = {
+      consecutive_529: 0,
+      has_escalated: false,
+      recovery_count: 0,
+      has_attempted_reactive_compact: false,
+      continuation_tokens: [] // 记录续写中每次生成的有效 tokens
+    };
+    const originalMaxTokens = this.maxTokens;
+
     try {
       const turns = {};
       this.messages.forEach(msg => {
@@ -249,19 +327,101 @@ export class AgentExecutor {
         // 生命周期：preLLM (在这里会发生：软硬清洗压缩、Todo 看板注入、Skills 组装等)
         await this.hooks.dispatch('preLLM', context);
 
+        let stopReason = null;
         try {
-          // 调用大模型
-          context.stopReason = await this._callLLM(context);
+          const isContinuation = recoveryState.recovery_count > 0;
+          stopReason = await this._callLLM(context, recoveryState, isContinuation);
+          context.stopReason = stopReason;
+          this.maxTokens = originalMaxTokens; // 恢复 tokens 限制
         } catch (err) {
+          this.maxTokens = originalMaxTokens; // 异常时也恢复
           console.error('[AgentExecutor] 调用大模型失败:', err);
+
+          // 4.1 反应式超限剪枝 (Reactive Compaction)
+          if (err instanceof PromptTooLongError && this.features.error_recovery?.reactive_compaction && !recoveryState.has_attempted_reactive_compact) {
+            recoveryState.has_attempted_reactive_compact = true;
+            this.onEvent('error_recovery_attempt', {
+              message: '⚠️ 上下文超限 (prompt_too_long)，已触发反应式硬压缩进行历史记忆重构重试...'
+            });
+            try {
+              await this.performHardCompact(turnIndex);
+              cycle--;
+              continue;
+            } catch (compactErr) {
+              console.error('[AgentExecutor] 反应式 Hard-Compact 失败:', compactErr);
+              err = new Error(`反应式硬压缩失败: ${compactErr.message}`);
+            }
+          }
+
+          // 5.1 终极报错建议拼装
+          const errPayload = {
+            message: err.message,
+            type: err.name || 'Error',
+            suggestion: (() => {
+              if (err instanceof AuthError) {
+                return '请检查当前模型的 API Key 是否配置正确。您可以在左侧『API 核心配置』面板中，点击『+ 添加模型』更新 Model Key，或在本地 `.env` 文件中更新对应环境变量。';
+              }
+              if (err instanceof PromptTooLongError) {
+                return '上下文已彻底超出该模型支持的硬限制。请尝试点击右上角『重置 Session』开启新的对话，或在『🔬 实验特性』中确保开启了『大模型语义重构 (Hard-Compact)』等上下文优化开关。';
+              }
+              if (err.message.includes('fetch failed') || err.message.includes('timeout') || err.message.includes('ENOTFOUND')) {
+                return '无法连接到大模型 API 终端。这通常是由于本地网络代理或 VPN 规则失效导致。请检查您本地终端是否配置了正确的 HTTP_PROXY/HTTPS_PROXY 环境变量，并确保 API URL 能正常解析访问。';
+              }
+              return '请检查大模型提供商的状态页，或尝试更换其他的模型节点继续执行。';
+            })()
+          };
+
           this.messages.push({
             role: 'assistant',
             type: 'text',
             turn: turnIndex,
-            content: `❌ **大模型请求失败**: ${err.message}`
+            content: `❌ **大模型请求失败**\n\n**错误原因**: ${errPayload.message}\n\n💡 **排查与调试建议**:\n${errPayload.suggestion}`
           });
-          this.onEvent('error', { message: err.message });
+          this.onEvent('messages_update', { messages: this.messages });
+          this.onEvent('error', errPayload);
           break;
+        }
+
+        // 3.1 & 3.2: 拦截并处理 max_tokens 引起的截断自愈
+        if (context.stopReason === 'max_tokens' && this.features.error_recovery?.max_tokens_escalation) {
+          if (!recoveryState.has_escalated) {
+            recoveryState.has_escalated = true;
+            const escalatedTokens = Math.min(this.maxTokens * 8, 64000);
+            
+            // 清除本轮产生的半截助手消息
+            this.messages = this.messages.filter(m => !(m.turn === turnIndex && m.role === 'assistant'));
+            
+            this.maxTokens = escalatedTokens;
+            this.onEvent('error_recovery_attempt', {
+              message: `⚠️ 检测到输出截断 (max_tokens)，正在执行第 1 阶段自愈：临时提升 max_tokens 限制至 ${escalatedTokens} 并无感重新生成...`
+            });
+            cycle--;
+            continue;
+          } else if (recoveryState.recovery_count < 3) {
+            // 2.5 收益递减检测
+            if (this.features.error_recovery?.diminishing_returns && recoveryState.continuation_tokens.length > 0) {
+              const lastTokens = recoveryState.continuation_tokens[recoveryState.continuation_tokens.length - 1];
+              if (lastTokens < 50) {
+                const熔断Msg = '生成收益递减熔断：检测到大模型疑似陷入死循环或输出枯竭（单次生成少于 50 tokens）。';
+                this.messages.push({
+                  role: 'assistant',
+                  type: 'text',
+                  turn: turnIndex,
+                  content: `❌ **输出异常终止**: ${熔断Msg}\n\n💡 **建议**: 如果大模型在续写时陷入复读或重复标点，建议修改 Prompt 或重新提问。`
+                });
+                this.onEvent('messages_update', { messages: this.messages });
+                this.onEvent('error', { message: 熔断Msg, suggestion: '如果大模型陷入复读或输出枯竭，请在左侧调整 Prompt 结构，或者点击『重置 Session』开启新对话。' });
+                break;
+              }
+            }
+
+            recoveryState.recovery_count++;
+            this.onEvent('error_recovery_attempt', {
+              message: `⚠️ 输出再次被截断，正在执行第 2 阶段自愈：注入续写指令（第 ${recoveryState.recovery_count}/3 次）继续生成...`
+            });
+            cycle--;
+            continue;
+          }
         }
 
         // 生命周期：拦截判定是否执行工具
@@ -332,66 +492,83 @@ export class AgentExecutor {
    * @param {number} turnIndex - 当前 ReAct 循环轮次
    * @returns {Promise<string>} stop_reason
    */
-  async _callLLM(context) {
+  async _callLLM(context, recoveryState, isContinuation = false) {
     const { apiMessages, turnIndex, systemPrompt, tools } = context;
-    const endpoint = `${(this.model.url || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
-    const isDeepSeek = endpoint.includes('deepseek.com');
+    const isRetryEnabled = !!this.features.error_recovery?.http_retry;
+    const maxRetries = isRetryEnabled ? 10 : 1;
 
-    // 提取目前启用的工具清单并生成后端统一定义的 Schema
-    const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
-    const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
+    let upstream = null;
+    let lastErr = null;
+    let newCharsGenerated = 0;
 
-    // 使用 alignRequestPayload 进行对齐 and 重排
-    const aligned = alignRequestPayload(
-      systemPrompt || '',
-      toolSchemas,
-      apiMessages,
-      this.model
-    );
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const baseUrl = this.model.url || 'https://api.anthropic.com';
+      const cleanedUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      const endpoint = `${cleanedUrl}/v1/messages`;
+      const isDeepSeek = endpoint.includes('deepseek.com');
 
-    // 准备大模型 API 请求体
-    const requestBody = {
-      model: this.model.modelId || 'claude-sonnet-4-5',
-      max_tokens: this.maxTokens || 8192,
-      system: aligned.system || '',
-      messages: aligned.messages || [],
-      stream: true,
-    };
+      // 提取目前启用的工具清单并生成后端统一定义的 Schema
+      const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
+      const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
 
-    if (aligned.tools && aligned.tools.length > 0) {
-      requestBody.tools = aligned.tools;
-    }
+      // 使用 alignRequestPayload 进行对齐 and 重排
+      const aligned = alignRequestPayload(
+        systemPrompt || '',
+        toolSchemas,
+        apiMessages,
+        this.model
+      );
 
-    // 处理大模型推理的扩展思考 (Extended Thinking) 特性
-    if (this.thinkingEnabled) {
-      requestBody.thinking = { 
-        type: 'enabled', 
-        budget_tokens: Math.floor(Math.min(this.maxTokens * 0.6 || 5000, 10000)) 
-      };
-      if (!isDeepSeek) {
-        requestBody.temperature = 1;
-        requestBody.betas = ['interleaved-thinking-2025-05-07'];
+      const messagesToSend = [...(aligned.messages || [])];
+      if (isContinuation) {
+        const isAnthropic = endpoint.includes('anthropic.com');
+        if (!isAnthropic) {
+          messagesToSend.push({
+            role: 'user',
+            content: 'Output token limit hit. Resume directly — no apology, no recap of what you were doing. Pick up mid-thought if that is where the cut happened. Break remaining work into smaller pieces.'
+          });
+        }
       }
-    } else if (isDeepSeek) {
-      requestBody.thinking = { type: 'disabled' };
-      if (this.temperature !== undefined) requestBody.temperature = this.temperature;
-    } else if (this.temperature !== undefined) {
-      requestBody.temperature = this.temperature;
-    }
 
-    const reqHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': this.model.key || '',
-      'anthropic-version': '2023-06-01',
-    };
-    if (this.thinkingEnabled && !isDeepSeek) {
-      reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
-    }
+      // 准备大模型 API 请求体
+      const requestBody = {
+        model: this.model.modelId || 'claude-sonnet-4-5',
+        max_tokens: this.maxTokens || 8192,
+        system: aligned.system || '',
+        messages: messagesToSend,
+        stream: true,
+      };
 
-    // 发起带重试机制的请求
-    let upstream;
-    let lastErr;
-    for (let attempt = 0; attempt < 3; attempt++) {
+      if (aligned.tools && aligned.tools.length > 0) {
+        requestBody.tools = aligned.tools;
+      }
+
+      // 处理大模型推理的扩展思考 (Extended Thinking) 特性
+      if (this.thinkingEnabled) {
+        requestBody.thinking = { 
+          type: 'enabled', 
+          budget_tokens: Math.floor(Math.min(this.maxTokens * 0.6 || 5000, 10000)) 
+        };
+        if (!isDeepSeek) {
+          requestBody.temperature = 1;
+          requestBody.betas = ['interleaved-thinking-2025-05-07'];
+        }
+      } else if (isDeepSeek) {
+        requestBody.thinking = { type: 'disabled' };
+        if (this.temperature !== undefined) requestBody.temperature = this.temperature;
+      } else if (this.temperature !== undefined) {
+        requestBody.temperature = this.temperature;
+      }
+
+      const reqHeaders = {
+        'Content-Type': 'application/json',
+        'x-api-key': this.model.key || '',
+        'anthropic-version': '2023-06-01',
+      };
+      if (this.thinkingEnabled && !isDeepSeek) {
+        reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
+      }
+
       try {
         upstream = await fetch(endpoint, {
           method: 'POST',
@@ -399,23 +576,95 @@ export class AgentExecutor {
           body: JSON.stringify(requestBody),
           signal: AbortSignal.timeout(120000),
         });
+
+        if (!upstream.ok) {
+          let errText = '';
+          try {
+            errText = await upstream.text();
+          } catch (e) {
+            errText = `(读取错误响应体失败: ${e.message})`;
+          }
+
+          let errMsg = `API 错误 ${upstream.status}`;
+          let errorType = null;
+          try {
+            const parsed = JSON.parse(errText);
+            errMsg = parsed?.error?.message || parsed?.message || errMsg;
+            errorType = parsed?.error?.type || null;
+          } catch (e) {
+            errMsg = errText ? errMsg + ' - ' + errText.slice(0, 200).split('\n').join(' ').split('\r').join(' ') + '...' : errMsg;
+          }
+
+          if (upstream.status === 401) {
+            throw new AuthError(errMsg);
+          } else if (upstream.status === 429) {
+            throw new RateLimitError(errMsg);
+          } else if (upstream.status === 529 || upstream.status === 503) {
+            throw new OverloadedError(errMsg);
+          } else if (upstream.status === 400 && (errorType === 'prompt_too_long' || errMsg.includes('prompt_too_long') || errMsg.includes('context_length_exceeded') || errMsg.includes('too many tokens'))) {
+            throw new PromptTooLongError(errMsg);
+          }
+          throw new Error(errMsg);
+        }
+
+        // 成功获取响应，跳出重试循环并清零 529 计数
+        recoveryState.consecutive_529 = 0;
         lastErr = null;
         break;
-      } catch (e) {
-        lastErr = e;
-        if (attempt < 2) {
-          console.log(`[AgentExecutor] 大模型请求失败 (attempt ${attempt + 1}/3): ${e.message}，1s 后重试...`);
-          await new Promise(r => setTimeout(r, 1000));
+      } catch (err) {
+        lastErr = err;
+        console.error(`[AgentExecutor] 大模型请求报错 (attempt ${attempt}/${maxRetries}):`, err.message);
+
+        // 如果重试次数没用完，且属于可重试错误
+        const isNetworkErr = err.message.includes('fetch failed') || err.message.includes('timeout') || err.message.includes('ENOTFOUND') || err.message.includes('fetch');
+        const isRecoverable = err instanceof RateLimitError || err instanceof OverloadedError || isNetworkErr;
+
+        if (attempt < maxRetries && isRecoverable) {
+          if (err instanceof OverloadedError) {
+            recoveryState.consecutive_529++;
+            const fallbackModelId = this.features.error_recovery?.fallback_model_id;
+            if (recoveryState.consecutive_529 >= 3 && this.features.error_recovery?.fallback_model && fallbackModelId) {
+              try {
+                let models = [];
+                if (process.env.MODELS_CONFIG) {
+                  models = JSON.parse(process.env.MODELS_CONFIG);
+                }
+                const fallbackModel = models.find(m => m.id === fallbackModelId);
+                if (fallbackModel) {
+                  this.model = {
+                    name: fallbackModel.name,
+                    modelId: fallbackModel.modelId,
+                    key: fallbackModel.key,
+                    url: fallbackModel.url || 'https://api.anthropic.com'
+                  };
+                  this.onEvent('error_recovery_fallback', {
+                    message: `⚡ 由于大模型连续过载 (529 Overloaded)，系统已自动故障转移切换至备用模型 [${fallbackModel.name}] 继续运行`
+                  });
+                  recoveryState.consecutive_529 = 0;
+                }
+              } catch (e) {
+                console.error('[AgentExecutor] Fallover 寻找备用模型失败:', e);
+              }
+            }
+          }
+
+          let delayMs = Math.min(500 * (2 ** (attempt - 1)), 32000);
+          delayMs = Math.round(delayMs + Math.random() * (delayMs * 0.25));
+
+          const delaySecs = (delayMs / 1000).toFixed(1);
+          this.onEvent('error_recovery_attempt', {
+            message: `⚠️ 大模型 API 遇到服务限流/过载或网络抖动 (${err.name || '网络异常'})，正在执行第 ${attempt} 次指数退避自愈，等待 ${delaySecs}s 后重新发起...`
+          });
+
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } else {
+          throw err;
         }
       }
     }
-    if (!upstream) throw lastErr;
 
-    if (!upstream.ok) {
-      const errText = await upstream.text();
-      let errMsg = `API 错误 ${upstream.status}`;
-      try { errMsg = JSON.parse(errText)?.error?.message || errMsg; } catch { }
-      throw new Error(errMsg);
+    if (!upstream) {
+      throw lastErr || new Error('大模型调用请求失败');
     }
 
     const reader = upstream.body.getReader();
@@ -471,15 +720,20 @@ export class AgentExecutor {
               this.messages.push(currentMsg);
               this.onEvent('thinking_start', { index: evt.index, signature: blk.signature, turn: turnIndex });
             } else if (blk.type === 'text') {
-              currentMsg = {
-                role: 'assistant',
-                type: 'text',
-                turn: turnIndex,
-                content: '',
-                tokens: { input: this._lastInputTokens || 0, output: 0 }
-              };
-              this.messages.push(currentMsg);
-              this.onEvent('text_start', { index: evt.index, turn: turnIndex });
+              if (isContinuation) {
+                currentMsg = this.messages.findLast(m => m.role === 'assistant' && m.type === 'text');
+              }
+              if (!currentMsg) {
+                currentMsg = {
+                  role: 'assistant',
+                  type: 'text',
+                  turn: turnIndex,
+                  content: '',
+                  tokens: { input: this._lastInputTokens || 0, output: 0 }
+                };
+                this.messages.push(currentMsg);
+              }
+              this.onEvent('text_start', { index: evt.index, turn: turnIndex, isContinuation });
             } else if (blk.type === 'tool_use') {
               currentMsg = {
                 role: 'assistant',
@@ -503,6 +757,9 @@ export class AgentExecutor {
               this.onEvent('thinking_delta', { text: delta.thinking });
             } else if (delta.type === 'text_delta') {
               if (currentMsg) currentMsg.content += delta.text;
+              if (isContinuation) {
+                newCharsGenerated += delta.text.length;
+              }
               this.onEvent('text_delta', { text: delta.text });
             } else if (delta.type === 'input_json_delta') {
               if (currentMsg && currentMsg.type === 'tool_call') {
@@ -550,6 +807,11 @@ export class AgentExecutor {
             break;
         }
       }
+    }
+
+    if (isContinuation) {
+      const generatedTokens = Math.round(newCharsGenerated / 3);
+      recoveryState.continuation_tokens.push(generatedTokens);
     }
 
     return stopReason;
