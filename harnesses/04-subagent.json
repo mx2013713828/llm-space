@@ -1,7 +1,7 @@
 {
   "id": "04-subagent",
   "name": "04-subagent.json",
-  "description": "",
+  "description": "子代理特性测试",
   "category": "basic",
   "model": {
     "name": "",
@@ -150,6 +150,34 @@
     "git-conventions"
   ],
   "features": {
+    "enable_security": false,
+    "context_compaction": {
+      "enabled": true,
+      "thinking_compaction": true,
+      "output_offload": true,
+      "soft_compact": true,
+      "hard_compact": true
+    },
+    "todo_nag": true,
+    "enable_skills": {
+      "enabled": false,
+      "enable_project_skills": true,
+      "enable_global_skills": true
+    },
+    "enable_memory": {
+      "enabled": false,
+      "memory_extract": false,
+      "memory_consolidate": false
+    },
+    "error_recovery": {
+      "enabled": true,
+      "max_tokens_escalation": true,
+      "reactive_compaction": true,
+      "http_retry": true,
+      "fallback_model": true,
+      "fallback_model_id": "",
+      "diminishing_returns": true
+    },
     "parallel_tool_execution": true
   }
 }

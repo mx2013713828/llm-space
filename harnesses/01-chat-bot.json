@@ -44,12 +44,12 @@
       }
     }
   ],
-  "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n当用户搜索互联网信息时，请：\n1. 分析用户提到的关键词。\n2. 调用web_search 工具获取信息。\n3. 将结果整理后回复给用户。\n",
+  "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n",
   "skills": [
     "skill-creator"
   ],
   "features": {
-    "enable_security": true,
+    "enable_security": false,
     "context_compaction": {
       "enabled": false,
       "thinking_compaction": false,
@@ -57,16 +57,25 @@
       "soft_compact": false,
       "hard_compact": false
     },
-    "todo_nag": true,
+    "todo_nag": false,
     "enable_skills": {
-      "enabled": true,
-      "enable_project_skills": true,
-      "enable_global_skills": true
+      "enabled": false,
+      "enable_project_skills": false,
+      "enable_global_skills": false
     },
     "enable_memory": {
       "enabled": false,
       "memory_extract": false,
       "memory_consolidate": false
+    },
+    "error_recovery": {
+      "enabled": false,
+      "max_tokens_escalation": false,
+      "reactive_compaction": false,
+      "http_retry": false,
+      "fallback_model": false,
+      "fallback_model_id": "",
+      "diminishing_returns": false
     },
     "parallel_tool_execution": false
   }

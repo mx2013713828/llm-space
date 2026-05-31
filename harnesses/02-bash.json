@@ -1,0 +1,149 @@
+{
+  "id": "02-bash",
+  "name": "02-bash.json",
+  "description": "提供多种工具调用",
+  "category": "basic",
+  "model": {
+    "name": "",
+    "response_format": "text",
+    "temperature": 1,
+    "max_tokens": 4096,
+    "top_p": 1
+  },
+  "tools": [
+    {
+      "name": "bash",
+      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The bash command to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file from the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Write or overwrite contents into a file on the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          },
+          "content": {
+            "type": "string",
+            "description": "The exact content to write to the file"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search keyword or question (concise natural language is recommended)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "name": "web_fetch",
+      "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The full URL of the web page to fetch (e.g., https://example.com/article)"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "weather_report",
+      "description": "获取指定城市的天气信息",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "城市名称（如：北京、上海、New York）"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    }
+  ],
+  "systemPrompt": "你是一个友好的智能助手，请准确、简洁地回答用户的问题。",
+  "skills": [],
+  "features": {
+    "enable_security": false,
+    "context_compaction": {
+      "enabled": false,
+      "thinking_compaction": true,
+      "output_offload": true,
+      "soft_compact": true,
+      "hard_compact": true
+    },
+    "todo_nag": false,
+    "enable_skills": {
+      "enabled": false,
+      "enable_project_skills": true,
+      "enable_global_skills": true
+    },
+    "enable_memory": {
+      "enabled": false,
+      "memory_extract": false,
+      "memory_consolidate": false
+    },
+    "error_recovery": {
+      "enabled": false,
+      "max_tokens_escalation": true,
+      "reactive_compaction": true,
+      "http_retry": true,
+      "fallback_model": true,
+      "fallback_model_id": "",
+      "diminishing_returns": true
+    },
+    "parallel_tool_execution": false
+  }
+}

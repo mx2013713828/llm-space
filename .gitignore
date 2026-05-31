@@ -29,11 +29,16 @@ dist-ssr
 !.env.example
 
 *.png
+*.jpg
 __pycache__/
 *.cpython-310.pyc
 server/sessions/*
 docs/superpowers/*
 harnesses/*
+!harnesses/01-chat-bot.json
+!harnesses/02-bash.json
+!harnesses/03-deep-research.json
+!harnesses/04-subagent.json
 .task_outputs/
 .transcripts/
 .offloaded/
