@@ -39,3 +39,4 @@ harnesses/*
 .offloaded/
 docs/
 scratch/
+.memory/
