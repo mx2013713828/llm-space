@@ -12,6 +12,14 @@
 
 ---
 
+## 🎬 整体交互演示
+
+*(提示：此处推荐放置 15~20 秒的整体交互 GIF/短视频，展示以下连续动作：切换预设 -> 插拔配置 -> 观察白盒轨迹 -> 一键存盘导出。)*
+
+![LLM Space 整体操作演示](docs/images/llm-space-overview.gif)
+
+---
+
 ## 💡 核心设计理念
 
 ### 🧱 乐高式插拔与配置 (Modular Sandbox)
@@ -20,7 +28,7 @@
 - **可插拔功能插槽 (Modular Features)**：
   - **API 自愈与容灾 (Error Recovery)**：遇到 429 自动非阻塞指数退避重试、连续 529 自动 Failover 备用模型、`max_tokens` 截断自动无损续写物理拼接、死循环熔断。
   - **大模型语义重构 (Hard-Compact)**：上下文爆满时，自动触发紧急历史记忆压缩与 transcript 归档。
-  - **实时缓存监控 (KV Cache Monitor)**：实时追踪 DeepSeek 等模型的 KV 缓存命中率与利用率。
+  - **实时缓存监控 (KV Cache Monitor)**：实时追踪 DeepSeek 等模型的 KV 缓存利用率。
 
 ### 👁️ 可视化白盒追踪 (White-Box Observability)
 拒绝黑盒运行！所有细节尽收眼底：
@@ -28,46 +36,22 @@
 - **工具调用轨迹**：直观展示 `tool_use` 发起、输入参数、工具本地真实执行输出（流式 Shell 输出、网页抓取等）的交互全过程。
 - **消息物理合并**：续写流式打字与历史气泡无缝对齐，不产生逻辑断裂气泡。
 
-### 🎯 从零基础到高阶玩家的 Playground
-- **对于新手 (Zero to Hero)**：
-  通过直观的视觉轨迹，零门槛看清 `LLM 思考 -> 触发工具调用 -> 本地真实执行 -> 结果流式回传 -> 下一轮循环决策` 的 ReAct 原理，无需配置高深复杂的代理类。
-- **对于高阶玩家 (Agent Craftsman)**：
-  - **随心所欲拼装**：在 UI 界面上自由勾选要挂载给大模型的 Tools 积木，在线修改 Base System Prompt。
-  - **极速自定义扩展**：没有任何繁琐的类继承和包装。只需编写几十行纯 Node.js 代码，即可把本地的任意脚本（Bash、Python、DB 查询）转化为 Agent 挂载的 Tool 积木。
-
----
-
-## ✨ 核心特性
-
-- **多轮自主 Agent 循环**：全自动流式解析与渲染多轮工具迭代交互。
-- **真实的系统工具调用**：内建代理服务器，真实执行 Bash 脚本、读写文件、连接 Open-Meteo 天气 API，以及通过 Tavily 进行网络搜索与网页抓取。
-- **Harness 资源管理器**：左侧面板动态读取 `harnesses/` 目录下的 `.json` 配置，秒级热切换和测试。
-- **Prompt Lab 沉浸式编辑**：支持在线修改 System Prompt，直接勾选工具，并支持一键 `保存到本地 JSON`。
-- **全兼容 API 代理层**：后端使用 Express 构建了兼容 Anthropic 协议的代理层，彻底解决浏览器跨域（CORS）问题，并动态适配 DeepSeek 接口（思考模式自动启停、budget_tokens 取整适配）。
-- **自动代理检测**：服务端自动识别系统 `HTTPS_PROXY` 环境变量，fetch 请求自动走代理。
-
 ---
 
 ## 🛠️ 快速启动 (3分钟极速上手)
 
-### 1. 环境准备
-确保你的电脑上安装了 **Node.js** (推荐 v18+)。
-
-### 2. 安装依赖
+### 1. 安装与运行
+确保你的电脑上安装了 **Node.js** (推荐 v18+)，然后执行：
 ```bash
+# 1. 安装依赖
 npm install
-```
 
-### 3. 一键启动
-本项目配置了 `concurrently`，一个命令即可同时启动 **前端 UI** 和 **后端代理服务**：
-```bash
+# 2. 一键启动 (同时运行前端 UI 与后端服务)
 npm run dev
 ```
-运行成功后：
-- **后端 API 服务** 运行在：`http://localhost:3001`
-- **前端工作台** 运行在：`http://localhost:5174` (浏览器会自动或需手动打开该地址)
+启动后，浏览器会自动打开前端工作台：`http://localhost:5174`。
 
-### 4. 环境变量配置 (.env)
+### 2. 环境变量配置 (.env)
 在项目根目录创建 `.env` 文件（或参考 `.env.example`）：
 ```dotenv
 # Tavily Search API — 用于网络搜索工具（https://tavily.com 免额度 1000次/月）
@@ -76,17 +60,71 @@ TAVILY_API_KEY=tvly-你的KEY
 # 服务端口（可选，默认 3001）
 PORT=3001
 ```
-*(提示：模型配置和 Key 可直接在前端 UI 中进行动态添加，系统会自动将其存盘。)*
+*(提示：大模型 API Key 可直接在前端 UI 左侧面板中动态添加，系统会自动将其存盘。)*
 
 ---
 
-## 🔧 乐高扩展：30秒开发你的第一个 Tool 积木
+## 🔬 4 大基础 Harness 预设实验
+
+我们为您预先创建了 4 个由浅入深的经典预设，可供您在左侧面板秒级切换并快速开始实验：
+
+### 📁 01-chat-bot.json (基础对话)
+* **定位**：理解最基础的 ReAct 工具调用循环。
+* **特色**：挂载了简单的城市天气查询等工具。适合观察大模型分析城市、触发 tool_call、获取数据并自然语言归纳的闭环。
+  <details>
+  <summary>🔍 点击展开看运行演示 GIF</summary>
+  
+  ![01-chat-bot 演示](docs/images/01-chat-bot-demo.gif)
+  
+  </details>
+
+### 📁 02-bash.json (系统交互)
+* **定位**：让 Agent 拥有文件系统操作与网络探针大礼包。
+* **特色**：挂载了真实的 Bash 执行器（流式回显）、文件读写、Tavily 实时网页搜索与抓取。你可以输入诸如“查找当前目录下最大的三个文件”来观察轨迹。
+  <details>
+  <summary>🔍 点击展开看运行演示 GIF</summary>
+  
+  ![02-bash 演示](docs/images/02-bash-demo.gif)
+  
+  </details>
+
+### 📁 03-deep-research.json (深度调研)
+* **定位**：学习 Agent 自动规划和拆解复杂任务。
+* **特色**：结合 systemPrompt 中的 Behaviors 与本地 `write_todos`，大模型遇到复杂调研任务时会自动在右侧拆解出 4~8 个 TODO 步骤，并逐个攻克。
+  <details>
+  <summary>🔍 点击展开看运行演示 GIF</summary>
+  
+  ![03-deep-research 演示](docs/images/03-deep-research-demo.gif)
+  
+  </details>
+
+### 📁 04-subagent.json (多 Agent 协作)
+* **定位**：探索多 Agent 分工与上下文隔离。
+* **特色**：挂载了 `sub_agent` 核心工具。主 Agent 在遇到繁重探针或庞大上下文搜集任务时，会主动派发任务并创建隔离的 Sub-agent 运行，最后接收并整合其汇报，避免当前主 context 溢出污染。
+  <details>
+  <summary>🔍 点击展开看运行演示 GIF</summary>
+  
+  ![04-subagent 演示](docs/images/04-subagent-demo.gif)
+  
+  </details>
+
+---
+
+## ⚙️ 乐高沙盒闭环交互 (如何自定义与导出)
+
+在 LLM Space 中，你所做的任何实验调整都可以无缝沉淀：
+
+1. **秒级插拔**：在左侧列表随意选中一个基础 Harness 后，在 **Prompt Lab** 中修改 Base System Prompt，勾选你想尝试的 Tools（如 `bash`, `sub_agent`），或者在实验特性区开启 `Error Recovery` 自愈开关。
+2. **白盒追踪**：发送提问，观察轨迹追踪面板中展开的运行轨迹是否符合预期。
+3. **一键存盘**：调试满意后，点击页面下方的 **“保存 (Save)”** 按钮。系统会立即在本地 `harnesses/` 目录下生成并导出您专属的全新 Harness JSON 配置文件，方便随用随切或与团队共享。
+
+---
+
+## 🔧 开发者进阶：30秒开发你的第一个 Tool 积木
 
 如果你想让 Agent 拥有新的能力（例如执行数据库查询、或是调用自定义 API），只需两步：
 
 ### 第一步：在 `server/tools/` 目录下新建一个 JS 文件（例如 `hello_tool.js`）
-导出一个包含 `name`、`description`、`parameters` (符合 JSON Schema 规范) 和 `execute` 函数的对象：
-
 ```javascript
 // server/tools/hello_tool.js
 export default {
@@ -101,7 +139,7 @@ export default {
     required: ['userName']
   },
   async execute({ userName, customMsg = '祝你开心！' }) {
-    // 这里可以编写任何真实的业务逻辑，比如查询数据库、执行 Bash 等
+    // 在这里编写真实的业务逻辑
     return `你好，${userName}！ ${customMsg}`;
   }
 };
@@ -117,31 +155,7 @@ export const tools = [
   hello_tool
 ];
 ```
-
-**搞定！** 刷新前端页面，在 Prompt Lab 的 **🔧 Tools 挂载** 选项卡里勾选 `hello_tool`，大模型便即刻拥有了向用户发送问候的能力。
-
----
-
-## 📂 核心目录结构
-
-```text
-llm-space/
-├── harnesses/                 # Agent 配置文件目录（JSON 格式，宿主）
-├── server.js                  # 后端代理与工具调度服务器 (Express)
-├── server/
-│   └── tools/                 # 后端真实工具库（乐高积木）
-│       ├── index.js           # 工具注册中心
-│       ├── bash.js            # 真实的 Shell 执行器
-│       ├── web_search.js      # Tavily 网络搜索
-│       └── ...                
-├── src/                       # React 前端源码 (白盒轨迹)
-│   ├── components/            # UI 组件（对话气泡、Todo 列表等）
-│   ├── pages/
-│   │   ├── TrajectoryPage.jsx # 运行轨迹追踪与 Agent Loop 引擎
-│   │   └── PromptLabPage.jsx  # Prompt/工具 配置工作台
-│   └── App.jsx                # 应用入口与资源管理器
-└── package.json
-```
+**搞定！** 刷新前端页面，在 Prompt Lab 的 **🔧 Tools 挂载** 选项卡里勾选它即可使用。
 
 ---
 
