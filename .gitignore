@@ -43,5 +43,6 @@ harnesses/*
 .transcripts/
 .offloaded/
 docs/
+!docs/images/llm-space.gif
 scratch/
 .memory/

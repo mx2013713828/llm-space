@@ -14,9 +14,7 @@
 
 ## 🎬 整体交互演示
 
-*(提示：此处推荐放置 15~20 秒的整体交互 GIF/短视频，展示以下连续动作：切换预设 -> 插拔配置 -> 观察白盒轨迹 -> 一键存盘导出。)*
-
-![LLM Space 整体操作演示](docs/images/llm-space-overview.gif)
+![LLM Space 整体操作演示](images/llm-space.gif)
 
 ---
 
