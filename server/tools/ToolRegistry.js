@@ -6,6 +6,11 @@ import writeTodos from './write_todos.js';
 import webSearch from './web_search.js';
 import webFetch from './web_fetch.js';
 import subAgent from './sub_agent.js';
+import createTask from './create_task.js';
+import listTasks from './list_tasks.js';
+import getTask from './get_task.js';
+import claimTask from './claim_task.js';
+import completeTask from './complete_task.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -22,6 +27,11 @@ class ToolRegistry {
       web_search: webSearch,
       web_fetch: webFetch,
       sub_agent: subAgent,
+      create_task: createTask,
+      list_tasks: listTasks,
+      get_task: getTask,
+      claim_task: claimTask,
+      complete_task: completeTask,
     };
   }
 
