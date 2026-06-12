@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { FEATURE_SCHEMA, parseFeatures } from '../lib/FeatureSchema.js';
 
+const SYSTEM_HIDDEN_TOOLS = [
+  'write_todos',
+  'create_task',
+  'list_tasks',
+  'get_task',
+  'claim_task',
+  'complete_task'
+];
+
 /**
  * Prompt Lab 页面
  * 用于配置当前 agent 的 system prompt 和 tools/skills
@@ -392,34 +401,36 @@ export function PromptLabPage({ harness, onSave }) {
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>正在从后端加载标准工具...</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-                {availableTools.map(tool => {
-                  const active = selectedTools.some(t => t.name === tool.name);
-                  return (
-                    <div
-                      key={tool.name}
-                      className="card"
-                      onClick={() => toggleTool(tool)}
-                      style={{
-                        padding: 16, cursor: 'pointer',
-                        borderColor: active ? 'var(--blue)' : 'var(--border)',
-                        background: active ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-card)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                        <span style={{ fontSize: 22 }}>🔧</span>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--blue)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                            {tool.name}
+                {availableTools
+                  .filter(tool => !SYSTEM_HIDDEN_TOOLS.includes(tool.name))
+                  .map(tool => {
+                    const active = selectedTools.some(t => t.name === tool.name);
+                    return (
+                      <div
+                        key={tool.name}
+                        className="card"
+                        onClick={() => toggleTool(tool)}
+                        style={{
+                          padding: 16, cursor: 'pointer',
+                          borderColor: active ? 'var(--blue)' : 'var(--border)',
+                          background: active ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-card)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 22 }}>🔧</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--blue)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                              {tool.name}
+                            </div>
+                          </div>
+                          <div style={{ marginLeft: 'auto', fontSize: 16, color: active ? 'var(--blue)' : 'var(--text-muted)' }}>
+                            {active ? '☑' : '☐'}
                           </div>
                         </div>
-                        <div style={{ marginLeft: 'auto', fontSize: 16, color: active ? 'var(--blue)' : 'var(--text-muted)' }}>
-                          {active ? '☑' : '☐'}
-                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.description}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.description}</div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -510,23 +521,36 @@ export function PromptLabPage({ harness, onSave }) {
                         {Object.entries(meta.children).map(([subKey, subMeta]) => {
                           if (subMeta.type === 'select') {
                             const selectedValue = features[key]?.[subKey] || subMeta.defaultValue;
+                            const hasOptions = !!subMeta.options;
+                            const isDisabled = hasOptions 
+                              ? !isParentEnabled 
+                              : (!isParentEnabled || !features[key]?.fallback_model);
+
                             return (
                               <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, width: '100%' }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>{subMeta.description}</div>
                                 <select
-                                  disabled={!isParentEnabled || !features[key]?.fallback_model}
+                                  disabled={isDisabled}
                                   value={selectedValue}
                                   onChange={(e) => handleSubFeatureChange(key, subKey, e.target.value)}
                                   className="model-select"
                                   style={{ width: '100%', fontSize: 11, padding: '4px 8px', height: 28 }}
                                 >
-                                  <option value="">-- 选择备用模型 --</option>
-                                  {models.map(m => (
-                                    <option key={m.id} value={m.id}>{m.name} ({m.modelId})</option>
-                                  ))}
+                                  {hasOptions ? (
+                                    subMeta.options.map(opt => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))
+                                  ) : (
+                                    <>
+                                      <option value="">-- 选择备用模型 --</option>
+                                      {models.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name} ({m.modelId})</option>
+                                      ))}
+                                    </>
+                                  )}
                                 </select>
-                                {features[key]?.fallback_model && !selectedValue && (
+                                {!hasOptions && features[key]?.fallback_model && !selectedValue && (
                                   <div style={{ color: 'var(--orange)', fontSize: 10 }}>⚠️ 请选择一个有效的备用模型以启用故障转移</div>
                                 )}
                               </div>
