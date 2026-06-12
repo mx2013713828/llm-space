@@ -524,7 +524,7 @@ export function PromptLabPage({ harness, onSave }) {
                             const hasOptions = !!subMeta.options;
                             const isDisabled = hasOptions 
                               ? !isParentEnabled 
-                              : (!isParentEnabled || !features[key]?.fallback_model);
+                              : (!isParentEnabled || (subKey === 'fallback_model_id' && !features[key]?.fallback_model));
 
                             return (
                               <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, width: '100%' }}>
@@ -543,9 +543,9 @@ export function PromptLabPage({ harness, onSave }) {
                                     ))
                                   ) : (
                                     <>
-                                      <option value="">-- 选择备用模型 --</option>
-                                      {models.map(m => (
-                                        <option key={m.id} value={m.id}>{m.name} ({m.modelId})</option>
+                                      <option value="">{models.length === 0 ? '-- 正在加载备用模型... --' : '-- 选择备用模型 --'}</option>
+                                      {models.map((m, idx) => (
+                                        <option key={m.id || m.modelId || idx} value={m.id}>{m.name} ({m.modelId})</option>
                                       ))}
                                     </>
                                   )}
