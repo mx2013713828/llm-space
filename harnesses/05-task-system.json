@@ -12,86 +12,6 @@
   },
   "tools": [
     {
-      "name": "create_task",
-      "description": "创建一个全新的任务。系统会自动利用 Kahn 拓扑排序算法校验是否存在环路，防止循环依赖。",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "subject": {
-            "type": "string",
-            "description": "任务标题 (例: \"设计表结构\")"
-          },
-          "description": {
-            "type": "string",
-            "description": "详细的任务上下文及背景说明"
-          },
-          "blockedBy": {
-            "type": "string",
-            "description": "该任务依赖的上游任务 ID 列表，以逗号分隔 (例: \"task_cd34,task_ef56\")"
-          }
-        },
-        "required": [
-          "subject"
-        ]
-      }
-    },
-    {
-      "name": "list_tasks",
-      "description": "列出当前会话下的所有任务及其完成状态、所属 Owner 和依赖情况。",
-      "input_schema": {
-        "type": "object",
-        "properties": {}
-      }
-    },
-    {
-      "name": "get_task",
-      "description": "查询单个任务的完整详细属性 (包括详细描述及完整的依赖列表)。",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "任务唯一 ID"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      }
-    },
-    {
-      "name": "claim_task",
-      "description": "认领一个处于待开始状态的任务。只有当其依赖的所有上游任务均处于 completed 状态时，认领才能成功。系统自动施加并发排他锁。",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "待认领任务的唯一 ID"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      }
-    },
-    {
-      "name": "complete_task",
-      "description": "将一个进行中的任务标记为已完成 (completed)。系统会自动解锁由于该任务完成而不再受阻的下游任务。",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "待完成任务的唯一 ID"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      }
-    },
-    {
       "name": "bash",
       "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
       "input_schema": {
@@ -156,7 +76,10 @@
       "soft_compact": true,
       "hard_compact": true
     },
-    "todo_nag": true,
+    "task_manager": {
+      "enabled": true,
+      "mode": "task_system"
+    },
     "enable_skills": {
       "enabled": false,
       "enable_project_skills": true,

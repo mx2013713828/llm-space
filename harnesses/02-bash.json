@@ -124,7 +124,10 @@
       "soft_compact": true,
       "hard_compact": true
     },
-    "todo_nag": false,
+    "task_manager": {
+      "enabled": false,
+      "mode": "todo"
+    },
     "enable_skills": {
       "enabled": false,
       "enable_project_skills": true,

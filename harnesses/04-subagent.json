@@ -81,22 +81,6 @@
       }
     },
     {
-      "name": "write_todos",
-      "description": "Update the TODO task list in the frontend panel. Use this when creating or updating a multi-step task plan. Every update should contain the complete state of all tasks.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "todos": {
-            "type": "array",
-            "description": "List of TODO tasks. Each element must contain content (task description), status (pending/in_progress/completed/failed), and priority (high/medium/low)."
-          }
-        },
-        "required": [
-          "todos"
-        ]
-      }
-    },
-    {
       "name": "sub_agent",
       "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
       "input_schema": {
@@ -158,7 +142,10 @@
       "soft_compact": true,
       "hard_compact": true
     },
-    "todo_nag": true,
+    "task_manager": {
+      "enabled": true,
+      "mode": "todo"
+    },
     "enable_skills": {
       "enabled": false,
       "enable_project_skills": true,
