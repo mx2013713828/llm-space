@@ -982,6 +982,11 @@ app.delete('/api/sessions/:harnessId', async (req, res) => {
     }
     const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
     await fs.unlink(sessionPath).catch(() => {}); // 允许文件不存在
+    
+    // 级联清理任务物理目录
+    const tasksDir = path.join(SESSIONS_DIR, `${harnessId}_tasks`);
+    await fs.rm(tasksDir, { recursive: true, force: true }).catch(() => {});
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
