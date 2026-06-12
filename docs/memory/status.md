@@ -42,15 +42,15 @@
 | `read_file` | `read_file.js` | 读取本地文件（容错 `path`/`filePath` 双参数名） |
 | `write_file` | `write_file.js` | 写入本地文件（容错 `path`/`filePath` 双参数名） |
 | `weather_report` | `weather_report.js` | 调用 Open-Meteo 真实天气 API |
-| `write_todos` | `write_todos.js` | TODO 任务列表管理（后端系统级拦截并向前端同步更新） |
+| `write_todos` | `write_todos.js` | TODO 任务列表管理（后端系统级拦截并向前端同步更新）（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
 | `web_search` | `web_search.js` | Tavily `/search` — 关键词搜索，返回 AI 摘要 + 结构化结果 |
 | `web_fetch` | `web_fetch.js` | Tavily `/extract` — 传入 URL，返回清洗后 Markdown 正文 |
 | `sub_agent` | `sub_agent.js` | 派发子代理任务（后端系统级拦截并实例化子 Executor 循环） |
-| `create_task` | `create_task.js` | 创建新任务（附带 Kahn DAG 环检测） |
-| `list_tasks` | `list_tasks.js` | 检索任务看板状态 |
-| `get_task` | `get_task.js` | 查询单个任务详情 |
-| `claim_task` | `claim_task.js` | 并发保护认领任务（带排他文件锁） |
-| `complete_task` | `complete_task.js` | 完成进行中任务，并自动解锁下游 |
+| `create_task` | `create_task.js` | 创建新任务（附带 Kahn DAG 环检测）（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
+| `list_tasks` | `list_tasks.js` | 检索任务看板状态（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
+| `get_task` | `get_task.js` | 查询单个任务详情（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
+| `claim_task` | `claim_task.js` | 并发保护认领任务（带排他文件锁）（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
+| `complete_task` | `complete_task.js` | 完成进行中任务，并自动解锁下游（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
 
 ### 2.5 网络代理支持
 - 使用 `undici` 的 `EnvHttpProxyAgent` + `setGlobalDispatcher` 全局适配。
@@ -101,7 +101,7 @@
 18. **先进技能体系 (A+B 方案) 落地**：支持有条件加载本地全局技能池（`~/.agents/skills`）与本地优先覆盖机制，提供前端 `enable_global_skills` 一键开关；后端自动深度扫描技能目录，解构其下的 `scripts/`（脚本）与 `references/`（参考资料）等附属资产，将其与主 `SKILL.md` 融合为 richSkills。大模型发包对齐层全量支持物理资产树注入及 XML 路径披露，实现 100% 物理寻址与前缀缓存对齐。
 19. **Hook-Based 生命周期架构重构**：将原本臃肿的后端 AgentExecutor 主循环彻底解耦。引入微内核 `HookManager`，将上下文清洗、大文本物理卸载、子代理拦截、技能按需扫描加载、Todo 看板同步及催促等特性，完全剥离为独立的可插拔插件（Plugins）。框架现已演进为严格遵循 `PreLLM -> PreToolUse -> PostToolUse -> OnLoopEnd` 的标准化流水线，具备了类似 Claude Code 等工业级 Agent 引擎的极致扩展能力与代码纯洁度。
 20. **长期记忆系统（Memory System）**：实现跨会话、跨压缩的知识积累层（阶段十，commit d5128f9）。包含 memoryStore（写锁+路径校验+UTF-8安全截断）、memorySelect（LLM side-query+关键词降级）、memoryExtract（对话结束后自动提取）、memoryConsolidate（三层门控定期整理）、MemoryPlugin（preLLM 注入 + onLoopEnd fire-and-forget）。索引注入 system prompt 保护 Prompt Cache，具体内容注入 user turn 不破坏缓存前缀。FeatureSchema 新增 enable_memory group，含子级联动约束。
-21. **可恢复的任务依赖系统 (DAG Task System)**：实现类似 Claude Code 的持久化任务图系统，内置 Kahn 算法环检测、Claim 排他文件锁、Release Path 中断回滚事务，以及前缀缓存（Prompt Cache）友好的静前动后拆分渲染逻辑。
+21. **可恢复的任务依赖系统 (DAG Task System) 与一键式合并重构**：实现类似 Claude Code 的持久化任务图系统，内置 Kahn 算法环检测、Claim 排他文件锁、Release Path 中断回滚事务，以及静前动后前缀缓存友好拆分。更进一步，进行了任务系统一键一类合并重构，在前端 Tools 面板中彻底隐藏 6 个物理原子工具，在 FeatureSchema 中引入统一的 `task_manager` 实验特性组，支持 `todo`/`task_system` 双模式动态净化与自动搭载。
 
 ## 6. CC 级记忆系统增强（待完成）
 

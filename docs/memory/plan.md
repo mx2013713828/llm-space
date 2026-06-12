@@ -136,4 +136,9 @@
 - [x] **TaskSystemPlugin.js**：完成 preLLM（静前动后缓存拆分注入）、preToolUse（拦截并广播 task_update）、onLoopEnd（崩溃事务自动回滚）。
 - [x] **DELETE REST API**：重置 Session 时自动清空物理任务文件夹。
 - [x] **TodoList.jsx**：React 组件渲染 blockedBy 依赖链及 Owner 分配。
+- [x] **FeatureSchema.js**：重构删除 `todo_nag`，合并并引入顶层 `task_manager` 特性组与模式选择项（支持 `todo` 与 `task_system` 模式）。
+- [x] **AgentExecutor.js**：重构物理过滤并动态拼装 `write_todos` 或是 5 个原子任务工具，免除用户手动开关 6 个原子工具。
+- [x] **PromptLabPage.jsx**：隐藏工具列表中的 6 个物理原子工具，并支持通用的 `select` 特性在 UI 配置面板的动态下拉渲染。
+- [x] **Harness Configs**：批量更新并重构 preset 配置，精简 tools 属性，采用新版 `task_manager` 一键装配。
+
 
