@@ -67,8 +67,27 @@ export class AgentExecutor {
     this.messages = [...(Array.isArray(messages) ? messages : [])];
     this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.systemPrompt = systemPrompt;
-    this.tools = tools;
     this.features = parseFeatures(features);
+    this.tools = Array.isArray(tools) ? [...tools] : [];
+
+    // 动态装配与净化任务看板工具
+    const isTaskManagerEnabled = this.features.task_manager?.enabled !== false;
+    const isTaskSystem = isTaskManagerEnabled && this.features.task_manager?.mode === 'task_system';
+    const isTodoMode = isTaskManagerEnabled && this.features.task_manager?.mode === 'todo';
+
+    const taskSystemTools = ['create_task', 'list_tasks', 'get_task', 'claim_task', 'complete_task'];
+    const allBoardTools = [...taskSystemTools, 'write_todos'];
+
+    // 首先清理从预设配置文件或外部传入的任何看板原子工具，防止配置冲突或残留
+    this.tools = this.tools.filter(t => !allBoardTools.includes(t) && !allBoardTools.some(bt => t?.name === bt));
+
+    // 根据运行模式，自动隐式向工具箱注入对应的底层工具
+    if (isTaskSystem) {
+      taskSystemTools.forEach(tName => this.tools.push(tName));
+    } else if (isTodoMode) {
+      this.tools.push('write_todos');
+    }
+
     this.model = model;
     this.temperature = temperature;
     this.maxTokens = maxTokens;
@@ -98,10 +117,9 @@ export class AgentExecutor {
     if (this.features.context_compaction && this.features.context_compaction.enabled) {
       this.hooks.register(CompactionPlugin);
     }
-    const isTaskSystemEnabled = this.tools.some(t => t === 'create_task' || t.name === 'create_task');
-    if (isTaskSystemEnabled) {
+    if (isTaskSystem) {
       this.hooks.register(TaskSystemPlugin);
-    } else if (this.features.todo_nag !== false) {
+    } else if (isTodoMode) {
       this.hooks.register(TodoNagPlugin);
     }
     if (this.features.context_compaction && this.features.context_compaction.enabled && this.features.context_compaction.output_offload) {
