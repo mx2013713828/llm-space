@@ -52,12 +52,25 @@ export const FEATURE_SCHEMA = {
       },
     },
   },
-  todo_nag: {
-    type: 'boolean',
-    label: '任务看板更新督促',
-    description: '当连续 3 轮未更新任务看板时，自动向大模型追加看板更新的系统督促提示。',
+  task_manager: {
+    type: 'group',
+    label: '任务看板与进度管理系统',
+    description: '配置 Agent 任务规划与催促流转机制（开启后会自动停用/屏蔽底层原子工具，由实验特性一键搭载）。',
     defaultValue: true,
     failSafeValue: true,
+    children: {
+      mode: {
+        type: 'select',
+        label: '看板运行模式',
+        description: '选择看板运行的引擎和依赖机制。',
+        defaultValue: 'todo',
+        failSafeValue: 'todo',
+        options: [
+          { value: 'todo', label: 'Write-Todo 线性看板 (经典版)' },
+          { value: 'task_system', label: 'Task-System 拓扑依赖系统 (DAG版)' }
+        ]
+      }
+    }
   },
   enable_skills: {
     type: 'group',
