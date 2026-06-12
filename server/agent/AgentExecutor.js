@@ -13,6 +13,7 @@ import { SkillsPlugin } from './plugins/SkillsPlugin.js';
 import { SecurityPlugin } from './plugins/SecurityPlugin.js';
 import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
+import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -97,7 +98,10 @@ export class AgentExecutor {
     if (this.features.context_compaction && this.features.context_compaction.enabled) {
       this.hooks.register(CompactionPlugin);
     }
-    if (this.features.todo_nag !== false) {
+    const isTaskSystemEnabled = this.tools.some(t => t === 'create_task' || t.name === 'create_task');
+    if (isTaskSystemEnabled) {
+      this.hooks.register(TaskSystemPlugin);
+    } else if (this.features.todo_nag !== false) {
       this.hooks.register(TodoNagPlugin);
     }
     if (this.features.context_compaction && this.features.context_compaction.enabled && this.features.context_compaction.output_offload) {
