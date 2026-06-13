@@ -202,7 +202,11 @@ export const TaskSystemPlugin = {
       return;
     }
 
-    if (hasUpdatedTodoThisTurn) {
+    const harnessId = executor.harnessId || 'default';
+    const tasks = await taskManager.loadTasks(harnessId);
+    const hasActiveTasks = tasks.some(t => t.status !== 'completed');
+
+    if (!hasActiveTasks || hasUpdatedTodoThisTurn) {
       executor.roundsSinceTaskAction = 0;
     } else {
       executor.roundsSinceTaskAction = (executor.roundsSinceTaskAction || 0) + 1;

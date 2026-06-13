@@ -31,9 +31,13 @@ export const TodoNagPlugin = {
   },
 
   async onLoopEnd(context) {
-    // 轮数累加逻辑：本轮如果更新了看板就归零，否则+1
-    context.executor.roundsSinceTodo = context.hasUpdatedTodoThisTurn 
-      ? 0 
-      : context.executor.roundsSinceTodo + 1;
+    // 轮数累加逻辑：只有存在未完成的 TODO，且本轮未更新时才累加，否则归零
+    const hasActiveTodos = (context.executor.todos || []).some(t => t.status !== 'completed');
+
+    if (!hasActiveTodos || context.hasUpdatedTodoThisTurn) {
+      context.executor.roundsSinceTodo = 0;
+    } else {
+      context.executor.roundsSinceTodo = (context.executor.roundsSinceTodo || 0) + 1;
+    }
   }
 };
