@@ -1,9 +1,24 @@
 import { injectTodoState } from '../messageBuilder.js';
+import { FEATURE_SCHEMA } from '../../../src/lib/FeatureSchema.js';
 
 export const TodoNagPlugin = {
   name: 'TodoNagPlugin',
 
   async preLLM(context) {
+    const { executor } = context;
+    if (!executor) return;
+    // 动态提取并实时装配 todo_prompt (带 XML 去重判定)
+    const customPrompt = executor.features.task_manager?.todo_prompt;
+    
+    let promptToInject = customPrompt;
+    if (promptToInject === undefined || promptToInject === null) {
+      promptToInject = FEATURE_SCHEMA.task_manager?.children?.todo_prompt?.defaultValue || '';
+    }
+
+    if (promptToInject && !context.systemPrompt.includes('<todo_mode_guidelines>')) {
+      context.systemPrompt += `\n${promptToInject}\n`;
+    }
+
     // 调用现有的注入逻辑，将 current_tasks_status 附加到 apiMessages 末尾
     context.apiMessages = injectTodoState(
       context.apiMessages, 

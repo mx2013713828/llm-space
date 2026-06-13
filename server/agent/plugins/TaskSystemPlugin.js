@@ -1,11 +1,24 @@
 import * as taskManager from '../utils/taskManager.js';
+import { FEATURE_SCHEMA } from '../../../src/lib/FeatureSchema.js';
 
 export const TaskSystemPlugin = {
   name: 'TaskSystemPlugin',
 
   async preLLM(context) {
-    const { executor, apiMessages } = context;
+    const { executor, apiMessages, turnIndex } = context;
+    if (!executor) return;
     const harnessId = executor.harnessId || 'default';
+
+    // 注入自定义的 task_system_prompt (带 XML 去重)
+    const customPrompt = executor.features.task_manager?.task_system_prompt;
+    let promptToInject = customPrompt;
+    if (promptToInject === undefined || promptToInject === null) {
+      promptToInject = FEATURE_SCHEMA.task_manager?.children?.task_system_prompt?.defaultValue || '';
+    }
+
+    if (promptToInject && !context.systemPrompt.includes('<task_system_guidelines>')) {
+      context.systemPrompt += `\n${promptToInject}\n`;
+    }
 
     // 1. 加载磁盘上该 Harness 下的所有任务
     const tasks = await taskManager.loadTasks(harnessId);
@@ -48,7 +61,7 @@ export const TaskSystemPlugin = {
     // 拼入最后一个 User 消息体中
     const lastMsg = apiMessages[apiMessages.length - 1];
     if (lastMsg && lastMsg.role === 'user') {
-      lastMsg.content.push(payloadBlock);
+      lastMsg.content = [...lastMsg.content, payloadBlock];
     } else {
       apiMessages.push({ role: 'user', content: [payloadBlock] });
     }
@@ -66,6 +79,7 @@ export const TaskSystemPlugin = {
     // 只要调用了写入类型的任务工具，重置计时器
     if (['create_task', 'claim_task', 'complete_task'].includes(toolName)) {
       executor.roundsSinceTaskAction = 0;
+      context.hasUpdatedTodoThisTurn = true; // 确保在 onLoopEnd 能正确阻断累加
     }
 
     try {
