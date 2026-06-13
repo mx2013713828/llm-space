@@ -39,6 +39,7 @@ harnesses/*
 !harnesses/02-bash.json
 !harnesses/03-deep-research.json
 !harnesses/04-subagent.json
+!harnesses/05-task-system.json
 .task_outputs/
 .transcripts/
 .offloaded/

@@ -82,8 +82,8 @@
     },
     "enable_skills": {
       "enabled": false,
-      "enable_project_skills": true,
-      "enable_global_skills": true
+      "enable_project_skills": false,
+      "enable_global_skills": false
     },
     "enable_memory": {
       "enabled": false,
