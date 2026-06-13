@@ -69,6 +69,33 @@ export const FEATURE_SCHEMA = {
           { value: 'todo', label: 'Write-Todo 线性看板 (经典版)' },
           { value: 'task_system', label: 'Task-System 拓扑依赖系统 (DAG版)' }
         ]
+      },
+      todo_prompt: {
+        type: 'text_area',
+        label: 'Todo 模式系统指引词 (XML 格式)',
+        description: '当大模型使用线性看板时，实时注入 System Prompt 的行为规范指南。',
+        defaultValue: `<todo_mode_guidelines>
+You must use the \`write_todos\` tool to manage your development board to keep your progress synchronized with the user:
+1. Upon receiving a complex request, immediately call \`write_todos\` to break down the task into 4-8 pending sub-tasks.
+2. Each time you complete a sub-task, call \`write_todos\` to mark its status as "completed".
+3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.
+</todo_mode_guidelines>`,
+        failSafeValue: ''
+      },
+      task_system_prompt: {
+        type: 'text_area',
+        label: 'Task System 模式系统指引词 (XML 格式)',
+        description: '当大模型使用 DAG 任务系统时，实时注入 System Prompt 的行为规范指南。',
+        defaultValue: `<task_system_guidelines>
+When facing complex development tasks, you must use the task dependency system to organize your workflow:
+1. First, analyze the requirements and create a dependency tree of Tasks using \`create_task\`. Declare upstream dependencies using \`blockedBy\` (comma-separated IDs).
+2. Call \`list_tasks\` to inspect the status of all current tasks.
+3. Before writing any code, call \`claim_task\` to claim a pending task that is not blocked by any uncompleted upstream dependencies.
+4. Once claimed successfully, use \`bash\`, \`read_file\`, and \`write_file\` to implement, debug, and verify the task.
+5. Upon completion, call \`complete_task\` to mark it as "completed", which will automatically unlock downstream dependent tasks.
+6. Do not write code for multiple consecutive turns without updating the task board status.
+</task_system_guidelines>`,
+        failSafeValue: ''
       }
     }
   },
@@ -205,12 +232,13 @@ export function parseFeatures(inputFeatures) {
         for (const [subKey, subMeta] of Object.entries(meta.children)) {
           let subVal;
           if (typeof userVal === 'boolean') {
-            subVal = userVal;
+            // 当父级为布尔值时，仅布尔子项继承此值；非布尔子项（如 select, text_area）应回退到默认值
+            subVal = subMeta.type === 'boolean' ? userVal : undefined;
           } else {
             subVal = userVal?.[subKey];
           }
 
-          if (subMeta.type === 'select') {
+          if (subMeta.type === 'select' || subMeta.type === 'text_area') {
             parsed[key][subKey] = isGroupEnabled
               ? (subVal !== undefined ? subVal : subMeta.defaultValue)
               : subMeta.defaultValue;
@@ -239,4 +267,4 @@ export function parseFeatures(inputFeatures) {
     return failSafeData;
   }
 }
-
+export const FeatureSchema = FEATURE_SCHEMA;
