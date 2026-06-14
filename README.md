@@ -1,175 +1,189 @@
-# LLM Space - 乐高式 AI Agent 可视化实验平台 🚀
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
+---
+
+# LLM Space - A LEGO-style Visual Experiment Platform for AI Agents 🚀
 
 [![Node Version](https://img.shields.io/badge/node-%3E%3D%2018.0.0-flat.svg?style=flat-square&color=339966)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-flat.svg?style=flat-square&color=blue)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-flat.svg?style=flat-square&color=orange)](https://github.com/shareAI-lab/learn-claude-code/pulls)
 
-> **“零抽象的白盒调试器，像拼乐高一样随心所欲搭建与测试你的 AI 代理。”**
+> **"A zero-abstraction white-box debugger, enabling you to build and test your AI agents like playing with LEGO bricks."**
 
-**LLM Space** 是一个专为开发者设计的零框架抽象、可视化 AI Agent 乐高实验平台与工作台（IDE）。
+**LLM Space** is a zero-framework-abstraction, visual AI Agent LEGO experiment platform and workbench (IDE) custom-designed for developers.
 
-许多重型 Agent 框架（如 LangChain）为了追求通用性引入了大量的黑盒封装与复杂的概念抽象，这给初学者的理解和开发者的本地调试带来了极高门槛。**LLM Space 坚持“所见即所得”与“极致轻量化”**，将 Agent 的决策、思考与工具调用轨迹完整呈现，并支持一键插拔高级特性。
-
----
-
-## 🆕 最近更新 (Recent Updates)
-
-* **2026-06-13：可恢复的有向无环图任务系统 (DAG Task System) 🕸️**
-  - **后端任务依赖流**：支持基于 DAG 的复杂任务系统，内置 Kahn 算法死锁检验、Claim 排他性文件锁并发保护、以及 Agent 异常崩溃退出时的物理看板租约自动回滚。
-  - **缓存友好与去重装配**：重构插件 lifecycle (`preLLM`)。静动态状态 Diff 拆分注入以最大化提升模型 KV Cache（Prompt Cache）命中率，同时引入 XML 标签防重注入过滤。
-  - **指引词自定义 UI (Prompt Lab)**：在实验特性中增加折叠手风琴卡片，高级用户可自定义修改 XML 指引词。支持文本垂直拉伸、长内容上下滚动、局部缓冲区安全暂存，以及一键重置默认指引。
+Many heavy Agent frameworks (such as LangChain) introduce massive black-box encapsulation and complex conceptual abstractions for the sake of generality. This introduces a steep learning curve for beginners and high barriers for developers' local debugging. **LLM Space adheres to "what you see is what you get" and "extreme lightweightness"**, completely exposing the Agent's decision-making, reasoning, and tool invocation trajectories, while supporting one-click toggling of advanced features.
 
 ---
 
-## 🎬 整体交互演示
+## 🆕 Recent Updates
 
-![LLM Space 整体操作演示](images/llm-space.gif)
-
----
-
-## 💡 核心设计理念
-
-### 🧱 乐高式插拔与配置 (Modular Sandbox)
-我们把 Agent 复杂的生命周期解构为清晰的“积木结构”，全部支持在 UI 界面一键开启/禁用：
-- **乐高底座 (Harness 宿主)**：使用极简的 `.json` 配置文件定义 Agent 的 System Prompt 预设与初始状态。在左侧面板秒级热切换。
-- **可插拔功能插槽 (Modular Features)**：
-  - **API 自愈与容灾 (Error Recovery)**：遇到 429 自动非阻塞指数退避重试、连续 529 自动 Failover 备用模型、`max_tokens` 截断自动无损续写物理拼接、死循环熔断。
-  - **大模型语义重构 (Hard-Compact)**：上下文爆满时，自动触发紧急历史记忆压缩与 transcript 归档。
-  - **实时缓存监控 (KV Cache Monitor)**：实时追踪 DeepSeek 等模型的 KV 缓存利用率。
-
-### 👁️ 可视化白盒追踪 (White-Box Observability)
-拒绝黑盒运行！所有细节尽收眼底：
-- **思考链渲染**：原生支持 Anthropic Extended Thinking，流式渲染并折叠 `<thinking>` 思考轨迹。
-- **工具调用轨迹**：直观展示 `tool_use` 发起、输入参数、工具本地真实执行输出（流式 Shell 输出、网页抓取等）的交互全过程。
-- **消息物理合并**：续写流式打字与历史气泡无缝对齐，不产生逻辑断裂气泡。
+* **2026-06-13: Recoverable Directed Acyclic Graph Task System (DAG Task System) 🕸️**
+  - **Backend Task Dependency Stream**: Supports a complex task system based on DAG. Features built-in Kahn's algorithm cycle detection, Claim exclusive file locks for concurrency protection, and automatic rollback of physical board leases when the Agent crashes or exits unexpectedly.
+  - **Cache-Friendly & Deduplicated Assembly**: Refactored the plugin lifecycle (`preLLM`). Splits and injects static/dynamic states to maximize LLM KV Cache (Prompt Cache) hit rate, while introducing XML tag deduplication filtering during injection.
+  - **Customizable Prompts UI (Prompt Lab)**: Added folding accordion cards in experimental features, allowing advanced users to customize XML prompts. Supports vertical text stretching, long-content scrolling, safe buffering for local changes, and one-click reset to default prompts.
 
 ---
 
-## 🛠️ 快速启动 (3分钟极速上手)
+## 🎬 Global Interaction Demo
 
-### 1. 安装与运行
-确保你的电脑上安装了 **Node.js** (推荐 v18+)，然后执行：
+![LLM Space Demo](images/llm-space.gif)
+
+---
+
+## 💡 Core Design Philosophy
+
+### 🧱 Modular Sandbox (LEGO-style plug-and-play config)
+We deconstruct the complex lifecycle of Agents into clear "building blocks", all supporting one-click enable/disable via the UI:
+- **LEGO Base (Harness Host)**: Uses minimalist `.json` configuration files to define the Agent's system prompt presets and initial state. Switch harnesses in seconds via the left panel.
+- **Pluggable Feature Slots (Modular Features)**:
+  - **API Self-Healing & Disaster Recovery (Error Recovery)**: Features automatic non-blocking exponential backoff retry on 429, automatic failover to fallback models on continuous 529, physical stitching and lossless continuation on `max_tokens` truncation, and infinite loop circuit breakers.
+  - **LLM Semantic Compaction (Hard-Compact)**: Triggers emergency history memory compression and transcript archiving when context window is close to full.
+  - **Real-time KV Cache Monitor**: Real-time tracking of KV cache utilization for models like DeepSeek.
+
+### 👁️ White-Box Observability (Visual tracking)
+Say no to black-box execution! Keep every detail in plain sight:
+- **Thinking Chain Rendering**: Native support for Anthropic Extended Thinking. Streams and folds `<thinking>` reasoning trajectories.
+- **Tool Call Trajectory**: Intuitively visualizes the entire interaction process, including `tool_use` initiation, input parameters, and actual local tool execution output (streaming shell outputs, web scraping, etc.).
+- **Physical Message Merging**: Seamlessly aligns typed stream continuations with history bubbles, preventing logical disruptions or fragmented bubbles.
+
+---
+
+## 🛠️ Quick Start (Get Started in 3 Mins)
+
+### 1. Installation & Execution
+Make sure **Node.js** (v18+ recommended) is installed on your computer, then execute:
 ```bash
-# 1. 安装依赖
+# 1. Install dependencies
 npm install
 
-# 2. 一键启动 (同时运行前端 UI 与后端服务)
+# 2. Start (runs both the frontend UI and backend services)
 npm run dev
 ```
-启动后，浏览器会自动打开前端工作台：`http://localhost:5174`。
+Once started, your browser will automatically open the frontend workbench: `http://localhost:5174`.
 
-### 2. 环境变量配置 (.env)
-在项目根目录创建 `.env` 文件（或参考 `.env.example`）：
+### 2. Environment Variables (.env)
+Create a `.env` file in the root directory (or refer to `.env.example`):
 ```dotenv
-# Tavily Search API — 用于网络搜索工具（https://tavily.com 免额度 1000次/月）
-TAVILY_API_KEY=tvly-你的KEY
+# Tavily Search API — Used by the web search tool (https://tavily.com - 1000 free calls/month)
+TAVILY_API_KEY=tvly-your-key-here
 
-# 服务端口（可选，默认 3001）
+# Service port (optional, default: 3001)
 PORT=3001
 ```
-*(提示：大模型 API Key 可直接在前端 UI 左侧面板中动态添加，系统会自动将其存盘。)*
+*(Tip: LLM API Keys can be dynamically added directly in the left panel of the frontend UI, and the system will automatically persist them.)*
 
 ---
 
-## 🔬 4 大基础 Harness 预设实验
+## 🔬 5 Basic Harness Preset Experiments
 
-我们为您预先创建了 4 个由浅入深的经典预设，可供您在左侧面板秒级切换并快速开始实验：
+We have pre-configured 5 classic presets ranging from simple to advanced for you, which can be switched in seconds in the left panel to quickly start experimenting:
 
-### 📁 01-chat-bot.json (基础对话)
-* **定位**：理解最基础的 ReAct 工具调用循环。
-* **特色**：挂载了简单的城市天气查询等工具。适合观察大模型分析城市、触发 tool_call、获取数据并自然语言归纳的闭环。
+### 📁 01-chat-bot.json (Basic Chatbot)
+* **Positioning**: Understand the most basic ReAct tool-call loop.
+* **Highlights**: Equipped with simple tools like city weather queries. Ideal for observing the closed-loop of the LLM analyzing cities, triggering `tool_call`, retrieving data, and summarizing in natural language.
   <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
-  
-  ![01-chat-bot 演示](docs/images/01-chat-bot-demo.gif)
-  
+  <summary>🔍 Click to expand running demo GIF</summary>
+
+  ![01-chat-bot Demo](docs/images/01-chat-bot-demo.gif)
+
   </details>
 
-### 📁 02-bash.json (系统交互)
-* **定位**：让 Agent 拥有文件系统操作与网络探针大礼包。
-* **特色**：挂载了真实的 Bash 执行器（流式回显）、文件读写、Tavily 实时网页搜索与抓取。你可以输入诸如“查找当前目录下最大的三个文件”来观察轨迹。
+### 📁 02-bash.json (System Interaction)
+* **Positioning**: Empower the Agent with filesystem operations and network diagnostics.
+* **Highlights**: Equipped with a real Bash executor (with streaming output echo), file read/write, and Tavily real-time web search and extraction. You can type commands like "Find the three largest files in the current directory" to observe the execution path.
   <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
-  
-  ![02-bash 演示](docs/images/02-bash-demo.gif)
-  
+  <summary>🔍 Click to expand running demo GIF</summary>
+
+  ![02-bash Demo](docs/images/02-bash-demo.gif)
+
   </details>
 
-### 📁 03-deep-research.json (深度调研)
-* **定位**：学习 Agent 自动规划和拆解复杂任务。
-* **特色**：结合 systemPrompt 中的 Behaviors 与本地 `write_todos`，大模型遇到复杂调研任务时会自动在右侧拆解出 4~8 个 TODO 步骤，并逐个攻克。
+### 📁 03-deep-research.json (Deep Research)
+* **Positioning**: Learn how the Agent automatically plans and breaks down complex tasks.
+* **Highlights**: Combines behaviors defined in `systemPrompt` with local `write_todos`. When facing complex research tasks, the LLM will automatically decompose them into 4-8 TODO steps on the right side and tackle them one by one.
   <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
-  
-  ![03-deep-research 演示](docs/images/03-deep-research-demo.gif)
-  
+  <summary>🔍 Click to expand running demo GIF</summary>
+
+  ![03-deep-research Demo](docs/images/03-deep-research-demo.gif)
+
   </details>
 
-### 📁 04-subagent.json (多 Agent 协作)
-* **定位**：探索多 Agent 分工与上下文隔离。
-* **特色**：挂载了 `sub_agent` 核心工具。主 Agent 在遇到繁重探针或庞大上下文搜集任务时，会主动派发任务并创建隔离的 Sub-agent 运行，最后接收并整合其汇报，避免当前主 context 溢出污染。
+### 📁 04-subagent.json (Multi-Agent Collaboration)
+* **Positioning**: Explore multi-agent division of labor and context isolation.
+* **Highlights**: Equipped with the `sub_agent` core tool. When encountering heavy diagnostics or massive context collection tasks, the main Agent will proactively assign tasks and spin up isolated Sub-agents, then receive and integrate their reports, preventing main context overflow.
   <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
-  
-  ![04-subagent 演示](docs/images/04-subagent-demo.gif)
-  
+  <summary>🔍 Click to expand running demo GIF</summary>
+
+  ![04-subagent Demo](docs/images/04-subagent-demo.gif)
+
+  </details>
+
+### 📁 05-task-system.json (DAG Task System)
+* **Positioning**: Understand complex, long-cycle task decomposition and concurrency safety based on DAG (Directed Acyclic Graph).
+* **Highlights**: Equipped with task dependency system tools (`create_task`, `list_tasks`, `claim_task`, `complete_task`). Features built-in Kahn's algorithm for cycle checking, Claim exclusive file locks, and crash self-healing. When facing complex multi-step tasks, the Agent can automatically decompose dependencies, claim tasks, and conquer them one by one like a human engineer.
+  <details>
+  <summary>🔍 Click to expand running demo GIF</summary>
+
+  ![05-task-system Demo](docs/images/05-task-system-demo.gif)
+
   </details>
 
 ---
 
-## ⚙️ 乐高沙盒闭环交互 (如何自定义与导出)
+## ⚙️ LEGO Sandbox Closed-loop Interaction (How to Customize & Export)
 
-在 LLM Space 中，你所做的任何实验调整都可以无缝沉淀：
+Any experimental adjustments you make in LLM Space can be seamlessly persisted:
 
-1. **秒级插拔**：在左侧列表随意选中一个基础 Harness 后，在 **Prompt Lab** 中修改 Base System Prompt，勾选你想尝试的 Tools（如 `bash`, `sub_agent`），或者在实验特性区开启 `Error Recovery` 自愈开关。
-2. **白盒追踪**：发送提问，观察轨迹追踪面板中展开的运行轨迹是否符合预期。
-3. **一键存盘**：调试满意后，点击页面下方的 **“保存 (Save)”** 按钮。系统会立即在本地 `harnesses/` 目录下生成并导出您专属的全新 Harness JSON 配置文件，方便随用随切或与团队共享。
+1. **Seconds-Level Hot Swap**: Select any basic Harness from the left list, modify the Base System Prompt in the **Prompt Lab**, check the Tools you want to try (e.g., `bash`, `sub_agent`), or toggle the `Error Recovery` self-healing switch in the experimental features section.
+2. **White-Box Tracking**: Send a query and observe whether the execution path expanded in the trace panel meets expectations.
+3. **One-Click Save**: Once satisfied, click the **"Save"** button at the bottom of the page. The system will immediately generate and export your custom Harness JSON configuration file in the local `harnesses/` directory for future use or sharing.
 
 ---
 
-## 🔧 开发者进阶：30秒开发你的第一个 Tool 积木
+## 🔧 Developer Guide: Develop your first Tool in 30 seconds
 
-如果你想让 Agent 拥有新的能力（例如执行数据库查询、或是调用自定义 API），只需两步：
+If you want to give the Agent new capabilities (e.g., executing database queries or calling custom APIs), it only takes two steps:
 
-### 第一步：在 `server/tools/` 目录下新建一个 JS 文件（例如 `hello_tool.js`）
+### Step 1: Create a JS file under the `server/tools/` directory (e.g., `hello_tool.js`)
 ```javascript
 // server/tools/hello_tool.js
 export default {
   name: 'hello_tool',
-  description: '向指定的用户发送问候，并附加一条自定义消息。',
+  description: 'Greet a specific user with a custom message.',
   parameters: {
     type: 'object',
     properties: {
-      userName: { type: 'string', description: '接收问候的用户名' },
-      customMsg: { type: 'string', description: '附加的自定义祝福消息' }
+      userName: { type: 'string', description: 'The username to greet' },
+      customMsg: { type: 'string', description: 'Additional custom blessing message' }
     },
     required: ['userName']
   },
-  async execute({ userName, customMsg = '祝你开心！' }) {
-    // 在这里编写真实的业务逻辑
-    return `你好，${userName}！ ${customMsg}`;
+  async execute({ userName, customMsg = 'Have a great day!' }) {
+    // Write your actual business logic here
+    return `Hello, ${userName}! ${customMsg}`;
   }
 };
 ```
 
-### 第二步：在 `server/tools/index.js` 中引入并注册
+### Step 2: Import and register it in `server/tools/index.js`
 ```javascript
 // server/tools/index.js
 import hello_tool from './hello_tool.js';
 
 export const tools = [
-  // ... 其他工具
+  // ... other tools
   hello_tool
 ];
 ```
-**搞定！** 刷新前端页面，在 Prompt Lab 的 **🔧 Tools 挂载** 选项卡里勾选它即可使用。
+**Done!** Refresh the frontend page, go to the **🔧 Tools** tab in the Prompt Lab, check the box, and it's ready to use.
 
 ---
 
-## 🤝 参与贡献
-欢迎大家共同完善这个 Agent 乐高沙盘！你可以通过以下方式参与：
-- 提交你手写的有趣、有创意的 `Tools`（例如对接 Jira, Notion 等）；
-- 提交新的 `Feature` 实验特性插件；
-- 改进轨迹渲染界面的用户体验与微动画。
+## 🤝 Contributing
+Everyone is welcome to help improve this Agent LEGO sandbox! You can participate by:
+- Submitting your custom, creative `Tools` (e.g., integrations with Jira, Notion, etc.);
+- Submitting new `Feature` plugins for experimental traits;
+- Improving user experience and micro-animations of the trace visualization UI.
 
-如果你觉得这个项目对你有帮助，请给项目点一个 **⭐ Star**，这对于开源作者是最大的鼓励！
+If you find this project helpful, please give it a **⭐ Star**. It is the greatest encouragement for open-source authors!
