@@ -11,7 +11,7 @@ export function ThinkingBubble({ content, tokens, duration, isCollapsed: default
     <div className="message-bubble msg-thinking animate-fade-in">
       <div className="msg-thinking-header" onClick={() => setCollapsed(!collapsed)}>
         <span>🧠</span>
-        <span>Thinking</span>
+        <span>Thinking Trajectory</span>
         {tokens && (
           <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9f7aea', fontFamily: 'var(--font-mono)' }}>
             {tokens.input}↑ {tokens.output}↓
@@ -37,16 +37,16 @@ export function ThinkingBubble({ content, tokens, duration, isCollapsed: default
           {tokens && (
             <div className="thinking-tokens">
               <div className="thinking-token-item">
-                <span>📥 输入</span>
+                <span>📥 Input</span>
                 <strong style={{ fontFamily: 'var(--font-mono)', color: '#c4b5fd' }}>{tokens.input}</strong>
               </div>
               <div className="thinking-token-item">
-                <span>📤 输出</span>
+                <span>📤 Output</span>
                 <strong style={{ fontFamily: 'var(--font-mono)', color: '#c4b5fd' }}>{tokens.output}</strong>
               </div>
               {duration && (
                 <div className="thinking-token-item">
-                  <span>⚡ 耗时</span>
+                  <span>⚡ Duration</span>
                   <strong style={{ fontFamily: 'var(--font-mono)', color: '#c4b5fd' }}>{duration}s</strong>
                 </div>
               )}
@@ -112,14 +112,14 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
         <div className="tool-call-body animate-fade-in">
           <div>
             <div className="tool-section-label">
-              <span>📥</span> 输入参数
+              <span>📥</span> Tool Input
             </div>
             <div className="tool-input-code">{formatJson(toolInput)}</div>
           </div>
           {toolOutput && (
             <div>
               <div className="tool-section-label">
-                <span>📤</span> 输出结果
+                <span>📤</span> Tool Output
               </div>
               <div className="tool-output-code">
                 {toolName === 'bash' ? processTerminalOutput(toolOutput) : formatJson(toolOutput)}
@@ -129,7 +129,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
           {subMessages && subMessages.length > 0 && (
             <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
               <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
-                <span>🤖</span> 子代理执行轨迹 (Sub-agent Trajectory)
+                <span>🤖</span> Sub-agent Trajectory
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {subMessages.map((msg, idx) => {
@@ -158,7 +158,7 @@ export function UserMessage({ content, onRetry }) {
         <button 
           className="btn-rewind" 
           onClick={onRetry} 
-          title="回滚到本轮对话之前重新开始"
+          title="Rewind to before this turn to restart"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>

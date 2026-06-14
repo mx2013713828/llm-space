@@ -9,7 +9,7 @@ import { PromptLabPage } from './pages/PromptLabPage';
 const TABS = [
   {
     key: 'trajectory',
-    label: '运行轨迹',
+    label: 'Trajectory',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -18,7 +18,7 @@ const TABS = [
   },
   {
     key: 'prompt-lab',
-    label: '配置工作台',
+    label: 'Prompt Lab',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -52,7 +52,7 @@ function AppContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, todos })
-      }).catch(err => console.error("同步 Session 失败:", err));
+      }).catch(err => console.error("Sync Session failed:", err));
     }, 1000);
   };
 
@@ -76,7 +76,7 @@ function AppContent() {
     e.preventDefault();
     setNewError('');
     if (!newName.trim()) {
-      setNewError('请输入名称');
+      setNewError('Please enter a name');
       return;
     }
     try {
@@ -87,7 +87,7 @@ function AppContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setNewError(data.error || '创建失败');
+        setNewError(data.error || 'Failed to create');
         return;
       }
       await loadHarnessList();
@@ -96,15 +96,15 @@ function AppContent() {
       setNewDesc('');
       setShowNewForm(false);
     } catch (err) {
-      setNewError('网络错误: ' + err.message);
+      setNewError('Network error: ' + err.message);
     }
   };
 
   const handleDeleteHarness = async (id) => {
-    if (!confirm(`确定删除 Harness "${id}"？此操作不可撤销。`)) return;
+    if (!confirm(`Are you sure you want to delete Harness "${id}"? This action cannot be undone.`)) return;
     try {
       const res = await fetch(`http://localhost:3001/api/harnesses/${id}`, { method: 'DELETE' });
-      if (!res.ok) { alert('删除失败'); return; }
+      if (!res.ok) { alert('Failed to delete'); return; }
       await loadHarnessList();
       if (activeHarnessId === id) {
         if (harnessFiles.length > 1) {
@@ -114,17 +114,17 @@ function AppContent() {
           navigate('/');
         }
       }
-    } catch (err) { alert('网络错误: ' + err.message); }
+    } catch (err) { alert('Network error: ' + err.message); }
   };
 
   const handleCopyHarness = async (id) => {
     try {
       const res = await fetch(`http://localhost:3001/api/harnesses/${id}/copy`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || '复制失败'); return; }
+      if (!res.ok) { alert(data.error || 'Failed to copy'); return; }
       await loadHarnessList();
       navigate(`/${data.harness.id}/${activeTab}`);
-    } catch (err) { alert('网络错误: ' + err.message); }
+    } catch (err) { alert('Network error: ' + err.message); }
     setCtxMenu(null);
   };
 
@@ -135,7 +135,7 @@ function AppContent() {
       .then(data => {
         setHarnessFiles(data);
       })
-      .catch(err => console.error("加载文件列表失败:", err));
+      .catch(err => console.error("Failed to load harness list:", err));
   }, []);
 
   // 当列表加载完毕且 URL 中缺失 harnessId 时，自动重定向到第一个有效 Harness
@@ -175,7 +175,7 @@ function AppContent() {
       }
     })
     .catch(err => {
-      console.error("加载 Harness 详情或 Session 失败:", err);
+      console.error("Failed to load Harness details or Session:", err);
       fetch('http://localhost:3001/api/harnesses')
         .then(res => res.json())
         .then(files => {
@@ -210,7 +210,7 @@ function AppContent() {
     }
     fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`, {
       method: 'DELETE'
-    }).catch(err => console.error("清空后端 Session 失败:", err));
+    }).catch(err => console.error("Failed to clear backend Session:", err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHarnessId]);
 
@@ -254,7 +254,7 @@ function AppContent() {
             boxShadow: '0 0 6px var(--green)',
             animation: 'pulse-glow 2s ease-in-out infinite',
           }} />
-          <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>本地运行</span>
+          <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>Running Locally</span>
         </div>
       </header>
 
@@ -263,19 +263,19 @@ function AppContent() {
         {/* 侧边栏：Harness 文件列表 */}
         <aside className="sidebar">
           <div className="sidebar-header">
-            Harness 资源管理器
+            Harness Explorer
             <div style={{ display: 'flex', gap: 4 }}>
               <button
                 className="icon-btn"
                 onClick={loadHarnessList}
-                title="刷新列表"
+                title="Refresh List"
               >
                 ↻
               </button>
               <button
                 style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--green)', color: '#fff', border: '1px solid var(--green)', cursor: 'pointer' }}
                 onClick={() => setShowNewForm(v => !v)}
-                title="新建 Harness"
+                title="Create Harness"
               >
                 +
               </button>
@@ -301,7 +301,7 @@ function AppContent() {
                 <button
                   className="sidebar-item-delete"
                   onClick={(e) => { e.stopPropagation(); handleDeleteHarness(file.id); }}
-                  title="删除"
+                  title="Delete"
                 >
                   🗑
                 </button>
@@ -322,7 +322,7 @@ function AppContent() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>新建 Harness</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Create New Harness</span>
                 <button
                   type="button"
                   onClick={() => { setShowNewForm(false); setNewError(''); }}
@@ -333,7 +333,7 @@ function AppContent() {
               </div>
               <input
                 type="text"
-                placeholder="名称（如: 03-example）"
+                placeholder="Name (e.g., 03-example)"
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 style={{
@@ -344,7 +344,7 @@ function AppContent() {
               />
               <input
                 type="text"
-                placeholder="描述（可选）"
+                placeholder="Description (Optional)"
                 value={newDesc}
                 onChange={e => setNewDesc(e.target.value)}
                 style={{
@@ -362,7 +362,7 @@ function AppContent() {
                   background: 'var(--green)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600,
                 }}
               >
-                创建
+                Create
               </button>
             </form>
           )}
@@ -375,9 +375,9 @@ function AppContent() {
             lineHeight: 1.5,
           }}>
             <div style={{ marginBottom: 6, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              📖 学习指南
+              📖 User Guide
             </div>
-            <div>选择不同的 harness 配置以观察 agent 行为，并在工作台中实时修改配置。</div>
+            <div>Select different harness configurations to observe agent behavior, and modify configurations in the lab in real-time.</div>
           </div>
         </aside>
 
@@ -441,7 +441,7 @@ function AppContent() {
               onMouseEnter={e => e.target.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.target.style.background = 'none'}
             >
-              📋 复制 Harness
+              📋 Copy Harness
             </button>
           </div>
         </>

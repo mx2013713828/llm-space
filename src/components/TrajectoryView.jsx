@@ -55,7 +55,7 @@ export function TrajectoryView({
         alignItems: 'center',
       }}>
         {[
-          { key: 'trajectory', label: '🔄 运行轨迹' },
+          { key: 'trajectory', label: '🔄 Run Trajectory' },
           { key: 'todos', label: `✅ TODO${todos.length > 0 ? ` (${todos.length})` : ''}` },
         ].map(tab => (
           <button key={tab.key}
@@ -67,7 +67,7 @@ export function TrajectoryView({
           {totalCacheTokens > 0 && (
             <span
               onClick={() => setShowCacheDetail(v => !v)}
-              title={showCacheDetail ? '点击查看命中率' : '点击查看详细 token 数'}
+              title={showCacheDetail ? 'Click to view hit rate' : 'Click to view detailed token count'}
               style={{
                 fontSize: 11,
                 fontFamily: 'var(--font-mono)',
@@ -89,27 +89,27 @@ export function TrajectoryView({
               💾&nbsp;
               {showCacheDetail ? (
                 <>
-                  <span style={{ color: 'var(--green)' }}>命中 {cacheStats.hitTokens.toLocaleString()}</span>
+                  <span style={{ color: 'var(--green)' }}>Hit {cacheStats.hitTokens.toLocaleString()}</span>
                   <span style={{ color: 'var(--text-muted)', fontWeight: 300 }}>/</span>
-                  <span style={{ color: 'var(--text-muted)' }}>未命中 {cacheStats.missTokens.toLocaleString()}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Miss {cacheStats.missTokens.toLocaleString()}</span>
                 </>
               ) : (
-                <span>{hitPercent}% 命中</span>
+                <span>{hitPercent}% Hit</span>
               )}
             </span>
           )}
 
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            已产生 {loopCount} 轮对话
+            Generated {loopCount} turns
           </span>
           {messages.length > 0 && (
             <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11, color: 'var(--purple)' }}
               onClick={() => setShowContextInspector(true)}
-              title="查看当前发送给 API 的完整上下文内容"
-            >🔍 查看上下文</button>
+              title="View the complete context currently sent to the API"
+            >🔍 Context Inspector</button>
           )}
           {messages.length > 0 && (
-            <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11, color: 'var(--red)' }} onClick={handleResetSession}>🔄 重置 Session</button>
+            <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11, color: 'var(--red)' }} onClick={handleResetSession}>🔄 Reset Session</button>
           )}
         </div>
       </div>
@@ -122,13 +122,13 @@ export function TrajectoryView({
               {messages.length === 0 && (
                 <div className="empty-state">
                   <div className="empty-state-icon">💬</div>
-                  <div className="empty-state-title">Harness 已就绪</div>
-                  <div className="empty-state-desc">在左侧选择一个模型，在下方输入消息即可开启真实对话。支持思维链与工具调用。</div>
+                  <div className="empty-state-title">Harness Ready</div>
+                  <div className="empty-state-desc">Enter an instruction here to start debugging the Agent...</div>
                 </div>
               )}
               {Object.entries(turns).map(([turn, msgs]) => (
                 <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="turn-divider"><span className="turn-label">🔄 Loop 第 {turn} 轮</span></div>
+                  <div className="turn-divider"><span className="turn-label">🔄 Step {turn}</span></div>
                   {msgs.map((msg, idx) => {
                     if (msg.role === 'user') return (
                       <UserMessage 
@@ -165,7 +165,7 @@ export function TrajectoryView({
               {isRunning && (
                 <div className="running-indicator animate-fade-in" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>
                   <div className="running-dots"><div className="loading-dot" /><div className="loading-dot" /><div className="loading-dot" /></div>
-                  正在处理中...
+                  Processing...
                 </div>
               )}
               <div ref={chatEndRef} style={{ height: 10 }} />
@@ -201,14 +201,14 @@ export function TrajectoryView({
           <textarea
             ref={textareaRef}
             className="chat-textarea"
-            placeholder="输入消息，按 Enter 发送，Shift+Enter 换行..."
+            placeholder="Enter message. Press Enter to send, Shift+Enter for a new line..."
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={1}
             disabled={isRunning}
           />
-          <button className="send-btn" onClick={handleSend} disabled={!inputText.trim() || isRunning}>
+          <button className="send-btn" onClick={handleSend} disabled={!inputText.trim() || isRunning} title={isRunning ? "Abort" : "Send"}>
             {isRunning ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>}
           </button>
         </div>
@@ -256,13 +256,13 @@ export function TrajectoryView({
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.05em' }}>安全防护：敏感操作等待授权</div>
+              <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.05em' }}>Security Guard: Sensitive action waiting for authorization</div>
             </div>
 
             {/* 内容区 */}
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                Agent 代理试图在后台触发敏感系统行为。根据工作台安全卫士策略，当前 ReAct 循环已被挂起，请您审查该行为以防潜在危险：
+                The Agent is attempting to trigger a sensitive system action. Under the safety guard policy, the current ReAct loop has been suspended. Please review this action to prevent potential hazards:
               </div>
 
               {/* 规则命中说明 */}
@@ -285,7 +285,7 @@ export function TrajectoryView({
 
               {/* 代码与命令行高亮 */}
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>工具及参数调用</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tool Call & Arguments</div>
                 <div style={{
                   background: 'var(--bg-base)',
                   border: '1px solid var(--border)',
@@ -335,7 +335,7 @@ export function TrajectoryView({
                 }}
                 onClick={() => handlePermissionDecision(pendingPermission.toolCallId, 'deny')}
               >
-                拒绝执行 (Deny)
+                Deny
               </button>
               <button
                 className="btn btn-primary"
@@ -350,7 +350,7 @@ export function TrajectoryView({
                 }}
                 onClick={() => handlePermissionDecision(pendingPermission.toolCallId, 'allow')}
               >
-                允许执行 (Allow)
+                Allow
               </button>
             </div>
           </div>

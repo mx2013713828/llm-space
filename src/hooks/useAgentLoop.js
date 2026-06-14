@@ -384,8 +384,8 @@ export function useAgentLoop({
                   type: 'text',
                   turn: 999,
                   content: evt.suggestion 
-                    ? `❌ **请求错误**: ${evt.message}\n\n💡 **排查与调试建议**:\n${evt.suggestion}`
-                    : `❌ **请求错误**: ${evt.message}`
+                    ? `❌ **Request Error**: ${evt.message}\n\n💡 **Troubleshooting & Debugging Suggestions**:\n${evt.suggestion}`
+                    : `❌ **Request Error**: ${evt.message}`
                 }
               ]);
               break;
@@ -400,7 +400,7 @@ export function useAgentLoop({
           role: 'assistant',
           type: 'text',
           turn: 999,
-          content: `❌ **网络或运行异常**\n\n${err.message}`
+          content: `❌ **Network or Runtime Exception**\n\n${err.message}`
         }
       ]);
     } finally {
@@ -435,7 +435,7 @@ export function useAgentLoop({
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isRunning) return;
-    if (!selectedModel || !selectedModel.key) return alert('请先选择或配置包含 API Key 的模型！');
+    if (!selectedModel || !selectedModel.key) return alert('Please select or configure a model with an API Key first!');
 
     setInputText('');
     if (textareaRef.current) textareaRef.current.style.height = '44px';
@@ -467,7 +467,7 @@ export function useAgentLoop({
 
   /** 重置 Session */
   const handleResetSession = () => {
-    if (window.confirm('确定要重置当前 Harness 的 Session（清空对话与 TODO 状态）吗？')) {
+    if (window.confirm("Clearing session will permanently delete the execution history for this Harness. Are you sure?")) {
       setMessages([]);
       setTodos([]);
       setPendingPermission(null);
@@ -480,7 +480,7 @@ export function useAgentLoop({
   /** 回滚并重试指定轮次 */
   const handleRetryTurn = (turnNum, originalText) => {
     if (isRunning) return; // 运行中禁止回滚
-    if (window.confirm(`确定要回滚到第 ${turnNum} 轮对话吗？此轮及之后的消息历史将被永久擦除。`)) {
+    if (window.confirm(`Are you sure you want to rewind to turn ${turnNum}? The message history of this and subsequent turns will be permanently erased.`)) {
       // 1. 剪枝消息：只保留 turn 小于 turnNum 的消息
       setMessages(prev => prev.filter(m => (m.turn || 1) < turnNum));
       // 2. 将原文本重新填入输入框
@@ -509,10 +509,10 @@ export function useAgentLoop({
         setPendingPermission(null);
       } else {
         const data = await res.json();
-        alert(`安全审批处理失败: ${data.error || '未知错误'}`);
+        alert(`Security approval failed: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
-      alert(`审批网络异常: ${err.message}`);
+      alert(`Approval network exception: ${err.message}`);
     }
   };
 

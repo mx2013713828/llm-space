@@ -89,18 +89,18 @@ export function PromptLabPage({ harness, onSave }) {
   };
 
   const PROMPT_TEMPLATES = [
-    { name: '基础聊天助手', icon: '💬', prompt: '你是一个友好的智能助手，请准确、简洁地回答用户的问题。' },
+    { name: 'Basic Chat Assistant', icon: '💬', prompt: 'You are a friendly AI assistant. Please answer the user\'s questions accurately and concisely.' },
     {
-      name: '深度研究员', icon: '🔬',
-      prompt: `你是一个专业研究员。\n\n<behaviors>\n<deep-research activate-when="用户要求研究某个话题">\n- Step 1: 调用 web_search 初步了解\n- Step 2: 制定研究计划 (write_todos)\n- Step 3: 逐项执行研究任务\n- Step 4: 综合生成报告\n</deep-research>\n</behaviors>`
+      name: 'Deep Researcher', icon: '🔬',
+      prompt: `You are a professional researcher.\n\n<behaviors>\n<deep-research activate-when="User requests research on a topic">\n- Step 1: Call web_search for initial understanding\n- Step 2: Formulate research plan (write_todos)\n- Step 3: Execute research tasks step by step\n- Step 4: Synthesize and generate report\n</deep-research>\n</behaviors>`
     },
     {
-      name: '代码工程师', icon: '💻',
-      prompt: `你是一个高级软件工程师。\n\n## 原则\n- 先理解需求，再写代码\n- 写清晰的注释\n- 考虑边界情况\n- 优先使用函数式编程`
+      name: 'Code Engineer', icon: '💻',
+      prompt: `You are a senior software engineer.\n\n## Principles\n- Understand requirements first, then write code\n- Write clear comments\n- Consider edge cases\n- Prefer functional programming`
     },
     {
-      name: '任务执行 Agent', icon: '🤖',
-      prompt: `你是一个任务执行 agent。\n\n执行流程：\n1. 收到任务后，用 write_todos 分解为子任务\n2. 按顺序执行每个子任务\n3. 标记完成状态\n4. 完成所有任务后给出汇总`
+      name: 'Task Execution Agent', icon: '🤖',
+      prompt: `You are a task execution agent.\n\nExecution flow:\n1. Upon receiving a task, decompose it into subtasks using write_todos\n2. Execute each subtask in order\n3. Mark completion status\n4. Provide a summary after completing all tasks`
     },
   ];
 
@@ -229,7 +229,7 @@ export function PromptLabPage({ harness, onSave }) {
   };
 
   let btnClass = "btn btn-primary";
-  let btnText = `保存至 ${harness.name}`;
+  let btnText = `Save to ${harness.name}`;
   let btnIcon = (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -240,7 +240,7 @@ export function PromptLabPage({ harness, onSave }) {
 
   if (saveStatus === 'saving') {
     btnClass = "btn btn-save-saving";
-    btnText = "正在保存...";
+    btnText = "Saving...";
     btnIcon = (
       <svg className="animate-spin-fast" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
         <line x1="12" y1="2" x2="12" y2="6"/>
@@ -255,7 +255,7 @@ export function PromptLabPage({ harness, onSave }) {
     );
   } else if (saveStatus === 'saved') {
     btnClass = "btn btn-save-saved";
-    btnText = "已保存 ✓";
+    btnText = "Saved ✓";
     btnIcon = (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
         <polyline points="20 6 9 17 4 12"/>
@@ -271,11 +271,11 @@ export function PromptLabPage({ harness, onSave }) {
         background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)',
       }}>
         {[
-          { key: 'editor', label: '✍️ Prompt 编辑器' },
-          (features.enable_skills?.enabled !== false) && { key: 'skills', label: '✨ Skills 配置' },
-          { key: 'tools-edit', label: '🔧 Tools 挂载' },
-          { key: 'features', label: '🔬 实验特性' },
-          { key: 'templates', label: '📄 模板库' },
+          { key: 'editor', label: '✍️ System Prompt' },
+          (features.enable_skills?.enabled !== false) && { key: 'skills', label: '✨ Skills Config' },
+          { key: 'tools-edit', label: '🔧 Tools Mounting' },
+          { key: 'features', label: '🔬 Experimental Features' },
+          { key: 'templates', label: '📄 Templates' },
         ].filter(Boolean).map(tab => (
           <button
             key={tab.key}
@@ -306,9 +306,9 @@ export function PromptLabPage({ harness, onSave }) {
             <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 3, height: 16, borderRadius: 99, background: 'var(--blue)' }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>当前 System Prompt</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Current System Prompt</span>
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  {systemPrompt.length}字 / ≈{Math.ceil(systemPrompt.length/4)} tokens
+                  {systemPrompt.length} chars / ≈{Math.ceil(systemPrompt.length/4)} tokens
                 </span>
               </div>
               <textarea
@@ -324,7 +324,7 @@ export function PromptLabPage({ harness, onSave }) {
                 }}
                 onFocus={e => { e.target.style.borderColor = 'var(--blue)'; e.target.style.boxShadow = `0 0 0 2px rgba(59, 130, 246, 0.2)`; }}
                 onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
-                placeholder="输入 system prompt..."
+                placeholder="Enter system prompt..."
               />
             </div>
           </div>
@@ -334,7 +334,7 @@ export function PromptLabPage({ harness, onSave }) {
         {activeTab === 'skills' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
-              💡 Skills 是嵌入到 system prompt 中的行为规则片段。启用后，agent 会在特定条件下自动触发对应的工作流。
+              💡 Skills are behavioral rule snippets embedded in the system prompt. When enabled, the agent will automatically trigger the corresponding workflow under specific conditions.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
               {availableSkills.map(skill => {
@@ -358,7 +358,7 @@ export function PromptLabPage({ harness, onSave }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: active ? color : 'var(--text-primary)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {skill.name}
                           {skill.isGlobal && (
-                            <span style={{ fontSize: 9, background: 'var(--blue)', color: '#fff', padding: '1px 5px', borderRadius: 4, fontWeight: 'bold' }}>🌐 全局</span>
+                            <span style={{ fontSize: 9, background: 'var(--blue)', color: '#fff', padding: '1px 5px', borderRadius: 4, fontWeight: 'bold' }}>🌐 Global</span>
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{skill.desc}</div>
@@ -382,7 +382,7 @@ export function PromptLabPage({ harness, onSave }) {
                         padding: '3px 8px', background: `${color}15`,
                         borderRadius: 99, display: 'inline-flex', alignItems: 'center', gap: 4,
                       }}>
-                        ✓ 已激活
+                        ✓ Activated
                       </div>
                     )}
                   </div>
@@ -393,7 +393,7 @@ export function PromptLabPage({ harness, onSave }) {
             {selectedSkills.length > 0 && (
               <div className="card" style={{ padding: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                  当前激活的 Skills
+                  Currently Active Skills
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {selectedSkills.map(s => (
@@ -409,10 +409,10 @@ export function PromptLabPage({ harness, onSave }) {
         {activeTab === 'tools-edit' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
-              🔧 Tools 配置。选择你要挂载给大模型的标准工具。
+              🔧 Tools Config. Select the standard tools you want to mount for the LLM.
             </div>
             {availableTools.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>正在从后端加载标准工具...</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading standard tools from backend...</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
                 {availableTools
@@ -454,7 +454,7 @@ export function PromptLabPage({ harness, onSave }) {
         {activeTab === 'features' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-secondary)' }}>
-              🔬 这里是 Agent 架构互动实验室的高级特性开关。你可以在这里自由开启或关闭各项底层架构能力。
+              🔬 Advanced feature switches for the Agent architecture interactive lab. You can freely enable or disable underlying architectural capabilities here.
             </div>
 
             {Object.entries(FEATURE_SCHEMA).map(([key, meta]) => {
@@ -499,7 +499,7 @@ export function PromptLabPage({ harness, onSave }) {
                       {/* 展开/折叠切换按钮 */}
                       <button
                         onClick={() => toggleGroupExpand(key)}
-                        title={isExpanded ? '收起子选项' : '展开子选项'}
+                        title={isExpanded ? 'Collapse sub-options' : 'Expand sub-options'}
                         style={{
                           flexShrink: 0,
                           background: 'none', border: 'none', cursor: 'pointer',
@@ -513,7 +513,7 @@ export function PromptLabPage({ harness, onSave }) {
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                       >
                         <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
-                        <span>{isExpanded ? '收起' : `${Object.keys(meta.children).length} 项`}</span>
+                        <span>{isExpanded ? 'Collapse' : `${Object.keys(meta.children).length} items`}</span>
                       </button>
                     </div>
 
@@ -557,7 +557,7 @@ export function PromptLabPage({ harness, onSave }) {
                                     ))
                                   ) : (
                                     <>
-                                      <option value="">{models.length === 0 ? '-- 正在加载备用模型... --' : '-- 选择备用模型 --'}</option>
+                                      <option value="">{models.length === 0 ? '-- Loading fallback models... --' : '-- Select fallback model --'}</option>
                                       {models.map((m, idx) => (
                                         <option key={m.id || m.modelId || idx} value={m.id}>{m.name} ({m.modelId})</option>
                                       ))}
@@ -565,7 +565,7 @@ export function PromptLabPage({ harness, onSave }) {
                                   )}
                                 </select>
                                 {!hasOptions && features[key]?.fallback_model && !selectedValue && (
-                                  <div style={{ color: 'var(--orange)', fontSize: 10 }}>⚠️ 请选择一个有效的备用模型以启用故障转移</div>
+                                  <div style={{ color: 'var(--orange)', fontSize: 10 }}>⚠️ Please select a valid fallback model to enable failover</div>
                                 )}
                               </div>
                             );
@@ -607,9 +607,9 @@ export function PromptLabPage({ harness, onSave }) {
                                       userSelect: 'none'
                                     }}
                                   >
-                                    <span>⚙️ 自定义系统行为指引词 (XML 配置)</span>
+                                    <span>⚙️ Custom System Guidelines (XML)</span>
                                     <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
-                                      {isExpanded ? '收起 ▲' : '展开编辑 ▶'}
+                                      {isExpanded ? 'Collapse ▲' : 'Edit ▶'}
                                     </span>
                                   </div>
 
@@ -635,7 +635,7 @@ export function PromptLabPage({ harness, onSave }) {
                                           resize: 'vertical',
                                           overflowY: 'auto'
                                         }}
-                                        placeholder="输入自定义 XML 格式的行为指引..."
+                                        placeholder="Enter custom guidelines in XML format..."
                                       />
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <button
@@ -656,7 +656,7 @@ export function PromptLabPage({ harness, onSave }) {
                                           className={`btn ${isSaved ? 'btn-save-saved' : 'btn-primary'}`}
                                           style={{ padding: '4px 12px', fontSize: 11, height: 26 }}
                                         >
-                                          {isSaved ? '已应用 ✓' : '💾 保存修改'}
+                                          {isSaved ? 'Applied ✓' : '💾 Save Changes'}
                                         </button>
                                         <button
                                           type="button"
@@ -667,13 +667,13 @@ export function PromptLabPage({ harness, onSave }) {
                                           className="btn"
                                           style={{ padding: '4px 12px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
                                         >
-                                          ↩️ 恢复默认
+                                          ↩️ Reset
                                         </button>
                                         
                                         {/* 状态差异指示器 */}
                                         {currentInputValue !== currentSavedValue && (
                                           <span style={{ fontSize: 10, color: 'var(--orange)' }}>
-                                            ⚠️ 更改尚未保存生效
+                                            ⚠️ Changes not saved yet
                                           </span>
                                         )}
                                       </div>
@@ -727,7 +727,7 @@ export function PromptLabPage({ harness, onSave }) {
                     style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 11 }}
                     onClick={() => { setSystemPrompt(tmpl.prompt); setActiveTab('editor'); }}
                   >
-                    使用此模板
+                    Use Template
                   </button>
                 </div>
                 <pre style={{

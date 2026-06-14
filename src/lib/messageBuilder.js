@@ -93,7 +93,7 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
             const head = outStr.slice(0, 1500);
             const tail = outStr.slice(-500);
             const truncatedCount = outStr.length - 2000;
-            outStr = `${head}\n\n...[OUTPUT OFFLOADED - 截断了 ${truncatedCount} 个字符，如果需要中间的内容，请使用 grep 检索]...\n\n${tail}`;
+            outStr = `${head}\n\n...[OUTPUT OFFLOADED - Truncated ${truncatedCount} characters, use grep to retrieve full content if needed]...\n\n${tail}`;
           }
           currentToolResults.push({
             type: 'tool_result',
@@ -189,7 +189,7 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         // Skip secondary compaction if this tool call has already been offloaded to disk
         if (!newMsg.toolOutput.includes('OUTPUT OFFLOADED TO FILE:')) {
           const head = newMsg.toolOutput.slice(0, 1000);
-          newMsg.toolOutput = `${head}\n\n...[已折叠旧的工具输出结果]...`;
+          newMsg.toolOutput = `${head}\n\n...[Older tool output results collapsed]...`;
           compactedCount++;
         }
       }
@@ -207,7 +207,7 @@ export function compactMessages(messages, turnIndex, currentTokens, systemPrompt
         role: 'system',
         type: 'system_alert',
         turn: turnIndex,
-        content: `触发上下文软清洗 (Soft Compact Epoch)：成功对 ${compactedCount} 处历史冗余数据进行了折叠或重写，从而释放 Context 空间，最大化保护 Prompt Cache。`
+        content: `Context Soft Compact Epoch triggered: Successfully collapsed or rewrote ${compactedCount} historical redundant entries, freeing up context space and maximizing prompt cache protection.`
       }
     ];
 
@@ -268,7 +268,7 @@ export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
   if (roundsSinceTodo >= 3 && todos && todos.length > 0) {
     const nagBlock = {
       type: 'text',
-      text: `\n<system_reminder>\n你已经连续 3 轮没有更新任务看板了。请在采取下一步行动前，务必使用 write_todos 工具同步当前的执行进度。\n</system_reminder>\n`
+      text: `\n<system_reminder>\nYou haven't updated the task board for 3 consecutive turns. Before taking your next action, please make sure to use the write_todos tool to sync the current progress.\n</system_reminder>\n`
     };
     const lastMsg = result[result.length - 1];
     if (lastMsg && lastMsg.role === 'user') {

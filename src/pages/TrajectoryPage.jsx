@@ -100,14 +100,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           onHarnessUpdate(updatedHarness);
         }
         setIsPromptDirty(false);
-        alert('Prompt 保存成功 ✓');
+        alert('Prompt saved successfully ✓');
       } else {
-        alert('Prompt 保存失败 ❌');
+        alert('Failed to save Prompt ❌');
       }
     })
     .catch(err => {
-      console.error("保存 harness 配置失败:", err);
-      alert('Prompt 保存失败 ❌');
+      console.error("Failed to save harness configuration:", err);
+      alert('Failed to save Prompt ❌');
     });
   };
 
@@ -115,7 +115,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     const handleBeforeUnload = (e) => {
       if (isPromptDirty) {
         e.preventDefault();
-        e.returnValue = '您有未保存的提示词更改，确定要离开吗？';
+        e.returnValue = 'You have unsaved system prompt changes. Are you sure you want to leave?';
         return e.returnValue;
       }
     };
@@ -166,13 +166,13 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           if (onHarnessUpdateRef.current) {
             onHarnessUpdateRef.current(updatedHarness);
           }
-          console.log(`💾 自动保存模型参数 (maxTokens/temp) 到 ${h.id}.json 成功`);
+          console.log(`💾 Automatically saved model parameters (maxTokens/temp) to ${h.id}.json successfully`);
         } else {
-          console.error(`自动保存模型参数失败，HTTP 状态码: ${res.status}`);
+          console.error(`Failed to automatically save model parameters, HTTP status code: ${res.status}`);
         }
       })
-      .catch(err => console.error("自动保存参数失败:", err));
-    }, 1000); // 1秒防抖，防止拖拽 range 或是连续输入时频繁写盘
+      .catch(err => console.error("Failed to automatically save parameters:", err));
+    }, 1000); // 1s debounce to prevent frequent writes when dragging range or typing continuously
 
     return () => clearTimeout(timer);
   }, [maxTokens, temperature]); // intentionally omit harness/onHarnessUpdate - read via refs

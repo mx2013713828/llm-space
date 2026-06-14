@@ -7,8 +7,8 @@ export function TodoList({ todos }) {
     return (
       <div className="empty-state">
         <div className="empty-state-icon">📋</div>
-        <div className="empty-state-title">暂无任务</div>
-        <div className="empty-state-desc">当使用 create_task 工具时，任务 DAG 看板将显示在这里</div>
+        <div className="empty-state-title">No Tasks</div>
+        <div className="empty-state-desc">When the create_task tool is used, the task DAG board will be displayed here.</div>
       </div>
     );
   }
@@ -19,11 +19,11 @@ export function TodoList({ todos }) {
   const progress = Math.round((completed / total) * 100);
 
   const STATUS_CONFIG = {
-    completed:   { label: '完成', color: 'var(--green)',  bgColor: 'var(--green-dim)',  icon: '✓' },
-    in_progress: { label: '执行中', color: 'var(--blue)', bgColor: 'var(--blue-dim)', icon: '▶' },
-    pending:     { label: '待执行', color: 'var(--text-muted)', bgColor: 'var(--bg-elevated)', icon: '○' },
-    failed:      { label: '失败', color: 'var(--red)',   bgColor: 'var(--red-dim)',   icon: '✗' },
-    aborted:     { label: '已撤销', color: 'var(--red)',   bgColor: 'var(--red-dim)',   icon: '✗' }
+    completed:   { label: 'Completed', color: 'var(--green)',  bgColor: 'var(--green-dim)',  icon: '✓' },
+    in_progress: { label: 'In Progress', color: 'var(--blue)', bgColor: 'var(--blue-dim)', icon: '▶' },
+    pending:     { label: 'Pending', color: 'var(--text-muted)', bgColor: 'var(--bg-elevated)', icon: '○' },
+    failed:      { label: 'Failed', color: 'var(--red)',   bgColor: 'var(--red-dim)',   icon: '✗' },
+    aborted:     { label: 'Aborted', color: 'var(--red)',   bgColor: 'var(--red-dim)',   icon: '✗' }
   };
 
   return (
@@ -31,7 +31,7 @@ export function TodoList({ todos }) {
       {/* 进度概览 */}
       <div style={{ padding: '12px 14px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>任务进度</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Progress</span>
           <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--blue)' }}>
             {completed}/{total}
           </span>
@@ -40,9 +40,9 @@ export function TodoList({ todos }) {
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-          <span style={{ color: 'var(--green)' }}>✓ {completed} 完成</span>
-          {inProgress > 0 && <span style={{ color: 'var(--blue)' }}>▶ {inProgress} 执行中</span>}
-          <span>{total - completed - inProgress} 待执行</span>
+          <span style={{ color: 'var(--green)' }}>✓ {completed} Completed</span>
+          {inProgress > 0 && <span style={{ color: 'var(--blue)' }}>▶ {inProgress} In Progress</span>}
+          <span>{total - completed - inProgress} Pending</span>
         </div>
       </div>
 
@@ -111,7 +111,7 @@ export function TodoList({ todos }) {
                   background: 'var(--bg-elevated)', border: '1px dashed var(--border)',
                   fontSize: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center'
                 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>🔒 依赖于:</span>
+                  <span style={{ color: 'var(--text-muted)' }}>🔒 Blocked by:</span>
                   {dependencyNames.map(dep => (
                     <span
                       key={dep.id}

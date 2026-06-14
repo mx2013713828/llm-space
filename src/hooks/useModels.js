@@ -38,7 +38,7 @@ export function useModels() {
    */
   const handleAddModel = async () => {
     if (!newModelConfig.name || !newModelConfig.modelId || !newModelConfig.url || !newModelConfig.key) {
-      alert('请填写完整模型信息');
+      alert('Please fill in all model information.');
       return;
     }
     const res = await fetch('http://localhost:3001/api/models', {

@@ -252,7 +252,7 @@ export function parseFeatures(inputFeatures) {
     }
     return parsed;
   } catch (err) {
-    console.error('[FeatureParser] 遇到异常损坏数据，拉起 Fail-Safe 熔断降级:', err);
+    console.error('[FeatureParser] Encountered corrupted data, trigger Fail-Safe fallback:', err);
     const failSafeData = {};
     for (const [key, meta] of Object.entries(FEATURE_SCHEMA)) {
       if (meta.type === 'boolean') {

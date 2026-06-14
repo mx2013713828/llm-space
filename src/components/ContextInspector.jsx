@@ -73,7 +73,7 @@ export function ContextInspector({
         throw new Error(errorMsg);
       }
       if (!isJson) {
-        throw new Error('后端返回了非 JSON 格式响应');
+        throw new Error('Backend returned non-JSON response');
       }
       return res.json();
     })
@@ -84,7 +84,7 @@ export function ContextInspector({
     .catch(err => {
       if (err.name === 'AbortError') return; // 忽略组件卸载时的主动中止
       console.error('Dry Run Alignment Error:', err);
-      setError(err.message || '向后端发起 Dry Run 静态对齐失败');
+      setError(err.message || 'Failed to dry run static alignment with backend');
       setLoading(false);
     });
 
@@ -107,7 +107,7 @@ export function ContextInspector({
   ]);
 
   const fullContext = {
-    system: alignedData.system || '(无)',
+    system: alignedData.system || '(None)',
     tools: alignedData.tools || [],
     messages: alignedData.messages || [],
   };
@@ -137,7 +137,7 @@ export function ContextInspector({
         marginTop: 6,
         fontFamily: 'sans-serif'
       }}>
-        💾 Anthropic Prompt Cache 缓存锚点
+        💾 Anthropic Prompt Cache Anchor
       </div>
     ) : null;
 
@@ -194,7 +194,7 @@ export function ContextInspector({
       <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(234, 179, 8, 0.05)', border: '1px solid var(--orange)', borderRadius: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--orange)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>⚙️</span> Assembled System Prompt (完整系统提示词)
+            <span>⚙️</span> Assembled System Prompt
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({String(systemText || '').length} chars)</span>
           </div>
           {hasCache && (
@@ -204,24 +204,24 @@ export function ContextInspector({
           )}
         </div>
         <pre style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 300, overflow: 'auto', margin: 0, color: 'var(--text-secondary)' }}>
-          {systemText || '(无)'}
+          {systemText || '(None)'}
         </pre>
         {isArray && (
           <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            发送结构: {JSON.stringify(alignedData.system)}
+            Payload Structure: {JSON.stringify(alignedData.system)}
           </div>
         )}
       </div>
     );
   };
 
-  // 渲染 Tools 列表
+  // Render Tools list
   const renderTools = () => {
     return (
       <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid var(--green)', borderRadius: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--green)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>🧰</span> 工具挂载 (Tools Schema)
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({(alignedData.tools || []).length} 个工具 · 按名称字母序排序)</span>
+          <span>🧰</span> Tools Mounting (Tools Schema)
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({(alignedData.tools || []).length} tools · Sorted alphabetically by name)</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(alignedData.tools || []).map((t, i) => {
@@ -265,10 +265,10 @@ export function ContextInspector({
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 18 }}>🔍</span>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>上下文检查器 (Context Inspector)</span>
+            <span style={{ fontWeight: 700, fontSize: 15 }}>Context Inspector</span>
             {!loading && !error && (
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 4 }}>
-                {alignedData.messages.length} 条消息 · ~{displayTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
+                {alignedData.messages.length} messages · ~{displayTokens.toLocaleString()} tokens · {(totalChars / 1024).toFixed(1)} KB
               </span>
             )}
           </div>
@@ -288,8 +288,8 @@ export function ContextInspector({
               gap: 12
             }}>
               <span className="animate-spin" style={{ fontSize: 32 }}>⏳</span>
-              <div style={{ fontSize: 14, fontWeight: 500 }}>正在向后端发起静态对齐推演 (Dry Run)...</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>这可能包含技能注入、记忆拼装及提示词处理</div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>Simulating static context alignment (Dry Run)...</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>This may include skill injection, memory consolidation, and prompt processing.</div>
             </div>
           )}
 
@@ -304,7 +304,7 @@ export function ContextInspector({
               marginBottom: 16
             }}>
               <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>❌</span> 静态对齐推演失败
+                <span>❌</span> Static context alignment simulation failed
               </div>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
                 {error}
@@ -323,7 +323,7 @@ export function ContextInspector({
               {/* 分割线 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0', color: 'var(--text-muted)', fontSize: 12 }}>
                 <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                Messages 序列 ({alignedData.messages.length} 条)
+                Messages Sequence ({alignedData.messages.length} messages)
                 <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               </div>
 
@@ -374,8 +374,8 @@ export function ContextInspector({
 
         {/* 底部状态栏 */}
         <div style={{ padding: '10px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-          <span>💡 这里展示的是经过 alignRequestPayload() 处理后，实际发送给大模型 API 的完整对齐上下文。</span>
-          <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(fullContext, null, 2)); }} style={{ marginLeft: 'auto', padding: '4px 12px', fontSize: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-secondary)', cursor: 'pointer' }}>📋 复制 JSON</button>
+          <span>💡 This displays the fully aligned context actually sent to the LLM API after processing by alignRequestPayload().</span>
+          <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(fullContext, null, 2)); }} style={{ marginLeft: 'auto', padding: '4px 12px', fontSize: 12, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-secondary)', cursor: 'pointer' }}>📋 Copy JSON</button>
         </div>
       </div>
     </div>
