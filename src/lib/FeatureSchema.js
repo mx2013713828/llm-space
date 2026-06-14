@@ -1,15 +1,15 @@
 export const FEATURE_SCHEMA = {
   enable_security: {
     type: 'boolean',
-    label: '安全防护与规则审批防线',
-    description: '拦截高危命令与越界文件写入操作，并通过前端弹窗获取授权。',
+    label: 'Security Shield & Approval Gate',
+    description: 'Intercept high-risk commands and unauthorized file write operations, and prompt for approval via a frontend modal.',
     defaultValue: false,
     failSafeValue: true, // 安全关键特性：解析损坏或异常时，默认 Fail-Closed 强行拦截防护
   },
   context_compaction: {
     type: 'group',
-    label: '上下文优化与提示词缓存管理',
-    description: '在大项目调试、多轮对话时，通过不同策略管理 Token 水位与优化响应速度。',
+    label: 'Context Optimization & Prompt Cache Management',
+    description: 'Manage token watermarks and optimize response speed with various compaction strategies during large codebase analysis and multi-turn chat.',
     defaultValue: true,
     failSafeValue: false, // 辅助特性：异常时 Fail-Open 关闭，避免干扰正常执行
     children: {
@@ -24,29 +24,29 @@ export const FEATURE_SCHEMA = {
       // ④ hard_compact：终极保底，LLM 语义摘要重构全量记忆
       thinking_compaction: {
         type: 'boolean',
-        label: '实时折叠已决思维链 (Thinking Compaction)',
-        description: '在工具调用返回结果后，将冗长的 thinking 块折叠为轻量占位符 [Thinking folded]，保护 Prompt Cache 前缀稳定性。',
+        label: 'Real-time Thinking Compaction',
+        description: 'Fold verbose thinking blocks into lightweight [Thinking folded] placeholders immediately after tool execution returns, preserving Prompt Cache prefix stability.',
         defaultValue: true,
         failSafeValue: false,
       },
       output_offload: {
         type: 'boolean',
-        label: '超长工具输出物理落盘 (Large Output Offload)',
-        description: '每次工具调用后立即检查，将超过 20KB 的单条输出转存到本地 .offloaded 目录，防止单条结果撑爆上下文。',
+        label: 'Large Output Offload',
+        description: 'Inspect output after every tool execution and offload outputs larger than 20KB to the local .offloaded directory, preventing massive tool outputs from exhausting context limits.',
         defaultValue: true,
         failSafeValue: false,
       },
       soft_compact: {
         type: 'boolean',
-        label: '软清洗老历史文件 (Soft-Compact)',
-        description: '在 Token 水位达到阈值后，批量掏空 5 轮前的 read_file/write_file/ls/grep/bash 工具结果，释放上下文空间。',
+        label: 'Soft-Compact Historic File Tools',
+        description: 'Bulk purge tool outputs from read_file/write_file/list_dir/grep_search/run_command from 5+ turns ago once token usage exceeds the threshold, freeing up context space.',
         defaultValue: true,
         failSafeValue: false,
       },
       hard_compact: {
         type: 'boolean',
-        label: '大模型语义记忆重构 (Hard-Compact)',
-        description: '在 Token 极度溢出时触发 LLM 自动生成历史记忆摘要，以最小代价重建核心上下文，保留最近 3 轮活跃记忆。',
+        label: 'Semantic Memory Reconstruction (Hard-Compact)',
+        description: 'Trigger LLM-based memory summarization when tokens are critically near limit, reconstructing the core context at minimal cost while retaining the most recent 3 active turns.',
         defaultValue: true,
         failSafeValue: false,
       },
@@ -54,26 +54,26 @@ export const FEATURE_SCHEMA = {
   },
   task_manager: {
     type: 'group',
-    label: '任务看板与进度管理系统',
-    description: '配置 Agent 任务规划与催促流转机制（开启后会自动停用/屏蔽底层原子工具，由实验特性一键搭载）。',
+    label: 'Task Dashboard & Progress System',
+    description: 'Configure agent task planning and drive-to-completion workflow (automatically disables/masks underlying atomic tools when enabled, accessible via experimental toggles).',
     defaultValue: true,
     failSafeValue: true,
     children: {
       mode: {
         type: 'select',
-        label: '看板运行模式',
-        description: '选择看板运行的引擎和依赖机制。',
+        label: 'Dashboard Operating Mode',
+        description: 'Choose the dashboard engine and dependency resolution mechanism.',
         defaultValue: 'todo',
         failSafeValue: 'todo',
         options: [
-          { value: 'todo', label: 'Write-Todo 线性看板 (经典版)' },
-          { value: 'task_system', label: 'Task-System 拓扑依赖系统 (DAG版)' }
+          { value: 'todo', label: 'Write-Todo Linear Board (Classic)' },
+          { value: 'task_system', label: 'Task-System DAG Dependencies (Advanced)' }
         ]
       },
       todo_prompt: {
         type: 'text_area',
-        label: 'Todo 模式系统指引词 (XML 格式)',
-        description: '当大模型使用线性看板时，实时注入 System Prompt 的行为规范指南。',
+        label: 'Todo Mode System Guidelines (XML Format)',
+        description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Todo mode.',
         defaultValue: `<todo_mode_guidelines>
 You must use the \`write_todos\` tool to manage your development board to keep your progress synchronized with the user:
 1. Upon receiving a complex request, immediately call \`write_todos\` to break down the task into 4-8 pending sub-tasks.
@@ -84,8 +84,8 @@ You must use the \`write_todos\` tool to manage your development board to keep y
       },
       task_system_prompt: {
         type: 'text_area',
-        label: 'Task System 模式系统指引词 (XML 格式)',
-        description: '当大模型使用 DAG 任务系统时，实时注入 System Prompt 的行为规范指南。',
+        label: 'Task System Guidelines (XML Format)',
+        description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Task System mode.',
         defaultValue: `<task_system_guidelines>
 When facing complex development tasks, you must use the task dependency system to organize your workflow:
 1. First, analyze the requirements and create a dependency tree of Tasks using \`create_task\`. Declare upstream dependencies using \`blockedBy\` (comma-separated IDs).
@@ -101,22 +101,22 @@ When facing complex development tasks, you must use the task dependency system t
   },
   enable_skills: {
     type: 'group',
-    label: '技能加载 (Skills)',
-    description: '向 Agent 注入特定领域的行为规则技能，增强其在对应场景下的专业能力。',
+    label: 'Skills Loading',
+    description: 'Inject domain-specific behavioral skillsets into the agent to enhance its expertise in targeted scenarios.',
     defaultValue: true,
     failSafeValue: true, // 技能只增强不拦截，安全降级时保持开启无害
     children: {
       enable_project_skills: {
         type: 'boolean',
-        label: '加载项目本地技能',
-        description: '从当前项目目录中自动发现并加载 Skill 定义文件，注入项目专属的工作流规则。',
+        label: 'Load Project-Local Skills',
+        description: 'Automatically discover and load skill definition files from the project root, injecting project-specific workflow rules.',
         defaultValue: true,
         failSafeValue: true,
       },
       enable_global_skills: {
         type: 'boolean',
-        label: '加载全局 .agent 目录技能',
-        description: '挂载系统全局 ~/.agent（或 .agent/）目录下的通用超能力技能库。',
+        label: 'Load Global Skills (~/.agent)',
+        description: 'Mount general capability skillsets located in the global ~/.agent (or .agent/) directory.',
         defaultValue: true,
         failSafeValue: false,
       },
@@ -124,8 +124,8 @@ When facing complex development tasks, you must use the task dependency system t
   },
   enable_memory: {
     type: 'group',
-    label: '长期记忆系统 (Memory)',
-    description: '在 .memory/ 目录下持久化用户偏好和项目知识，跨会话、跨压缩保留关键信息。索引注入 system prompt（可被 Prompt Cache 缓存），相关内容按需注入当前对话。',
+    label: 'Long-term Memory System',
+    description: 'Persist user preferences and project knowledge in the .memory/ directory to retain critical context across sessions and compactions. An index is injected into the system prompt (cache-friendly) with relevant memory entries retrieved on demand.',
     defaultValue: false,
     failSafeValue: false, // 辅助特性，异常时 Fail-Open 关闭
     children: {
@@ -133,15 +133,15 @@ When facing complex development tasks, you must use the task dependency system t
       // memory_consolidate 依赖 memory_extract 开启（整理的前提是有提取）
       memory_extract: {
         type: 'boolean',
-        label: '每轮自动提取记忆 (Memory Extract)',
-        description: '每次对话结束后，用 LLM 自动从对话中提取用户偏好、工作习惯和项目事实，写入持久化文件。',
+        label: 'Auto-extract Memory on Every Turn',
+        description: 'Automatically extract user preferences, work habits, and project facts from the conversation using LLM after each session, writing them to persistent storage.',
         defaultValue: true,
         failSafeValue: false,
       },
       memory_consolidate: {
         type: 'boolean',
-        label: '定期整理记忆 (Memory Consolidate)',
-        description: '记忆文件积累到 10 条以上后，触发 LLM 自动去重、合并矛盾、淘汰过时记忆（每 24 小时最多一次）。需先开启"每轮自动提取记忆"。',
+        label: 'Consolidate Memories Periodically',
+        description: 'Trigger automatic deduplication, resolution of conflicts, and pruning of obsolete memories using LLM when memory items exceed 10 (limited to once every 24 hours). Requires "Auto-extract Memory on Every Turn" to be enabled.',
         defaultValue: false,
         failSafeValue: false,
         // 依赖约束：此子项须 memory_extract 开启才能生效（UI 层联动控制）
@@ -150,50 +150,50 @@ When facing complex development tasks, you must use the task dependency system t
   },
   error_recovery: {
     type: 'group',
-    label: '错误自愈与容灾机制 (Error Recovery)',
-    description: '在大模型 API 调用遇到网络波动、截断、超限或过载错误时，自动尝试恢复或执行灾备方案。',
+    label: 'Self-Healing & Disaster Recovery',
+    description: 'Automatically attempt recovery or execute failover plans when LLM API calls encounter network fluctuations, truncation, limits, or overload errors.',
     defaultValue: true,
     failSafeValue: false,
     children: {
       max_tokens_escalation: {
         type: 'boolean',
-        label: '临时增加 max_tokens 限制与续写',
-        description: '被 max_tokens 截断时，第一阶段无感提升 max_tokens 限制重试；第二阶段注入续写指令。',
+        label: 'Escalate max_tokens & Auto-Continue',
+        description: 'When truncated by max_tokens, silently scale up the max_tokens limit for a retry in the first stage, and inject an auto-continue prompt in the second stage.',
         defaultValue: true,
         failSafeValue: false,
       },
       reactive_compaction: {
         type: 'boolean',
-        label: '反应式历史剪枝 (Reactive Compact)',
-        description: '若 API 抛出 prompt_too_long 错误，触发极限制的紧急历史语义重构并重试。',
+        label: 'Reactive Context Compaction',
+        description: 'Trigger an aggressive, emergency context compaction and reconstruction if the API returns a prompt_too_long error, then retry.',
         defaultValue: true,
         failSafeValue: false,
       },
       http_retry: {
         type: 'boolean',
-        label: 'HTTP 异常退避重试 (指数退避+抖动)',
-        description: '遭遇网络异常、429限流、529服务过载时，执行带有随机抖动的指数退避重试。',
+        label: 'Retry on HTTP Errors (Exponential Backoff + Jitter)',
+        description: 'Execute exponential backoff retries with randomized jitter when encountering network anomalies, 429 rate limits, or 529 service overloads.',
         defaultValue: true,
         failSafeValue: false,
       },
       fallback_model: {
         type: 'boolean',
-        label: '过载模型自动故障转移 (Failover)',
-        description: '连续 3 次遭遇 529 过载错误时，自动将后续请求转移切换至备用灾备模型继续运行。',
+        label: 'API Model Failover',
+        description: 'Automatically switch subsequent API requests to the backup failover model after encountering 529 overload errors 3 times consecutively.',
         defaultValue: true,
         failSafeValue: false,
       },
       fallback_model_id: {
         type: 'select',
-        label: '备用故障转移模型',
-        description: '选择用于故障转移的备用模型。需先在左侧配置该模型的 API Key。',
+        label: 'Fallback Model ID',
+        description: 'Select the fallback model for disaster recovery. The API key for this model must be configured in advance.',
         defaultValue: '',
         failSafeValue: '',
       },
       diminishing_returns: {
         type: 'boolean',
-        label: '防止输出死循环与收益递减检测',
-        description: '限制最多续写 3 次，且单次续写产出的 Token 增量少于 50 时自动熔断。',
+        label: 'Detect Loops & Diminishing Returns',
+        description: 'Limit automatic continuation to a maximum of 3 retries, and trigger an immediate breaker if token increments from a single continuation fall below 50.',
         defaultValue: true,
         failSafeValue: false,
       },
@@ -201,8 +201,8 @@ When facing complex development tasks, you must use the task dependency system t
   },
   parallel_tool_execution: {
     type: 'boolean',
-    label: '并行工具执行',
-    description: '单回合产生多个工具调用时并发执行，缩短整体工具执行的等待时间。',
+    label: 'Parallel Tool Execution',
+    description: 'Execute multiple tool calls in parallel within a single turn to reduce the overall waiting time for tool execution.',
     defaultValue: false,
     failSafeValue: false,
   },

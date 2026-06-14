@@ -1,7 +1,7 @@
 {
   "id": "chat-bot",
-  "name": "01-chat-bot.json",
-  "description": "基础对话 agent",
+  "name": "Basic Chatbot",
+  "description": "Understand the basic ReAct tool call loop with weather query tools.",
   "category": "basic",
   "model": {
     "name": "Doubao Seed 2.0 Code",
@@ -13,13 +13,13 @@
   "tools": [
     {
       "name": "weather_report",
-      "description": "获取指定城市的天气信息",
+      "description": "Get weather information for a specified city",
       "input_schema": {
         "type": "object",
         "properties": {
           "city": {
             "type": "string",
-            "description": "城市名称（如：北京、上海、New York）"
+            "description": "The city name (e.g., Beijing, Shanghai, New York)"
           }
         },
         "required": [
@@ -44,7 +44,7 @@
       }
     }
   ],
-  "systemPrompt": "你是一个智能助手。\n\n当用户询问天气时，请：\n1. 分析用户提到的城市\n2. 调用 weather_report 工具获取天气\n3. 将结果以自然语言回复用户\n\n",
+  "systemPrompt": "You are a helpful assistant.\n\nWhen the user asks about the weather, please:\n1. Analyze the city mentioned by the user.\n2. Call the weather_report tool to get the weather information.\n3. Reply to the user with the result in natural language.\n\n",
   "skills": [
     "skill-creator"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "04-subagent",
-  "name": "04-subagent.json",
-  "description": "子代理特性测试",
+  "name": "Multi-Agent System",
+  "description": "Explore multi-agent delegation, subagent task planning, and context isolation.",
   "category": "basic",
   "model": {
     "name": "",
@@ -66,13 +66,13 @@
     },
     {
       "name": "weather_report",
-      "description": "获取指定城市的天气信息",
+      "description": "Get weather information for a specified city",
       "input_schema": {
         "type": "object",
         "properties": {
           "city": {
             "type": "string",
-            "description": "城市名称（如：北京、上海、New York）"
+            "description": "The city name (e.g., Beijing, Shanghai, New York)"
           }
         },
         "required": [
@@ -129,7 +129,7 @@
       }
     }
   ],
-  "systemPrompt": "你是一个友好的智能助手，请准确、简洁地回答用户的问题。",
+  "systemPrompt": "You are a friendly and helpful assistant. Please answer the user's questions accurately and concisely.",
   "skills": [
     "git-conventions"
   ],
