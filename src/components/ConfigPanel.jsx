@@ -97,7 +97,7 @@ export function ConfigPanel({
           <span className="param-value">{temperature}</span>
         </div>
         <div className="param-row">
-          <span className="param-label" style={{ whiteSpace: 'nowrap' }}>Max Tokens Limit (Optional)</span>
+          <span className="param-label">Max Tokens (Opt)</span>
           <input type="range" className="param-slider" min="1024" max="32000" step="1024" value={maxTokens} onChange={e => setMaxTokens(parseInt(e.target.value))} />
           <span className="param-value" style={{ width: 44 }}>{maxTokens}</span>
         </div>
