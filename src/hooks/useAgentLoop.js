@@ -32,6 +32,7 @@ export function useAgentLoop({
 }) {
   const [messages, setMessages] = useState([]);
   const [todos, setTodos] = useState([]);
+  const [backgroundTasks, setBackgroundTasks] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [cacheStats, setCacheStats] = useState({ hitTokens: 0, missTokens: 0 });
   const [contextTokens, setContextTokens] = useState(0);
@@ -41,21 +42,25 @@ export function useAgentLoop({
   const [inputText, setInputText] = useState('');
 
   // Track last reported content to avoid triggering onSessionUpdate unnecessarily
-  const lastReportedRef = useRef({ messages: null, todos: null });
+  const lastReportedRef = useRef({ messages: null, todos: null, backgroundTasks: null });
 
   // Sync local state up to parent — only when content actually changes
   useEffect(() => {
     if (!onSessionUpdate) return;
     const newMsgStr = JSON.stringify(messages);
     const newTodoStr = JSON.stringify(todos);
-    const same = lastReportedRef.current.messages === newMsgStr && lastReportedRef.current.todos === newTodoStr;
+    const newBgStr = JSON.stringify(backgroundTasks);
+    const same = lastReportedRef.current.messages === newMsgStr && 
+                 lastReportedRef.current.todos === newTodoStr &&
+                 lastReportedRef.current.backgroundTasks === newBgStr;
     if (same) {
       return; // Skip if content is identical to last report
     }
     lastReportedRef.current.messages = newMsgStr;
     lastReportedRef.current.todos = newTodoStr;
-    onSessionUpdate(messages, todos);
-  }, [messages, todos]);
+    lastReportedRef.current.backgroundTasks = newBgStr;
+    onSessionUpdate(messages, todos, backgroundTasks);
+  }, [messages, todos, backgroundTasks]);
 
   // Synchronize local messages and todos state when external savedSession changes.
   // After updating local state, pre-populate lastReportedRef so that the A effect
@@ -67,8 +72,16 @@ export function useAgentLoop({
     if (isRunning) return; // Skip updating during active run to avoid race condition with stream delta
 
     const incoming = savedSession
-      ? { messages: savedSession.messages || [], todos: savedSession.todos || [] }
-      : { messages: harness?.trajectory || [], todos: harness?.todos || [] };
+      ? { 
+          messages: savedSession.messages || [], 
+          todos: savedSession.todos || [],
+          backgroundTasks: savedSession.backgroundTasks || []
+        }
+      : { 
+          messages: harness?.trajectory || [], 
+          todos: harness?.todos || [],
+          backgroundTasks: []
+        };
 
     const incomingStr = JSON.stringify(incoming);
     const same = lastSavedSessionRef.current === incomingStr;
@@ -81,9 +94,11 @@ export function useAgentLoop({
     // ref changes → this effect again → infinite loop.
     lastReportedRef.current.messages = JSON.stringify(incoming.messages);
     lastReportedRef.current.todos = JSON.stringify(incoming.todos);
+    lastReportedRef.current.backgroundTasks = JSON.stringify(incoming.backgroundTasks);
 
     setMessages(incoming.messages);
     setTodos(incoming.todos);
+    setBackgroundTasks(incoming.backgroundTasks);
   }, [savedSession, harness, isRunning]);
 
   // 按 turn 分组
@@ -109,6 +124,7 @@ export function useAgentLoop({
           harnessId: harness?.id,
           messages: currentMessages,
           todos: currentTodos,
+          backgroundTasks,
           systemPrompt,
           tools: harness.tools,
           features: harness.features || {},
@@ -174,6 +190,10 @@ export function useAgentLoop({
           try { evt = JSON.parse(raw); } catch { continue; }
 
           switch (evt.type) {
+            case 'background_tasks_update':
+              setBackgroundTasks(evt.tasks || []);
+              break;
+
             case 'error_recovery_attempt':
             case 'error_recovery_fallback':
               updateMessages(evt.parentToolCallId, (list) => [
@@ -420,6 +440,9 @@ export function useAgentLoop({
         } else {
           setPendingPermission(null);
         }
+        if (data.backgroundTasks) {
+          setBackgroundTasks(data.backgroundTasks);
+        }
         if (data.isRunning) {
           console.log(`🔌 Background task found for ${harness.id}, auto attaching...`);
           setIsRunning(true);
@@ -520,6 +543,7 @@ export function useAgentLoop({
     // 消息和状态
     messages,
     todos,
+    backgroundTasks,
     turns,
     loopCount,
     toolCallCount,

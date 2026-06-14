@@ -433,7 +433,7 @@ app.post('/api/harnesses', async (req, res) => {
 app.post('/api/harnesses/:id', async (req, res) => {
   try {
     const data = req.body;
-    const filename = data.name || `${req.params.id}.json`;
+    const filename = `${req.params.id}.json`;
     const targetPath = path.join(HARNESS_DIR, filename);
     await fs.writeFile(targetPath, JSON.stringify(data, null, 2), 'utf-8');
     res.json({ success: true });
@@ -763,6 +763,7 @@ app.post('/api/agent/run', async (req, res) => {
     harnessId,
     messages,
     todos,
+    backgroundTasks,
     systemPrompt,
     tools,
     features,
@@ -790,6 +791,7 @@ app.post('/api/agent/run', async (req, res) => {
     // Synchronize current state to newly attached client
     sendEvent(res, 'messages_update', { messages: job.executor.messages });
     sendEvent(res, 'todo_update', { todos: job.executor.todos });
+    sendEvent(res, 'background_tasks_update', { tasks: job.executor.backgroundTasks || [] });
 
     // Keep the request handler pending until client disconnects
     await new Promise((resolve) => {
@@ -817,6 +819,7 @@ app.post('/api/agent/run', async (req, res) => {
     harnessId,
     messages,
     todos,
+    backgroundTasks,
     systemPrompt,
     tools,
     features,
@@ -832,6 +835,9 @@ app.post('/api/agent/run', async (req, res) => {
 
   const job = { executor, clients: new Set([res]) };
   activeJobs.set(harnessId, job);
+  
+  // 初始化发送一次已有后台任务给客户端
+  sendEvent(res, 'background_tasks_update', { tasks: executor.backgroundTasks || [] });
 
   // Listen to connection close and remove client, but keep the job running in background
   res.on('close', () => {
@@ -879,10 +885,12 @@ app.get('/api/agent/status/:harnessId', (req, res) => {
   const job = activeJobs.get(harnessId);
   const isRunning = !!job;
   let pendingPermission = null;
+  let backgroundTasks = [];
   if (job && job.executor) {
     pendingPermission = job.executor.pendingPermission || null;
+    backgroundTasks = job.executor.backgroundTasks || [];
   }
-  res.json({ isRunning, pendingPermission });
+  res.json({ isRunning, pendingPermission, backgroundTasks });
 });
 
 /** 健康检查 */
@@ -964,9 +972,9 @@ app.post('/api/sessions/:harnessId', async (req, res) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
       return res.status(400).json({ error: '非法的 Harness ID' });
     }
-    const { messages, todos } = req.body;
+    const { messages, todos, backgroundTasks } = req.body;
     const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
-    await fs.writeFile(sessionPath, JSON.stringify({ messages: messages || [], todos: todos || [] }, null, 2), 'utf-8');
+    await fs.writeFile(sessionPath, JSON.stringify({ messages: messages || [], todos: todos || [], backgroundTasks: backgroundTasks || [] }, null, 2), 'utf-8');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

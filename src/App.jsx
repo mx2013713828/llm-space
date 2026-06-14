@@ -43,7 +43,7 @@ function AppContent() {
 
   const syncTimeoutRef = useRef(null);
 
-  const saveSessionToBackend = (harnessId, messages, todos) => {
+  const saveSessionToBackend = (harnessId, messages, todos, backgroundTasks) => {
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
@@ -51,7 +51,7 @@ function AppContent() {
       fetch(`http://localhost:3001/api/sessions/${harnessId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, todos })
+        body: JSON.stringify({ messages, todos, backgroundTasks })
       }).catch(err => console.error("Sync Session failed:", err));
     }, 1000);
   };
@@ -191,12 +191,12 @@ function AppContent() {
 
   // Stable callback refs — prevents TrajectoryPage's internal effects from re-firing
   // just because App.jsx re-renders due to sessions/harness state updates
-  const handleSessionUpdate = useCallback((messages, todos) => {
+  const handleSessionUpdate = useCallback((messages, todos, backgroundTasks) => {
     setSessions(prev => ({
       ...prev,
-      [activeHarnessId]: { messages, todos }
+      [activeHarnessId]: { messages, todos, backgroundTasks }
     }));
-    saveSessionToBackend(activeHarnessId, messages, todos);
+    saveSessionToBackend(activeHarnessId, messages, todos, backgroundTasks);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHarnessId]);
 

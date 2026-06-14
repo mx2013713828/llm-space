@@ -86,21 +86,23 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
         currentAssistantContent.push(b);
       } else if (msg.type === 'tool_call') {
         currentAssistantContent.push({ type: 'tool_use', id: msg.id, name: msg.toolName, input: msg.toolInput });
-        if (msg.toolOutput != null) {
-          // 阶段一：日常防护盾 (Always-On Shield) - 拦截超大文本（排除 read_file，确保当前轮次能读到完整源码）
-          let outStr = String(msg.toolOutput);
-          if (msg.toolName !== 'read_file' && outStr.length > 4000) {
-            const head = outStr.slice(0, 1500);
-            const tail = outStr.slice(-500);
-            const truncatedCount = outStr.length - 2000;
-            outStr = `${head}\n\n...[OUTPUT OFFLOADED - Truncated ${truncatedCount} characters, use grep to retrieve full content if needed]...\n\n${tail}`;
-          }
-          currentToolResults.push({
-            type: 'tool_result',
-            tool_use_id: msg.id,
-            content: outStr
-          });
+        
+        // Defensive safety net: if toolOutput is missing or has not been generated (e.g. aborted by user, network failure, or pending background execution),
+        // enforce a placeholder tool_result block to prevent Anthropic's "tool_use without tool_result" structural API error.
+        const outStr = msg.toolOutput != null ? String(msg.toolOutput) : '[Tool execution canceled, aborted, or pending]';
+        
+        let formattedOutput = outStr;
+        if (msg.toolName !== 'read_file' && outStr.length > 4000) {
+          const head = outStr.slice(0, 1500);
+          const tail = outStr.slice(-500);
+          const truncatedCount = outStr.length - 2000;
+          formattedOutput = `${head}\n\n...[OUTPUT OFFLOADED - Truncated ${truncatedCount} characters, use grep to retrieve full content if needed]...\n\n${tail}`;
         }
+        currentToolResults.push({
+          type: 'tool_result',
+          tool_use_id: msg.id,
+          content: formattedOutput
+        });
       }
     }
   }
@@ -113,11 +115,19 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
     apiMessages.push({ role: 'user', content: currentToolResults });
   }
 
-  // 合并相邻 of 同角色消息（双重兜底防护）
+  // 合并相邻 of 同角色消息（双重兜底防护，但绝不能把 tool_result 与普通 text 合并，保持 tool_result 纯净独立）
   const collapsedMsgs = [];
   apiMessages.forEach(msg => {
     let last = collapsedMsgs[collapsedMsgs.length - 1];
-    if (last && last.role === msg.role) {
+    
+    const isBothUser = last && last.role === 'user' && msg.role === 'user';
+    const hasToolResultLast = last && Array.isArray(last.content) && last.content.some(c => c.type === 'tool_result');
+    const hasToolResultMsg = msg && Array.isArray(msg.content) && msg.content.some(c => c.type === 'tool_result');
+
+    // 针对 user 角色且带有 tool_result 的消息，强制拆分，以遵守 API 严格的 tool_result 独立性原则
+    if (isBothUser && (hasToolResultLast || hasToolResultMsg)) {
+      collapsedMsgs.push(msg);
+    } else if (last && last.role === msg.role) {
       last.content.push(...msg.content);
     } else {
       collapsedMsgs.push(msg);
@@ -257,8 +267,14 @@ export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
     };
 
     const lastMsg = result[result.length - 1];
-    if (lastMsg && lastMsg.role === 'user') {
-      lastMsg.content.push(stateBlock);
+    const isLastMsgToolResult = lastMsg && lastMsg.role === 'user' && 
+                               Array.isArray(lastMsg.content) && 
+                               lastMsg.content.some(c => c.type === 'tool_result');
+
+    if (lastMsg && lastMsg.role === 'user' && !isLastMsgToolResult) {
+      if (Array.isArray(lastMsg.content)) {
+        lastMsg.content.push(stateBlock);
+      }
     } else {
       result.push({ role: 'user', content: [stateBlock] });
     }
@@ -271,8 +287,14 @@ export function injectTodoState(apiMessages, todos, roundsSinceTodo) {
       text: `\n<system_reminder>\nYou haven't updated the task board for 3 consecutive turns. Before taking your next action, please make sure to use the write_todos tool to sync the current progress.\n</system_reminder>\n`
     };
     const lastMsg = result[result.length - 1];
-    if (lastMsg && lastMsg.role === 'user') {
-      lastMsg.content.push(nagBlock);
+    const isLastMsgToolResult = lastMsg && lastMsg.role === 'user' && 
+                               Array.isArray(lastMsg.content) && 
+                               lastMsg.content.some(c => c.type === 'tool_result');
+
+    if (lastMsg && lastMsg.role === 'user' && !isLastMsgToolResult) {
+      if (Array.isArray(lastMsg.content)) {
+        lastMsg.content.push(nagBlock);
+      }
     } else {
       result.push({ role: 'user', content: [nagBlock] });
     }

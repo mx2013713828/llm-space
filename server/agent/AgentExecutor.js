@@ -1,6 +1,7 @@
 import os from 'os';
 import path from 'path';
 import { promises as fs } from 'fs';
+import { spawn } from 'child_process';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 import { COMPACT_PROMPT } from './compactPrompt.js';
@@ -53,6 +54,7 @@ export class AgentExecutor {
     harnessId = '',
     messages = [],
     todos = [],
+    backgroundTasks = [],
     systemPrompt = '',
     tools = [],
     features = {},
@@ -66,6 +68,8 @@ export class AgentExecutor {
     this.harnessId = harnessId;
     this.messages = [...(Array.isArray(messages) ? messages : [])];
     this.todos = [...(Array.isArray(todos) ? todos : [])];
+    this.backgroundTasks = Array.isArray(backgroundTasks) ? [...backgroundTasks] : [];
+    this.pendingNotifications = [];
     this.systemPrompt = systemPrompt;
     this.features = parseFeatures(features);
     this.tools = Array.isArray(tools) ? [...tools] : [];
@@ -159,7 +163,7 @@ export class AgentExecutor {
         // Auto-save agent messages and todos state to session file
         await fs.writeFile(
           sessionPath,
-          JSON.stringify({ messages: this.messages, todos: this.todos }, null, 2),
+          JSON.stringify({ messages: this.messages, todos: this.todos, backgroundTasks: this.backgroundTasks }, null, 2),
           'utf-8'
         );
       } catch (err) {
@@ -349,6 +353,46 @@ export class AgentExecutor {
         // 生命周期：preLLM (在这里会发生：软硬清洗压缩、Todo 看板注入、Skills 组装等)
         await this.hooks.dispatch('preLLM', context);
 
+        if (this.pendingNotifications && this.pendingNotifications.length > 0) {
+          const notificationsText = this.pendingNotifications.join('\n\n');
+          this.pendingNotifications = []; // 消费清空
+
+          // 1. 注入到即将发送给大模型的 context.apiMessages 列表中。
+          // 规则：如果最新的一条是 user 消息且不含 tool_result 块，则安全地 unshift 注入头部；
+          // 否则（是 assistant，或虽然是 user 但包含了 tool_result），为避免 API 协议报错，必须作为一条独立的 user 消息 push 到末尾。
+          const lastApiMsg = context.apiMessages[context.apiMessages.length - 1];
+          const isLastMsgToolResult = lastApiMsg && lastApiMsg.role === 'user' && 
+                                     Array.isArray(lastApiMsg.content) && 
+                                     lastApiMsg.content.some(c => c.type === 'tool_result');
+
+          if (lastApiMsg && lastApiMsg.role === 'user' && !isLastMsgToolResult) {
+            if (Array.isArray(lastApiMsg.content)) {
+              lastApiMsg.content.unshift({ type: 'text', text: notificationsText });
+            }
+          } else {
+            context.apiMessages.push({
+              role: 'user',
+              content: [{ type: 'text', text: notificationsText }]
+            });
+          }
+
+          // 2. 持久化，追加到 messages 历史中
+          const lastMsg = this.messages[this.messages.length - 1];
+          if (lastMsg && lastMsg.role === 'user') {
+            lastMsg.content = `${notificationsText}\n\n${lastMsg.content}`;
+          } else {
+            this.messages.push({
+              role: 'user',
+              type: 'text',
+              turn: turnIndex,
+              content: notificationsText
+            });
+          }
+
+          // 3. 广播更新事件
+          this.onEvent('messages_update', { messages: this.messages });
+        }
+
         let stopReason = null;
         try {
           const isContinuation = recoveryState.recovery_count > 0;
@@ -459,14 +503,37 @@ export class AgentExecutor {
             await this.hooks.dispatch('preToolUse', toolContext);
 
             if (!tool.handled) {
-              try {
-                const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
-                  tool.toolOutput = (tool.toolOutput || '') + chunk;
-                  this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
-                });
-                tool.toolOutput = String(finalOutput);
-              } catch (err) {
-                tool.toolOutput = `[工具执行错误]\n${err.message}`;
+              const isBgEnabled = this.features.task_manager?.enabled !== false && this.features.task_manager?.enable_background_tasks === true;
+              const shouldBg = tool.toolName === 'bash' && (tool.toolInput?.run_in_background || this._isSlowCommand(tool.toolInput?.command));
+
+              if (isBgEnabled && shouldBg) {
+                const bgId = `bg_${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 10)}`;
+                const bgTask = {
+                  id: bgId,
+                  toolCallId: tool.id,
+                  command: tool.toolInput.command,
+                  status: 'running',
+                  output: '',
+                  exitCode: null,
+                  startedAt: new Date().toISOString()
+                };
+                this.backgroundTasks.push(bgTask);
+                this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+                
+                this._runBackgroundTask(bgTask);
+
+                tool.toolOutput = `[Background task ${bgId} started] Result will be available when complete.`;
+                tool.handled = true;
+              } else {
+                try {
+                  const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
+                    tool.toolOutput = (tool.toolOutput || '') + chunk;
+                    this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
+                  });
+                  tool.toolOutput = String(finalOutput);
+                } catch (err) {
+                  tool.toolOutput = `[工具执行错误]\n${err.message}`;
+                }
               }
             }
 
@@ -870,5 +937,71 @@ export class AgentExecutor {
     } catch (err) {
       console.error('[AgentExecutor] Failed during offload cleanup:', err);
     }
+  }
+
+  _isSlowCommand(command) {
+    const cmd = String(command || '').toLowerCase();
+    const slowKeywords = [
+      'install', 'build', 'test', 'deploy', 'compile',
+      'docker build', 'pip install', 'npm install', 'yarn',
+      'cargo build', 'pytest', 'make'
+    ];
+    return slowKeywords.some(kw => cmd.includes(kw));
+  }
+
+  _runBackgroundTask(bgTask) {
+    const env = { 
+      ...process.env, 
+      FORCE_COLOR: '1', 
+      PYTHONUNBUFFERED: '1',
+      PIP_PROGRESS_BAR: 'on',
+      TERM: 'xterm-256color' 
+    };
+
+    const child = spawn('bash', ['-c', bgTask.command], { env });
+
+    child.stdout.on('data', (data) => {
+      bgTask.output += data.toString();
+      this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+    });
+
+    child.stderr.on('data', (data) => {
+      bgTask.output += data.toString();
+      this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+    });
+
+    child.on('close', (code) => {
+      bgTask.status = code === 0 ? 'completed' : 'failed';
+      bgTask.exitCode = code;
+      bgTask.completedAt = new Date().toISOString();
+
+      const notification = `<task_notification>
+  <task_id>${bgTask.id}</task_id>
+  <status>${bgTask.status}</status>
+  <command>${bgTask.command}</command>
+  <summary>${bgTask.output.slice(-300) || 'No output'}</summary>
+</task_notification>`;
+
+      this.pendingNotifications.push(notification);
+      this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+      this.saveSession();
+    });
+
+    child.on('error', (err) => {
+      bgTask.status = 'failed';
+      bgTask.output += `\n[LAUNCH ERROR] ${err.message}`;
+      bgTask.completedAt = new Date().toISOString();
+
+      const notification = `<task_notification>
+  <task_id>${bgTask.id}</task_id>
+  <status>failed</status>
+  <command>${bgTask.command}</command>
+  <summary>Launch error: ${err.message}</summary>
+</task_notification>`;
+
+      this.pendingNotifications.push(notification);
+      this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+      this.saveSession();
+    });
   }
 }

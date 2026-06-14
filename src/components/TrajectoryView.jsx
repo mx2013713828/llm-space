@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
 
 export function TrajectoryView({
   activeRightTab,
   setActiveRightTab,
+  harness,
+  backgroundTasks = [],
   messages,
   todos,
   turns,
@@ -57,7 +59,11 @@ export function TrajectoryView({
         {[
           { key: 'trajectory', label: '🔄 Run Trajectory' },
           { key: 'todos', label: `✅ TODO${todos.length > 0 ? ` (${todos.length})` : ''}` },
-        ].map(tab => (
+          harness?.features?.task_manager?.enable_background_tasks && {
+            key: 'background_tasks',
+            label: `⚙️ Background Tasks${backgroundTasks && backgroundTasks.length > 0 ? ` (${backgroundTasks.filter(t => t.status === 'running').length}/${backgroundTasks.length})` : ''}`
+          }
+        ].filter(Boolean).map(tab => (
           <button key={tab.key}
             className={`topbar-tab ${activeRightTab === tab.key ? 'active' : ''}`}
             onClick={() => setActiveRightTab(tab.key)}
@@ -191,6 +197,12 @@ export function TrajectoryView({
         {activeRightTab === 'todos' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
             <TodoList todos={todos} />
+          </div>
+        )}
+
+        {activeRightTab === 'background_tasks' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+            <BackgroundTasksPanel backgroundTasks={backgroundTasks} />
           </div>
         )}
       </div>
@@ -356,6 +368,150 @@ export function TrajectoryView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BackgroundTasksPanel({ backgroundTasks = [] }) {
+  const [expandedTasks, setExpandedTasks] = useState({});
+
+  if (backgroundTasks.length === 0) {
+    return (
+      <div className="empty-state" style={{ marginTop: 40 }}>
+        <div className="empty-state-icon">⚙️</div>
+        <div className="empty-state-title">No Background Tasks</div>
+        <div className="empty-state-desc">Background tasks will show up here once a slow command is run.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <h3 style={{ margin: '0 0 4px 0', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+        Active & Historic Processes
+      </h3>
+      {backgroundTasks.map(task => {
+        const isRunning = task.status === 'running';
+        const isCompleted = task.status === 'completed';
+        const isFailed = task.status === 'failed';
+        const isExpanded = !!expandedTasks[task.id];
+
+        let statusColor = 'var(--text-muted)';
+        let statusText = task.status.toUpperCase();
+        let statusIcon = '⚪';
+
+        if (isRunning) {
+          statusColor = 'var(--blue)';
+          statusIcon = '⚡';
+        } else if (isCompleted) {
+          statusColor = 'var(--green)';
+          statusIcon = '✅';
+        } else if (isFailed) {
+          statusColor = 'var(--red)';
+          statusIcon = '❌';
+        }
+
+        return (
+          <div 
+            key={task.id}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--bg-elevated)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              transition: 'border-color 0.15s'
+            }}
+          >
+            {/* 卡片头部 */}
+            <div
+              onClick={() => setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
+              style={{
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                background: 'rgba(255,255,255,0.02)',
+                userSelect: 'none',
+                gap: 10
+              }}
+            >
+              <span style={{ fontSize: 14 }}>{statusIcon}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {task.id}
+                  </span>
+                  <span 
+                    style={{ 
+                      fontSize: 9, 
+                      padding: '1px 5px', 
+                      borderRadius: 4, 
+                      fontWeight: 600,
+                      background: isRunning ? 'rgba(59, 130, 246, 0.15)' : isCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: statusColor
+                    }}
+                  >
+                    {statusText}
+                  </span>
+                </div>
+                <div 
+                  style={{ 
+                    fontSize: 11, 
+                    color: 'var(--text-muted)', 
+                    fontFamily: 'var(--font-mono)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    marginTop: 2
+                  }}
+                  title={task.command}
+                >
+                  $ {task.command}
+                </div>
+              </div>
+
+              {/* 呼吸灯特效 */}
+              {isRunning && (
+                <span className="pulse-indicator" style={{
+                  width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', marginRight: 4
+                }} />
+              )}
+
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                {isExpanded ? 'Collapse ▲' : 'Logs ▶'}
+              </span>
+            </div>
+
+            {/* 折叠的内容，也就是终端模拟器 */}
+            {isExpanded && (
+              <div 
+                style={{
+                  borderTop: '1px solid var(--border)',
+                  background: '#0c0f12',
+                  padding: 12,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: '#4af626', // 经典黑客绿
+                  maxHeight: 300,
+                  overflowY: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all'
+                }}
+              >
+                <div>
+                  <div style={{ color: '#888', borderBottom: '1px dashed #333', paddingBottom: 4, marginBottom: 8, userSelect: 'none' }}>
+                    [Process started at {new Date(task.startedAt).toLocaleTimeString()}]
+                    {task.completedAt && ` [Finished at ${new Date(task.completedAt).toLocaleTimeString()}]`}
+                  </div>
+                  {task.output || 'No outputs recorded yet...'}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

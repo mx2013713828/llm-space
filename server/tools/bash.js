@@ -4,7 +4,8 @@ export default {
   name: 'bash',
   description: 'Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.',
   parameters: {
-    command: { type: 'string', description: 'The bash command to execute', required: true }
+    command: { type: 'string', description: 'The bash command to execute', required: true },
+    run_in_background: { type: 'boolean', description: 'Whether to run the command in the background without waiting for it to finish. Useful for long-running processes like npm install, python scripts, server starts.', required: false }
   },
   /**
    * 执行逻辑支持流式回调

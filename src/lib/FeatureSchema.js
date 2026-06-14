@@ -59,6 +59,13 @@ export const FEATURE_SCHEMA = {
     defaultValue: true,
     failSafeValue: true,
     children: {
+      enable_background_tasks: {
+        type: 'boolean',
+        label: 'Enable Background Task Runner',
+        description: 'Enable non-blocking asynchronous task execution for slow operations. Provides real-time task notifications and white-box task monitoring in the UI.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
       mode: {
         type: 'select',
         label: 'Dashboard Operating Mode',

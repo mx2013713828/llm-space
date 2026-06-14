@@ -48,6 +48,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
 
   const lastHarnessIdRef = useRef(harness?.id);
+  const isFirstMountRef = useRef(true);
 
   // 监听 harness 的变化，实时同步最新配置，同时利用 isPromptDirty 状态进行数据防覆盖守卫
   useEffect(() => {
@@ -67,6 +68,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       if (isSwitching) {
         setSystemPrompt(harness.systemPrompt || '');
         setIsPromptDirty(false);
+        isFirstMountRef.current = true;
       } else if (!isPromptDirty && harness.systemPrompt !== undefined) {
         setSystemPrompt(harness.systemPrompt);
       }
@@ -137,9 +139,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     const harness = harnessRef.current;
     if (!harness) return;
 
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+
     const hasChanges = 
-      maxTokens !== harness.model?.max_tokens ||
-      temperature !== harness.model?.temperature;
+      Number(maxTokens) !== Number(harness.model?.max_tokens) ||
+      Number(temperature) !== Number(harness.model?.temperature);
 
     if (!hasChanges) return;
 
@@ -227,8 +234,10 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       <TrajectoryView
         activeRightTab={activeRightTab}
         setActiveRightTab={setActiveRightTab}
+        harness={harness}
         messages={agentState.messages}
         todos={agentState.todos}
+        backgroundTasks={agentState.backgroundTasks}
         turns={agentState.turns}
         isRunning={agentState.isRunning}
         currentTokens={agentState.currentTokens}

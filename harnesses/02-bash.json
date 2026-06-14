@@ -125,7 +125,8 @@
       "hard_compact": true
     },
     "task_manager": {
-      "enabled": false,
+      "enabled": true,
+      "enable_background_tasks": true,
       "mode": "todo"
     },
     "enable_skills": {
