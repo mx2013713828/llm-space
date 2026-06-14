@@ -33,7 +33,8 @@ dist-ssr
 __pycache__/
 *.cpython-310.pyc
 server/sessions/*
-docs/superpowers/*
+!docs/superpowers/*
+!docs/memory/*
 harnesses/*
 !harnesses/01-chat-bot.json
 !harnesses/02-bash.json
