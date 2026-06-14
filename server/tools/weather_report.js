@@ -7,8 +7,14 @@ export default {
   execute: async ({ city }) => {
     try {
       // 1. Get coordinates of the city (using Open-Meteo free geocoding API)
-      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en`);
-      const geoData = await geoRes.json();
+      let geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en`);
+      let geoData = await geoRes.json();
+      
+      // Fallback to language=zh if no results are found in English mode (to support Chinese inputs like "北京")
+      if (!geoData.results || geoData.results.length === 0) {
+        geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh`);
+        geoData = await geoRes.json();
+      }
       
       if (!geoData.results || geoData.results.length === 0) {
         return `Could not find coordinates for city "${city}". Please check the spelling.`;
