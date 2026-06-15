@@ -520,7 +520,7 @@ export class AgentExecutor {
                 if (isAlreadyRunning) {
                   tool.toolOutput = `[Duplicate Command Rejected] The command "${tool.toolInput.command}" is already running in the background. Please wait for its completion notification or use query_background_tasks.`;
                   tool.handled = true;
-                  continue;
+                  return;
                 }
 
                 const bgId = `bg_${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 10)}`;
