@@ -981,23 +981,46 @@ export class AgentExecutor {
 
     const child = spawn('bash', ['-c', bgTask.command], { env });
     
-    // 5-minute timeout protection
+    let lastOutputTime = Date.now();
+
+    // 5-minute hard timeout protection
     const timeoutHandle = setTimeout(() => {
+      clearInterval(stallCheckInterval);
       bgTask.output += '\n[TIMEOUT] Task exceeded 5 minutes timeout limit. Process killed.';
       child.kill('SIGKILL');
     }, 5 * 60 * 1000);
 
+    // 45-second Stall Watchdog
+    const stallCheckInterval = setInterval(() => {
+      if (Date.now() - lastOutputTime > 45000) {
+        clearInterval(stallCheckInterval);
+        clearTimeout(timeoutHandle);
+        
+        const lastChars = bgTask.output.trim().slice(-100).toLowerCase();
+        const isPrompt = /\[y\/n\]|\(y\/n\)|password:|please select:|choose:|continue\?/i.test(lastChars);
+        
+        bgTask.output += '\n[STALL WATCHDOG] Process killed due to 45 seconds of inactivity.';
+        if (isPrompt) {
+          bgTask.output += ' Detected possible interactive prompt. You MUST retry with non-interactive flags (e.g., -y).';
+        }
+        child.kill('SIGKILL');
+      }
+    }, 5000);
+
     child.stdout.on('data', (data) => {
+      lastOutputTime = Date.now();
       bgTask.output += data.toString();
       this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
     });
 
     child.stderr.on('data', (data) => {
+      lastOutputTime = Date.now();
       bgTask.output += data.toString();
       this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
     });
 
     child.on('close', (code) => {
+      clearInterval(stallCheckInterval);
       clearTimeout(timeoutHandle);
       bgTask.status = code === 0 ? 'completed' : (code === null ? 'failed (timeout)' : 'failed');
       bgTask.exitCode = code;
@@ -1016,6 +1039,7 @@ export class AgentExecutor {
     });
 
     child.on('error', (err) => {
+      clearInterval(stallCheckInterval);
       clearTimeout(timeoutHandle);
       bgTask.status = 'failed';
       bgTask.output += `\n[LAUNCH ERROR] ${err.message}`;
