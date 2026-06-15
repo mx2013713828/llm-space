@@ -11,6 +11,7 @@ import listTasks from './list_tasks.js';
 import getTask from './get_task.js';
 import claimTask from './claim_task.js';
 import completeTask from './complete_task.js';
+import queryBackgroundTasks from './query_background_tasks.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -32,6 +33,7 @@ class ToolRegistry {
       get_task: getTask,
       claim_task: claimTask,
       complete_task: completeTask,
+      query_background_tasks: queryBackgroundTasks,
     };
   }
 

@@ -500,9 +500,29 @@ export class AgentExecutor {
 
             if (!tool.handled) {
               const isBgEnabled = this.features.task_manager?.enabled !== false && this.features.task_manager?.enable_background_tasks === true;
+              if (tool.toolName === 'query_background_tasks') {
+                const activeTasks = this.backgroundTasks.map(t => ({
+                  id: t.id,
+                  command: t.command,
+                  status: t.status,
+                  duration: t.startedAt ? Math.round((new Date() - new Date(t.startedAt)) / 1000) + 's' : 'unknown',
+                  outputPreview: t.output ? t.output.slice(-500) : ''
+                }));
+                tool.toolOutput = JSON.stringify(activeTasks.length > 0 ? activeTasks : { message: "No active or history background tasks." }, null, 2);
+                tool.handled = true;
+              }
+
               const shouldBg = tool.toolName === 'bash' && (tool.toolInput?.run_in_background || this._isSlowCommand(tool.toolInput?.command));
 
               if (isBgEnabled && shouldBg) {
+                // Deduplication logic
+                const isAlreadyRunning = this.backgroundTasks.some(t => t.command === tool.toolInput.command && t.status === 'running');
+                if (isAlreadyRunning) {
+                  tool.toolOutput = `[Duplicate Command Rejected] The command "${tool.toolInput.command}" is already running in the background. Please wait for its completion notification or use query_background_tasks.`;
+                  tool.handled = true;
+                  continue;
+                }
+
                 const bgId = `bg_${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 10)}`;
                 const bgTask = {
                   id: bgId,
@@ -518,7 +538,7 @@ export class AgentExecutor {
                 
                 this._runBackgroundTask(bgTask);
 
-                tool.toolOutput = `[Background task ${bgId} started] Result will be available when complete.`;
+                tool.toolOutput = `[Background task ${bgId} started] Result will be available when complete. Do not run this command again while it is running. You can proceed with other tasks or wait for the <task_notification> message, or use query_background_tasks to check its status.`;
                 tool.handled = true;
               } else {
                 try {
@@ -594,6 +614,11 @@ export class AgentExecutor {
 
       // 提取目前启用的工具清单并生成后端统一定义的 Schema
       const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
+      if (this.features.task_manager?.enable_background_tasks) {
+        if (!enabledToolNames.includes('query_background_tasks')) {
+          enabledToolNames.push('query_background_tasks');
+        }
+      }
       const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
 
       // 使用 alignRequestPayload 进行对齐 and 重排
@@ -955,6 +980,12 @@ export class AgentExecutor {
     };
 
     const child = spawn('bash', ['-c', bgTask.command], { env });
+    
+    // 5-minute timeout protection
+    const timeoutHandle = setTimeout(() => {
+      bgTask.output += '\n[TIMEOUT] Task exceeded 5 minutes timeout limit. Process killed.';
+      child.kill('SIGKILL');
+    }, 5 * 60 * 1000);
 
     child.stdout.on('data', (data) => {
       bgTask.output += data.toString();
@@ -967,7 +998,8 @@ export class AgentExecutor {
     });
 
     child.on('close', (code) => {
-      bgTask.status = code === 0 ? 'completed' : 'failed';
+      clearTimeout(timeoutHandle);
+      bgTask.status = code === 0 ? 'completed' : (code === null ? 'failed (timeout)' : 'failed');
       bgTask.exitCode = code;
       bgTask.completedAt = new Date().toISOString();
 
@@ -984,6 +1016,7 @@ export class AgentExecutor {
     });
 
     child.on('error', (err) => {
+      clearTimeout(timeoutHandle);
       bgTask.status = 'failed';
       bgTask.output += `\n[LAUNCH ERROR] ${err.message}`;
       bgTask.completedAt = new Date().toISOString();

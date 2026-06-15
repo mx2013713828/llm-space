@@ -161,8 +161,8 @@ export function TrajectoryView({
                                 <span style={{ fontSize: 13, flexShrink: 0 }}>{ok ? '✅' : '❌'}</span>
                                 <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, flexShrink: 0 }}>{n.taskId}</span>
                                 <span style={{ opacity: 0.5 }}>·</span>
-                                <span style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {n.command.length > 60 ? n.command.slice(0, 60) + '…' : n.command}
+                                <span style={{ opacity: 0.7, wordBreak: 'break-all', display: 'inline-block' }}>
+                                  {n.command}
                                 </span>
                               </div>
                             );
