@@ -477,6 +477,30 @@ export function PromptLabPage({ harness, onSave }) {
                     </label>
                   </div>
                 );
+              } else if (meta.type === 'select') {
+                const selectedValue = features[key] || meta.defaultValue;
+                return (
+                  <div key={key} className="card" style={{ padding: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                          {meta.description}
+                        </div>
+                      </div>
+                      <select
+                        value={selectedValue}
+                        onChange={(e) => handleFeatureChange(key, e.target.value)}
+                        className="model-select"
+                        style={{ width: '100%', fontSize: 13, padding: '6px 10px', height: 32, marginTop: 4 }}
+                      >
+                        {meta.options.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
               } else if (meta.type === 'group') {
                 const isParentEnabled = !!(features[key]?.enabled ?? features[key]);
                 const isExpanded = !!expandedGroups[key];
