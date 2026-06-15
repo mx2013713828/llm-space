@@ -136,6 +136,40 @@ export function TrajectoryView({
                 <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div className="turn-divider"><span className="turn-label">🔄 Step {turn}</span></div>
                   {msgs.map((msg, idx) => {
+                    // 后台任务完成通知：渲染为紧凑的 inline 状态标签，而非原始 XML 用户气泡
+                    if (msg.type === 'bg_notification') {
+                      const notifications = [];
+                      const regex = /<task_notification>\s*<task_id>([\s\S]*?)<\/task_id>\s*<status>([\s\S]*?)<\/status>\s*<command>([\s\S]*?)<\/command>\s*<summary>([\s\S]*?)<\/summary>\s*<\/task_notification>/g;
+                      let match;
+                      while ((match = regex.exec(msg.content)) !== null) {
+                        notifications.push({ taskId: match[1].trim(), status: match[2].trim(), command: match[3].trim() });
+                      }
+                      if (notifications.length === 0) return null;
+                      return (
+                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '4px 0' }}>
+                          {notifications.map((n, nIdx) => {
+                            const ok = n.status === 'completed';
+                            return (
+                              <div key={nIdx} style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                padding: '3px 10px', fontSize: 11, borderRadius: 12,
+                                background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                                border: `1px solid ${ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                                color: ok ? '#22c55e' : '#ef4444',
+                                maxWidth: '100%', overflow: 'hidden'
+                              }}>
+                                <span style={{ fontSize: 13, flexShrink: 0 }}>{ok ? '✅' : '❌'}</span>
+                                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, flexShrink: 0 }}>{n.taskId}</span>
+                                <span style={{ opacity: 0.5 }}>·</span>
+                                <span style={{ opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {n.command.length > 60 ? n.command.slice(0, 60) + '…' : n.command}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
                     if (msg.role === 'user') return (
                       <UserMessage 
                         key={idx} 

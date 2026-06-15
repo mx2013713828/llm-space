@@ -376,18 +376,14 @@ export class AgentExecutor {
             });
           }
 
-          // 2. 持久化，追加到 messages 历史中
-          const lastMsg = this.messages[this.messages.length - 1];
-          if (lastMsg && lastMsg.role === 'user') {
-            lastMsg.content = `${notificationsText}\n\n${lastMsg.content}`;
-          } else {
-            this.messages.push({
-              role: 'user',
-              type: 'text',
-              turn: turnIndex,
-              content: notificationsText
-            });
-          }
+          // 2. 持久化，追加到 messages 历史中（标记为 bg_notification，前端据此做差异化渲染，
+          //    不再与普通 user 消息合并，避免裸露 XML 污染对话流）
+          this.messages.push({
+            role: 'user',
+            type: 'bg_notification',
+            turn: turnIndex,
+            content: notificationsText
+          });
 
           // 3. 广播更新事件
           this.onEvent('messages_update', { messages: this.messages });
