@@ -91,10 +91,7 @@ export const SecurityPlugin = {
   async preToolUse(context) {
     const { executor, tool } = context;
 
-    // 如果没有启用安全策略，直接跳过
-    if (executor.features.enable_security !== true) {
-      return;
-    }
+    const securityMode = executor.features.security_mode || 'relaxed';
 
     const toolName = tool.toolName;
     const toolInput = tool.toolInput || {};
@@ -104,7 +101,7 @@ export const SecurityPlugin = {
       const command = toolInput.command || '';
       const cmdTrimmed = command.trim();
 
-      // A. 检测黑名单硬拒绝模式
+      // A. 检测黑名单硬拒绝模式 (所有模式下均生效，防自杀)
       for (const pattern of DENY_LIST) {
         if (command.includes(pattern)) {
           console.warn(`⛔ [Security Blocked] 命中了黑名单硬拒绝模式: "${pattern}"`);
@@ -134,16 +131,39 @@ export const SecurityPlugin = {
       }
     }
 
+    // 如果安全模式为 full (Level 0)，越过人工审批直接放行
+    if (securityMode === 'full') {
+      return;
+    }
+
     // 2. 闸门二：敏感规则扫描，判断是否需要人工审批
     let matchedReason = null;
-    for (const rule of SUSPICIOUS_RULES) {
-      if (rule.tools.includes(toolName) && rule.check(toolInput)) {
-        matchedReason = rule.message;
-        break;
+
+    if (securityMode === 'strict') {
+      // 严格模式 (Level 2: Fail-Closed 白名单)
+      if (toolName === 'bash') {
+        const command = toolInput.command || '';
+        const cmdTrimmed = command.trim();
+        // 白名单：只有纯粹的读取和状态查看命令直接放行
+        const isSafeRead = /^\s*(ls|pwd|echo|git\s+status|git\s+diff|git\s+log|file)\b/.test(cmdTrimmed) && !cmdTrimmed.includes('>');
+        if (!isSafeRead) {
+          matchedReason = '严格安全模式 (Fail-Closed)：拦截到非纯粹读取性质的 Bash 命令，需要人工确认其副作用。';
+        }
+      } else if (['write_file', 'replace_file_content', 'multi_replace_file_content', 'run_command'].includes(toolName)) {
+        // 所有修改性质的专属工具均要求审批
+        matchedReason = `严格安全模式 (Fail-Closed)：拦截到修改工作区状态的高危工具 [${toolName}]，需要人工确认。`;
+      }
+    } else {
+      // 宽松模式 (Level 1: Relaxed 灰名单)
+      for (const rule of SUSPICIOUS_RULES) {
+        if (rule.tools.includes(toolName) && rule.check(toolInput)) {
+          matchedReason = rule.message;
+          break;
+        }
       }
     }
 
-    // 如果未命中规则，直接放行
+    // 如果未命中规则（比如纯安全的读取），直接放行
     if (!matchedReason) {
       return;
     }

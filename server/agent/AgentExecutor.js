@@ -110,10 +110,8 @@ export class AgentExecutor {
     // 初始化 Hook 管理器并按需挂载插件
     this.hooks = new HookManager();
     
-    // 如果启用了安全防护机制，挂载 SecurityPlugin
-    if (this.features.enable_security === true) {
-      this.hooks.register(SecurityPlugin);
-    }
+    // 挂载安全性审查拦截插件
+    this.hooks.register(SecurityPlugin);
     
     // Skills 插件默认开启（它内部会判断 this.features.enable_skills）
     this.hooks.register(SkillsPlugin);

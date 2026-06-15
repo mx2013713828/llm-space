@@ -1,10 +1,15 @@
 export const FEATURE_SCHEMA = {
-  enable_security: {
-    type: 'boolean',
-    label: 'Security Shield & Approval Gate',
-    description: 'Intercept high-risk commands and unauthorized file write operations, and prompt for approval via a frontend modal.',
-    defaultValue: false,
-    failSafeValue: true, // 安全关键特性：解析损坏或异常时，默认 Fail-Closed 强行拦截防护
+  security_mode: {
+    type: 'select',
+    label: 'Security Shield Level',
+    description: 'Choose the strictness of the security sandbox and manual review gate.',
+    defaultValue: 'relaxed',
+    failSafeValue: 'strict',
+    options: [
+      { value: 'full', label: 'Level 0: Full Access (No manual review)' },
+      { value: 'relaxed', label: 'Level 1: Relaxed (Blacklist & High-Risk Interception)' },
+      { value: 'strict', label: 'Level 2: Strict (Fail-Closed Whitelist)' }
+    ]
   },
   context_compaction: {
     type: 'group',
