@@ -127,6 +127,8 @@ export function PromptLabPage({ harness, onSave }) {
       
       if (meta.type === 'boolean') {
         updated[key] = val;
+      } else if (meta.type === 'select') {
+        updated[key] = val;
       } else if (meta.type === 'group') {
         updated[key] = {
           enabled: val,
