@@ -161,6 +161,8 @@ export function useAgentLoop({
       const decoder = new TextDecoder();
       let buffer = '';
       let lastInputTokens = 0;
+      // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
+      let currentTurn = messages.length > 0 ? Math.max(...messages.map(m => m.turn || 1)) : 1;
 
       // 辅助更新消息轨：支持 parentToolCallId 的多层嵌套更新
       const updateMessages = (parentToolCallId, updater) => {
@@ -201,7 +203,7 @@ export function useAgentLoop({
                 {
                   role: 'system',
                   type: 'system_alert',
-                  turn: evt.turn || 999,
+                  turn: evt.turn || currentTurn,
                   content: evt.message
                 }
               ]);
@@ -236,6 +238,8 @@ export function useAgentLoop({
               break;
 
             case 'thinking_start':
+              // 更新轮次追踪器，确保后续错误消息归属到正确的 Step
+              if (evt.turn) currentTurn = evt.turn;
               updateMessages(evt.parentToolCallId, (list) => [
                 ...list,
                 {
@@ -402,7 +406,7 @@ export function useAgentLoop({
                 {
                   role: 'assistant',
                   type: 'text',
-                  turn: 999,
+                  turn: currentTurn,
                   content: evt.suggestion 
                     ? `❌ **Request Error**: ${evt.message}\n\n💡 **Troubleshooting & Debugging Suggestions**:\n${evt.suggestion}`
                     : `❌ **Request Error**: ${evt.message}`
@@ -419,7 +423,7 @@ export function useAgentLoop({
         {
           role: 'assistant',
           type: 'text',
-          turn: 999,
+          turn: currentTurn,
           content: `❌ **Network or Runtime Exception**\n\n${err.message}`
         }
       ]);
