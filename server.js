@@ -433,7 +433,22 @@ app.post('/api/harnesses', async (req, res) => {
 app.post('/api/harnesses/:id', async (req, res) => {
   try {
     const data = req.body;
-    const filename = `${req.params.id}.json`;
+    let filename = `${req.params.id}.json`;
+
+    // 查找是否已经存在该 ID 对应的文件，避免生成多余的同 ID 文件
+    const files = await fs.readdir(HARNESS_DIR);
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
+      try {
+        const parsed = JSON.parse(content);
+        if (parsed.id === req.params.id) {
+          filename = file;
+          break;
+        }
+      } catch (e) {}
+    }
+
     const targetPath = path.join(HARNESS_DIR, filename);
     await fs.writeFile(targetPath, JSON.stringify(data, null, 2), 'utf-8');
     res.json({ success: true });
