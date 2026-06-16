@@ -68,7 +68,7 @@
   "systemPrompt": "You are a professional software engineer assistant. Please help the user design, implement, and verify their complex development requests. Utilize the tools and systems provided to you to structure your workflow.",
   "skills": [],
   "features": {
-    "enable_security": false,
+    "security_mode": "relaxed",
     "context_compaction": {
       "enabled": true,
       "thinking_compaction": true,
