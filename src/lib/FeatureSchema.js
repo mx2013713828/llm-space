@@ -233,6 +233,8 @@ export function parseFeatures(inputFeatures) {
 
       if (meta.type === 'boolean') {
         parsed[key] = userVal !== undefined ? !!userVal : meta.defaultValue;
+      } else if (meta.type === 'select') {
+        parsed[key] = userVal !== undefined ? userVal : meta.defaultValue;
       } else if (meta.type === 'group') {
         parsed[key] = {};
         const isGroupEnabled = typeof userVal === 'boolean'
@@ -268,6 +270,8 @@ export function parseFeatures(inputFeatures) {
     const failSafeData = {};
     for (const [key, meta] of Object.entries(FEATURE_SCHEMA)) {
       if (meta.type === 'boolean') {
+        failSafeData[key] = meta.failSafeValue;
+      } else if (meta.type === 'select') {
         failSafeData[key] = meta.failSafeValue;
       } else if (meta.type === 'group') {
         failSafeData[key] = { enabled: meta.failSafeValue };
