@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
+import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js';
 
 export function TrajectoryView({
   activeRightTab,
@@ -12,6 +13,7 @@ export function TrajectoryView({
   turns,
   isRunning,
   currentTokens,
+  selectedModel,
   cacheStats,
   inputText,
   textareaRef,
@@ -27,7 +29,8 @@ export function TrajectoryView({
   pendingPermission,
   handlePermissionDecision
 }) {
-  const maxTokens = 200000;
+  const contextWindow = getModelContextWindow(selectedModel);
+  const maxTokens = contextWindow.value;
   const tokenPercent = Math.min(100, (currentTokens / maxTokens) * 100);
   let tokenColorClass = "token-info-current-normal";
   let progressFillClass = "progress-fill-glow";
@@ -43,10 +46,11 @@ export function TrajectoryView({
   // 缓存命中显示模式：false=百分比，true=详细数值
   const [showCacheDetail, setShowCacheDetail] = useState(false);
 
-  const totalCacheTokens = cacheStats.hitTokens + cacheStats.missTokens;
+  const totalCacheTokens = cacheStats.hitTokens + cacheStats.missTokens + (cacheStats.writeTokens || 0);
   const hitPercent = totalCacheTokens > 0
     ? Math.round(cacheStats.hitTokens / totalCacheTokens * 100)
     : 0;
+  const providerLabel = cacheStats.provider || '';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
@@ -98,9 +102,15 @@ export function TrajectoryView({
                   <span style={{ color: 'var(--green)' }}>Hit {cacheStats.hitTokens.toLocaleString()}</span>
                   <span style={{ color: 'var(--text-muted)', fontWeight: 300 }}>/</span>
                   <span style={{ color: 'var(--text-muted)' }}>Miss {cacheStats.missTokens.toLocaleString()}</span>
+                  {cacheStats.supportsWriteTokens && (
+                    <>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 300 }}>/</span>
+                      <span style={{ color: 'var(--orange)' }}>Write {(cacheStats.writeTokens || 0).toLocaleString()}</span>
+                    </>
+                  )}
                 </>
               ) : (
-                <span>{hitPercent}% Hit</span>
+                <span>{hitPercent}% Hit{providerLabel ? ` · ${providerLabel}` : ''}</span>
               )}
             </span>
           )}
@@ -210,10 +220,19 @@ export function TrajectoryView({
               )}
               <div ref={chatEndRef} style={{ height: 10 }} />
             </div>
-            {/* 底部 Token 页脚 */}
+            {/* 底部 Context 页脚 */}
             <div className="token-dashboard">
-              <div className="token-info-text">
-                Tokens: <span className={tokenColorClass}>{currentTokens.toLocaleString()}</span> / {maxTokens.toLocaleString()}
+              <div className="token-info-text" style={{ minWidth: 190, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}>
+                  Context Used
+                </span>
+                <span className={tokenColorClass} style={{ fontFamily: 'var(--font-mono)', fontWeight: 800 }}>
+                  {formatTokenCount(currentTokens)}
+                </span>
+                <span style={{ color: 'var(--text-muted)' }}>/</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                  {formatTokenCount(maxTokens)}{contextWindow.estimated ? ' est.' : ''}
+                </span>
               </div>
               <div className="progress-bar-wide">
                 <div 
@@ -221,7 +240,7 @@ export function TrajectoryView({
                   style={{ width: `${tokenPercent}%` }}
                 />
               </div>
-              <div className="token-info-text" style={{ width: '40px', textAlign: 'right' }}>
+              <div className="token-info-text" style={{ width: '52px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                 {tokenPercent.toFixed(1)}%
               </div>
             </div>

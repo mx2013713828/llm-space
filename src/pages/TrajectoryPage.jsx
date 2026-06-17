@@ -241,6 +241,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         turns={agentState.turns}
         isRunning={agentState.isRunning}
         currentTokens={agentState.currentTokens}
+        selectedModel={selectedModel}
         cacheStats={agentState.cacheStats}
         contextTokens={agentState.contextTokens}
         inputText={agentState.inputText}

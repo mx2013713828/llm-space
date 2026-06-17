@@ -17,6 +17,7 @@ import { toolRegistry } from './server/tools/ToolRegistry.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from './server/agent/messageBuilder.js';
 import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
+import { normalizeUsageMetrics } from './server/agent/usageNormalizer.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -208,14 +209,25 @@ app.post('/api/chat', async (req, res) => {
         try { evt = JSON.parse(raw); } catch { continue; }
 
         switch (evt.type) {
-          case 'message_start':
+          case 'message_start': {
+            const usageMetrics = normalizeUsageMetrics(evt.message?.usage || {}, {
+              baseUrl,
+              modelId: model,
+            });
             sendEvent(res, 'message_start', {
               model: evt.message?.model,
-              inputTokens: evt.message?.usage?.input_tokens,
-              cacheReadTokens: evt.message?.usage?.cache_read_input_tokens ?? 0,
-              cacheCreationTokens: evt.message?.usage?.cache_creation_input_tokens ?? 0,
+              inputTokens: usageMetrics.inputTokens,
+              totalInputTokens: usageMetrics.totalInputTokens,
+              cacheReadTokens: usageMetrics.cacheHitTokens,
+              cacheCreationTokens: usageMetrics.cacheWriteTokens,
+              cacheHitTokens: usageMetrics.cacheHitTokens,
+              cacheMissTokens: usageMetrics.cacheMissTokens,
+              cacheWriteTokens: usageMetrics.cacheWriteTokens,
+              cacheSupportsWriteTokens: usageMetrics.cacheSupportsWriteTokens,
+              cacheProvider: usageMetrics.cacheProvider,
             });
             break;
+          }
 
           case 'content_block_start': {
             const blk = evt.content_block;

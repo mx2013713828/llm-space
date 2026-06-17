@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { estimateTokens } from '../lib/messageBuilder.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
+import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -34,7 +35,7 @@ export function useAgentLoop({
   const [todos, setTodos] = useState([]);
   const [backgroundTasks, setBackgroundTasks] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [cacheStats, setCacheStats] = useState({ hitTokens: 0, missTokens: 0 });
+  const [cacheStats, setCacheStats] = useState(() => createCacheStats());
   const [contextTokens, setContextTokens] = useState(0);
   const [pendingPermission, setPendingPermission] = useState(null);
 
@@ -116,6 +117,9 @@ export function useAgentLoop({
 
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
   const runAgentLoop = async (currentMessages, currentTodos = todos) => {
+    // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
+    let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
+
     try {
       const res = await fetch('http://localhost:3001/api/agent/run', {
         method: 'POST',
@@ -161,8 +165,6 @@ export function useAgentLoop({
       const decoder = new TextDecoder();
       let buffer = '';
       let lastInputTokens = 0;
-      // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
-      let currentTurn = messages.length > 0 ? Math.max(...messages.map(m => m.turn || 1)) : 1;
 
       // 辅助更新消息轨：支持 parentToolCallId 的多层嵌套更新
       const updateMessages = (parentToolCallId, updater) => {
@@ -230,11 +232,12 @@ export function useAgentLoop({
 
             case 'message_start':
               lastInputTokens = evt.inputTokens || 0;
-              setContextTokens((evt.inputTokens || 0) + (evt.cacheReadTokens || 0));
-              setCacheStats(prev => ({
-                hitTokens: prev.hitTokens + (evt.cacheReadTokens || 0),
-                missTokens: prev.missTokens + (evt.inputTokens || 0),
-              }));
+              setContextTokens(evt.totalInputTokens ?? (
+                (evt.inputTokens || 0) +
+                (evt.cacheReadTokens || 0) +
+                (evt.cacheCreationTokens || 0)
+              ));
+              setCacheStats(prev => accumulateCacheStats(prev, evt));
               break;
 
             case 'thinking_start':
@@ -499,7 +502,7 @@ export function useAgentLoop({
       setTodos([]);
       setPendingPermission(null);
       setContextTokens(0);
-      setCacheStats({ hitTokens: 0, missTokens: 0 }); // 修复：重置缓存统计，避免旧数据残留到新 session
+      setCacheStats(createCacheStats()); // 修复：重置缓存统计，避免旧数据残留到新 session
       if (onSessionReset) onSessionReset();
     }
   };

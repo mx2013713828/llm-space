@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
 
 /**
  * useModels — 模型管理 Hook
@@ -10,7 +11,13 @@ export function useModels() {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
   const [showAddModel, setShowAddModel] = useState(false);
-  const [newModelConfig, setNewModelConfig] = useState({ name: '', modelId: '', url: '', key: '' });
+  const [newModelConfig, setNewModelConfig] = useState({
+    name: '',
+    modelId: '',
+    url: '',
+    key: '',
+    contextWindow: DEFAULT_CONTEXT_WINDOW
+  });
 
   // 初始化：从后端加载模型列表
   useEffect(() => {
@@ -50,7 +57,13 @@ export function useModels() {
     setModels(updated);
     setSelectedModel(updated[updated.length - 1]);
     setShowAddModel(false);
-    setNewModelConfig({ name: '', modelId: '', url: '', key: '' });
+    setNewModelConfig({
+      name: '',
+      modelId: '',
+      url: '',
+      key: '',
+      contextWindow: DEFAULT_CONTEXT_WINDOW
+    });
   };
 
   return {

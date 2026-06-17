@@ -15,6 +15,7 @@ import { SecurityPlugin } from './plugins/SecurityPlugin.js';
 import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
+import { normalizeUsageMetrics } from './usageNormalizer.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -799,18 +800,42 @@ export class AgentExecutor {
         try { evt = JSON.parse(raw); } catch { continue; }
 
         switch (evt.type) {
-          case 'message_start':
-            if (evt.message?.usage?.input_tokens) {
-              this._lastInputTokens = evt.message.usage.input_tokens;
-              this.contextTokens = (evt.message.usage.input_tokens || 0) + (evt.message.usage.cache_read_input_tokens || 0);
+          case 'message_start': {
+            if (evt.message?.usage) {
+              const usageMetrics = normalizeUsageMetrics(evt.message.usage, {
+                baseUrl: this.model.url,
+                modelId: this.model.modelId || this.model.name,
+              });
+              this._lastInputTokens = usageMetrics.inputTokens;
+              this.contextTokens = usageMetrics.totalInputTokens;
+              this.onEvent('message_start', {
+                model: evt.message?.model,
+                inputTokens: usageMetrics.inputTokens,
+                totalInputTokens: usageMetrics.totalInputTokens,
+                cacheReadTokens: usageMetrics.cacheHitTokens,
+                cacheCreationTokens: usageMetrics.cacheWriteTokens,
+                cacheHitTokens: usageMetrics.cacheHitTokens,
+                cacheMissTokens: usageMetrics.cacheMissTokens,
+                cacheWriteTokens: usageMetrics.cacheWriteTokens,
+                cacheSupportsWriteTokens: usageMetrics.cacheSupportsWriteTokens,
+                cacheProvider: usageMetrics.cacheProvider,
+              });
+            } else {
+              this.onEvent('message_start', {
+                model: evt.message?.model,
+                inputTokens: 0,
+                totalInputTokens: 0,
+                cacheReadTokens: 0,
+                cacheCreationTokens: 0,
+                cacheHitTokens: 0,
+                cacheMissTokens: 0,
+                cacheWriteTokens: 0,
+                cacheSupportsWriteTokens: false,
+                cacheProvider: 'generic',
+              });
             }
-            this.onEvent('message_start', {
-              model: evt.message?.model,
-              inputTokens: evt.message?.usage?.input_tokens,
-              cacheReadTokens: evt.message?.usage?.cache_read_input_tokens ?? 0,
-              cacheCreationTokens: evt.message?.usage?.cache_creation_input_tokens ?? 0,
-            });
             break;
+          }
 
           case 'content_block_start': {
             const blk = evt.content_block;

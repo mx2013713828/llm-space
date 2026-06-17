@@ -908,21 +908,24 @@
 }
 .running-dots { display: flex; gap: 3px; }
 
-/* Token 进度条增强 */
+/* Context usage status */
 .token-dashboard {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: rgba(11, 14, 23, 0.6);
-  border-top: 1px solid var(--border);
-  backdrop-filter: blur(8px);
+  gap: 10px;
+  padding: 9px 16px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(11, 14, 23, 0.92));
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
 }
 
 .token-info-text {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .token-info-text span {
@@ -943,21 +946,23 @@
 
 .progress-bar-wide {
   flex: 1;
-  height: 10px;
-  background: #0b0e17;
+  height: 8px;
+  background: rgba(2, 6, 23, 0.72);
   border-radius: 99px;
-  border: 1px solid var(--border-light);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   overflow: hidden;
   position: relative;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .progress-fill-glow {
   height: 100%;
   border-radius: 99px;
   transition: width 0.6s var(--ease-smooth);
-  background: linear-gradient(90deg, #3b82f6 0%, #a855f7 50%, #ec4899 100%);
+  background: linear-gradient(90deg, #14b8a6 0%, #3b82f6 58%, #8b5cf6 100%);
   background-size: 200% 100%;
   animation: tokenShimmer 4s linear infinite;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
 }
 
 .progress-fill-warning {
@@ -1040,7 +1045,6 @@
 .animate-spin-fast {
   animation: spin 0.8s linear infinite;
 }
-
 
 
 

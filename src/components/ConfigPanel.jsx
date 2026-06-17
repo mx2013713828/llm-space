@@ -50,6 +50,16 @@ export function ConfigPanel({
               <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Display Name (e.g. Local DeepSeek)" value={newModelConfig.name} onChange={e => setNewModelConfig({ ...newModelConfig, name: e.target.value })} />
               <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (e.g. deepseek-chat)" value={newModelConfig.modelId} onChange={e => setNewModelConfig({ ...newModelConfig, modelId: e.target.value })} />
               <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (e.g. https://api.deepseek.com/v1)" value={newModelConfig.url} onChange={e => setNewModelConfig({ ...newModelConfig, url: e.target.value })} />
+              <input
+                className="input"
+                type="number"
+                min="1"
+                step="1000"
+                style={{ fontSize: 11, padding: '6px 8px' }}
+                placeholder="Context Window (e.g. 128000)"
+                value={newModelConfig.contextWindow}
+                onChange={e => setNewModelConfig({ ...newModelConfig, contextWindow: parseInt(e.target.value, 10) || '' })}
+              />
               <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={newModelConfig.key} onChange={e => setNewModelConfig({ ...newModelConfig, key: e.target.value })} />
               <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                 <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={handleAddModel}>Save</button>
