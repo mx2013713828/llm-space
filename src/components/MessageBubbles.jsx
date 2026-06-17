@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MarkdownRenderer } from './MarkdownRenderer.jsx';
 
 /**
  * Thinking 气泡组件
@@ -190,9 +191,7 @@ export function AssistantMessage({ content }) {
         <span>Assistant</span>
         <span className="badge badge-green" style={{ fontSize: 10 }}>Final Answer</span>
       </div>
-      <div style={{ color: 'var(--text-secondary)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
-        {content}
-      </div>
+      <MarkdownRenderer content={content} />
     </div>
   );
 }
