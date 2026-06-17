@@ -15,6 +15,7 @@ import { SecurityPlugin } from './plugins/SecurityPlugin.js';
 import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
+import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
 
 
@@ -93,6 +94,12 @@ export class AgentExecutor {
       this.tools.push('write_todos');
     }
 
+    if (this.features.enable_cron_scheduler === true) {
+      ['schedule_cron', 'list_crons', 'cancel_cron'].forEach(tName => {
+        if (!this.tools.includes(tName)) this.tools.push(tName);
+      });
+    }
+
     this.model = model;
     this.temperature = temperature;
     this.maxTokens = maxTokens;
@@ -132,6 +139,7 @@ export class AgentExecutor {
     if (this.features.enable_memory?.enabled) {
       this.hooks.register(MemoryPlugin);
     }
+    this.hooks.register(CronSchedulerPlugin);
     this.hooks.register(SubAgentPlugin);
 
   }

@@ -160,6 +160,13 @@ When facing complex development tasks, you must use the task dependency system t
       },
     },
   },
+  enable_cron_scheduler: {
+    type: 'boolean',
+    label: 'Cron Scheduler',
+    description: 'Allow the agent to create, list, and cancel in-process scheduled tasks for the current harness.',
+    defaultValue: false,
+    failSafeValue: false,
+  },
   error_recovery: {
     type: 'group',
     label: 'Self-Healing & Disaster Recovery',
