@@ -1,14 +1,21 @@
 
 
+import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
+
 export function ConfigPanel({
   models,
   selectedModel,
   setSelectedModel,
   showAddModel,
   setShowAddModel,
+  showEditModel,
+  setShowEditModel,
   newModelConfig,
   setNewModelConfig,
+  editModelConfig,
+  setEditModelConfig,
   handleAddModel,
+  handleUpdateModel,
   
   temperature,
   setTemperature,
@@ -22,6 +29,25 @@ export function ConfigPanel({
   onPromptChange,
   onSavePrompt
 }) {
+  const renderModelFields = (modelConfig, setModelConfig) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Display Name (e.g. Local DeepSeek)" value={modelConfig.name} onChange={e => setModelConfig({ ...modelConfig, name: e.target.value })} />
+      <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (e.g. deepseek-chat)" value={modelConfig.modelId} onChange={e => setModelConfig({ ...modelConfig, modelId: e.target.value })} />
+      <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (e.g. https://api.deepseek.com/anthropic)" value={modelConfig.url} onChange={e => setModelConfig({ ...modelConfig, url: e.target.value })} />
+      <input
+        className="input"
+        type="number"
+        min="1"
+        step="1000"
+        style={{ fontSize: 11, padding: '6px 8px' }}
+        placeholder="Context Window (e.g. 128000)"
+        value={modelConfig.contextWindow}
+        onChange={e => setModelConfig({ ...modelConfig, contextWindow: parseInt(e.target.value, 10) || '' })}
+      />
+      <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={modelConfig.key} onChange={e => setModelConfig({ ...modelConfig, key: e.target.value })} />
+    </div>
+  );
+
   return (
     <div className="config-panel" style={{ width: 340, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -37,7 +63,10 @@ export function ConfigPanel({
           <button
             className="btn btn-ghost"
             style={{ padding: '2px 8px', fontSize: 11 }}
-            onClick={() => setShowAddModel(!showAddModel)}
+            onClick={() => {
+              setShowAddModel(!showAddModel);
+              if (!showAddModel) setShowEditModel(false);
+            }}
           >
             + Add Model
           </button>
@@ -46,25 +75,10 @@ export function ConfigPanel({
         {showAddModel && (
           <div style={{ marginBottom: 16, padding: 12, background: 'var(--bg-base)', borderRadius: 6, border: '1px dashed var(--border)' }}>
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Add Model Config (Saved to .env)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Display Name (e.g. Local DeepSeek)" value={newModelConfig.name} onChange={e => setNewModelConfig({ ...newModelConfig, name: e.target.value })} />
-              <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (e.g. deepseek-chat)" value={newModelConfig.modelId} onChange={e => setNewModelConfig({ ...newModelConfig, modelId: e.target.value })} />
-              <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (e.g. https://api.deepseek.com/v1)" value={newModelConfig.url} onChange={e => setNewModelConfig({ ...newModelConfig, url: e.target.value })} />
-              <input
-                className="input"
-                type="number"
-                min="1"
-                step="1000"
-                style={{ fontSize: 11, padding: '6px 8px' }}
-                placeholder="Context Window (e.g. 128000)"
-                value={newModelConfig.contextWindow}
-                onChange={e => setNewModelConfig({ ...newModelConfig, contextWindow: parseInt(e.target.value, 10) || '' })}
-              />
-              <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={newModelConfig.key} onChange={e => setNewModelConfig({ ...newModelConfig, key: e.target.value })} />
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={handleAddModel}>Save</button>
-                <button className="btn btn-ghost" style={{ flex: 1, padding: '4px' }} onClick={() => setShowAddModel(false)}>Cancel</button>
-              </div>
+            {renderModelFields(newModelConfig, setNewModelConfig)}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={handleAddModel}>Save</button>
+              <button className="btn btn-ghost" style={{ flex: 1, padding: '4px' }} onClick={() => setShowAddModel(false)}>Cancel</button>
             </div>
           </div>
         )}
@@ -72,7 +86,8 @@ export function ConfigPanel({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2 }}>LLM Model</div>
-            <div className="model-select-wrapper">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div className="model-select-wrapper" style={{ flex: 1 }}>
               <select
                 className="model-select"
                 value={selectedModel?.id || ''}
@@ -84,8 +99,36 @@ export function ConfigPanel({
                 {models.length === 0 && <option value="">No models available, please add one</option>}
                 {models.map(m => <option key={m.id} value={m.id}>{m.name} ({m.modelId})</option>)}
               </select>
+              </div>
+              <button
+                className="btn btn-ghost"
+                disabled={!selectedModel}
+                style={{ padding: '0 10px', fontSize: 11, height: 32 }}
+                onClick={() => {
+                  setShowEditModel(!showEditModel);
+                  setShowAddModel(false);
+                  if (selectedModel) {
+                    setEditModelConfig({
+                      ...selectedModel,
+                      contextWindow: selectedModel.contextWindow || DEFAULT_CONTEXT_WINDOW
+                    });
+                  }
+                }}
+              >
+                Edit
+              </button>
             </div>
           </div>
+          {showEditModel && editModelConfig && (
+            <div style={{ marginTop: 10, padding: 12, background: 'var(--bg-base)', borderRadius: 6, border: '1px dashed var(--border)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Edit Model Config (Saved to .env)</div>
+              {renderModelFields(editModelConfig, setEditModelConfig)}
+              <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                <button className="btn btn-primary" style={{ flex: 1, padding: '4px' }} onClick={handleUpdateModel}>Save Changes</button>
+                <button className="btn btn-ghost" style={{ flex: 1, padding: '4px' }} onClick={() => setShowEditModel(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -107,7 +150,7 @@ export function ConfigPanel({
           <span className="param-value">{temperature}</span>
         </div>
         <div className="param-row">
-          <span className="param-label">Max Tokens (Opt)</span>
+          <span className="param-label">Output Tokens</span>
           <input type="range" className="param-slider" min="1024" max="32000" step="1024" value={maxTokens} onChange={e => setMaxTokens(parseInt(e.target.value))} />
           <span className="param-value" style={{ width: 44 }}>{maxTokens}</span>
         </div>

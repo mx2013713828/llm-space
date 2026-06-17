@@ -11,6 +11,8 @@ export function useModels() {
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState(null);
   const [showAddModel, setShowAddModel] = useState(false);
+  const [showEditModel, setShowEditModel] = useState(false);
+  const [editModelConfig, setEditModelConfig] = useState(null);
   const [newModelConfig, setNewModelConfig] = useState({
     name: '',
     modelId: '',
@@ -66,14 +68,42 @@ export function useModels() {
     });
   };
 
+  const handleUpdateModel = async () => {
+    if (!editModelConfig?.id || !editModelConfig.name || !editModelConfig.modelId || !editModelConfig.url || !editModelConfig.key) {
+      alert('Please fill in all model information.');
+      return;
+    }
+
+    const res = await fetch(`http://localhost:3001/api/models/${editModelConfig.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editModelConfig)
+    });
+    const updated = await res.json();
+    if (!res.ok) {
+      alert(updated.error || 'Failed to update model.');
+      return;
+    }
+
+    setModels(updated);
+    const nextSelected = updated.find(m => m.id === editModelConfig.id) || updated[0] || null;
+    setSelectedModel(nextSelected);
+    setShowEditModel(false);
+  };
+
   return {
     models,
     selectedModel,
     setSelectedModel,
     showAddModel,
     setShowAddModel,
+    showEditModel,
+    setShowEditModel,
     newModelConfig,
     setNewModelConfig,
+    editModelConfig,
+    setEditModelConfig,
     handleAddModel,
+    handleUpdateModel,
   };
 }

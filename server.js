@@ -18,17 +18,23 @@ import { AgentExecutor } from './server/agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from './server/agent/messageBuilder.js';
 import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
 import { normalizeUsageMetrics } from './server/agent/usageNormalizer.js';
+import { parseModelsConfig, upsertModelsConfig } from './server/modelConfig.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
 try {
   const envContent = await fs.readFile(dotEnvPath, 'utf-8');
+  const modelsConfig = parseModelsConfig(envContent);
+  if (modelsConfig.length > 0 && !process.env.MODELS_CONFIG) {
+    process.env.MODELS_CONFIG = JSON.stringify(modelsConfig);
+  }
   for (const line of envContent.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     const eqIdx = trimmed.indexOf('=');
     if (eqIdx === -1) continue;
     const key = trimmed.slice(0, eqIdx).trim();
+    if (key === 'MODELS_CONFIG') continue;
     const value = trimmed.slice(eqIdx + 1).trim();
     if (!process.env[key]) process.env[key] = value;
   }
@@ -929,10 +935,11 @@ app.get('/api/health', (_, res) => res.json({ status: 'ok', version: '1.0.0' }))
  */
 app.get('/api/models', async (req, res) => {
   try {
-    if (process.env.MODELS_CONFIG) {
-      return res.json(JSON.parse(process.env.MODELS_CONFIG));
-    }
-    return res.json([]);
+    const envPath = path.join(process.cwd(), '.env');
+    const envStr = await fs.readFile(envPath, 'utf-8').catch(() => '');
+    const models = parseModelsConfig(envStr);
+    process.env.MODELS_CONFIG = JSON.stringify(models);
+    return res.json(models);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -947,27 +954,47 @@ app.post('/api/models', async (req, res) => {
     const newModel = req.body; // { name, url, key, modelId }
     const envPath = path.join(process.cwd(), '.env');
     let envStr = await fs.readFile(envPath, 'utf-8').catch(() => '');
-    let models = [];
-
-    const match = envStr.match(/^MODELS_CONFIG=(.+)$/m);
-    if (match) {
-      models = JSON.parse(match[1]);
-    }
+    const models = parseModelsConfig(envStr);
 
     // 如果没有 id，生成一个
     if (!newModel.id) newModel.id = Date.now().toString();
 
     models.push(newModel);
-    const updatedLine = `MODELS_CONFIG=${JSON.stringify(models)}`;
-
-    if (match) {
-      envStr = envStr.replace(/^MODELS_CONFIG=.*$/m, updatedLine);
-    } else {
-      envStr += (envStr.endsWith('\n') ? '' : '\n') + updatedLine + '\n';
-    }
+    envStr = upsertModelsConfig(envStr, models);
 
     await fs.writeFile(envPath, envStr, 'utf-8');
     process.env.MODELS_CONFIG = JSON.stringify(models);  // 同步更新内存
+    res.json(models);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * PUT /api/models/:id
+ * 更新已有模型配置并写入 .env
+ */
+app.put('/api/models/:id', async (req, res) => {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    let envStr = await fs.readFile(envPath, 'utf-8').catch(() => '');
+    const models = parseModelsConfig(envStr);
+    const idx = models.findIndex(m => String(m.id) === String(req.params.id));
+
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+
+    const updatedModel = {
+      ...models[idx],
+      ...req.body,
+      id: models[idx].id,
+    };
+    models[idx] = updatedModel;
+    envStr = upsertModelsConfig(envStr, models);
+
+    await fs.writeFile(envPath, envStr, 'utf-8');
+    process.env.MODELS_CONFIG = JSON.stringify(models);
     res.json(models);
   } catch (e) {
     res.status(500).json({ error: e.message });

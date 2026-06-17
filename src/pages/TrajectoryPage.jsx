@@ -15,9 +15,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     setSelectedModel,
     showAddModel,
     setShowAddModel,
+    showEditModel,
+    setShowEditModel,
     newModelConfig,
     setNewModelConfig,
-    handleAddModel
+    editModelConfig,
+    setEditModelConfig,
+    handleAddModel,
+    handleUpdateModel
   } = useModels();
 
   // 2. 本地配置状态
@@ -213,9 +218,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         setSelectedModel={setSelectedModel}
         showAddModel={showAddModel}
         setShowAddModel={setShowAddModel}
+        showEditModel={showEditModel}
+        setShowEditModel={setShowEditModel}
         newModelConfig={newModelConfig}
         setNewModelConfig={setNewModelConfig}
+        editModelConfig={editModelConfig}
+        setEditModelConfig={setEditModelConfig}
         handleAddModel={handleAddModel}
+        handleUpdateModel={handleUpdateModel}
         
         temperature={temperature}
         setTemperature={setTemperature}
