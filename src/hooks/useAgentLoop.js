@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { estimateTokens } from '../lib/messageBuilder.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
+import { shouldSubmitMessage } from '../lib/chatInput.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -40,6 +41,7 @@ export function useAgentLoop({
   const [pendingPermission, setPendingPermission] = useState(null);
 
   const textareaRef = useRef(null);
+  const isComposingRef = useRef(false);
   const [inputText, setInputText] = useState('');
 
   // Track last reported content to avoid triggering onSessionUpdate unnecessarily
@@ -492,7 +494,18 @@ export function useAgentLoop({
 
   /** 处理按键事件 */
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (shouldSubmitMessage(e, isComposingRef.current)) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    isComposingRef.current = false;
   };
 
   /** 重置 Session */
@@ -567,6 +580,8 @@ export function useAgentLoop({
     textareaRef,
     handleInputChange,
     handleKeyDown,
+    handleCompositionStart,
+    handleCompositionEnd,
     handleSend,
 
     // Session 管理

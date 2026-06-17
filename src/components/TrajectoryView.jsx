@@ -19,6 +19,8 @@ export function TrajectoryView({
   textareaRef,
   handleInputChange,
   handleKeyDown,
+  handleCompositionStart,
+  handleCompositionEnd,
   handleSend,
   chatEndRef,
   scrollContainerRef,
@@ -270,6 +272,8 @@ export function TrajectoryView({
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             rows={1}
             disabled={isRunning}
           />
