@@ -21,3 +21,16 @@ test('keeps raw html as text content', () => {
     { type: 'paragraph', text: '<img src=x onerror=alert(1)>' },
   ]);
 });
+
+test('parses simple pipe tables', () => {
+  assert.deepEqual(parseMarkdownBlocks('| Name | Value |\n| --- | --- |\n| model | deepseek-v4 |\n| cache | hit |'), [
+    {
+      type: 'table',
+      headers: ['Name', 'Value'],
+      rows: [
+        ['model', 'deepseek-v4'],
+        ['cache', 'hit'],
+      ],
+    },
+  ]);
+});

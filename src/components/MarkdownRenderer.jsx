@@ -64,6 +64,30 @@ export function MarkdownRenderer({ content }) {
             </ListTag>
           );
         }
+        if (block.type === 'table') {
+          return (
+            <div key={index} className="markdown-table-wrap">
+              <table className="markdown-table">
+                <thead>
+                  <tr>
+                    {block.headers.map((header, headerIndex) => (
+                      <th key={headerIndex}>{renderInline(header)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {row.map((cell, cellIndex) => (
+                        <td key={cellIndex}>{renderInline(cell)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
         return <p key={index}>{renderInline(block.text)}</p>;
       })}
     </div>

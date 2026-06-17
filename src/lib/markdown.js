@@ -3,6 +3,23 @@ export function parseMarkdownBlocks(markdown = '') {
   const blocks = [];
   let index = 0;
 
+  const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+  const isTableSeparator = (line) => {
+    if (!isTableRow(line)) return false;
+    return line
+      .trim()
+      .slice(1, -1)
+      .split('|')
+      .every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+  };
+  const parseTableRow = (line) => (
+    line
+      .trim()
+      .slice(1, -1)
+      .split('|')
+      .map((cell) => cell.trim())
+  );
+
   const pushParagraph = (paragraphLines) => {
     const text = paragraphLines.join('\n').trim();
     if (text) blocks.push({ type: 'paragraph', text });
@@ -35,6 +52,23 @@ export function parseMarkdownBlocks(markdown = '') {
       continue;
     }
 
+    if (
+      isTableRow(line) &&
+      index + 1 < lines.length &&
+      isTableSeparator(lines[index + 1])
+    ) {
+      const headers = parseTableRow(line);
+      const rows = [];
+      index += 2;
+      while (index < lines.length && isTableRow(lines[index])) {
+        const row = parseTableRow(lines[index]);
+        rows.push(headers.map((_, cellIndex) => row[cellIndex] || ''));
+        index++;
+      }
+      blocks.push({ type: 'table', headers, rows });
+      continue;
+    }
+
     if (/^\s*[-*]\s+/.test(line)) {
       const items = [];
       while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
@@ -61,6 +95,11 @@ export function parseMarkdownBlocks(markdown = '') {
       lines[index].trim() &&
       !/^```/.test(lines[index]) &&
       !/^(#{1,3})\s+/.test(lines[index]) &&
+      !(
+        isTableRow(lines[index]) &&
+        index + 1 < lines.length &&
+        isTableSeparator(lines[index + 1])
+      ) &&
       !/^\s*[-*]\s+/.test(lines[index]) &&
       !/^\s*\d+\.\s+/.test(lines[index])
     ) {
