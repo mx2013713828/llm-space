@@ -422,6 +422,7 @@
   color: #c4b5fd;
   line-height: 1.7;
   font-style: italic;
+  white-space: pre-wrap;
   overflow: hidden;
   transition: max-height 0.3s var(--ease-smooth);
 }

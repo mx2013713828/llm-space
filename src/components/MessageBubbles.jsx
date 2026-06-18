@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
+import { getThinkingDisplayContent } from '../lib/messagePresentation.js';
 
 /**
  * Thinking 气泡组件
@@ -34,7 +35,7 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
 
       {!collapsed && (
         <div className="thinking-content animate-fade-in">
-          {folded ? '[Thinking folded]' : content}
+          {getThinkingDisplayContent(content, folded)}
           {tokens && (
             <div className="thinking-tokens">
               <div className="thinking-token-item">
