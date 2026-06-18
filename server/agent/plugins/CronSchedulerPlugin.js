@@ -33,6 +33,7 @@ export function createCronSchedulerPlugin(scheduler = cronScheduler) {
             recurring: args.recurring !== false,
             durable: args.durable !== false,
             modelRef: executor?.model?.id || null,
+            thinkingEnabled: executor?.thinkingEnabled === true,
             executionMode: 'main'
           });
           tool.toolOutput = `[系统] 已创建定时任务 ${job.id}\ncron: ${job.cron}\nprompt: ${job.prompt}`;

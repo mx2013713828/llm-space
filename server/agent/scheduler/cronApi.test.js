@@ -36,7 +36,7 @@ test('returns 400 when creating a job with an invalid cron expression', async ()
     async scheduleJob() {
       throw new Error('minute value must be between 0 and 59');
     }
-  });
+  }, { harnessExists: async () => true });
   const res = createResponse();
 
   await handlers.create({
@@ -46,4 +46,23 @@ test('returns 400 when creating a job with an invalid cron expression', async ()
 
   assert.equal(res.statusCode, 400);
   assert.match(res.body.error, /minute/);
+});
+
+test('returns 404 instead of creating a job for a missing harness', async () => {
+  let scheduled = false;
+  const handlers = createCronApiHandlers({
+    async scheduleJob() {
+      scheduled = true;
+    }
+  }, { harnessExists: async () => false });
+  const res = createResponse();
+
+  await handlers.create({
+    params: { harnessId: 'missing' },
+    body: { cron: '* * * * *', prompt: 'check build' }
+  }, res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(scheduled, false);
+  assert.match(res.body.error, /Harness not found/);
 });

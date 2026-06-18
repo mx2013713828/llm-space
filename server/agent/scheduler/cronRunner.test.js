@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processScheduledEvents } from './cronRunner.js';
+import { processScheduledEvents, runScheduledEvent } from './cronRunner.js';
 
 test('requeues scheduled events while the target harness is active', async () => {
   const requeued = [];
@@ -66,4 +66,72 @@ test('runs scheduled events when the target harness is idle', async () => {
 
   assert.equal(ranEvents.length, 1);
   assert.equal(ranEvents[0].id, 'evt_1');
+});
+
+test('reserves a harness before awaiting scheduled event startup', async () => {
+  const event = {
+    id: 'evt_1',
+    jobId: 'cron_1',
+    harnessId: '01-chat-bot',
+    prompt: 'check build'
+  };
+  const requeued = [];
+  let drains = 0;
+  const scheduler = {
+    drainDueEvents() {
+      drains += 1;
+      return drains <= 2 ? [{ ...event, id: `evt_${drains}` }] : [];
+    },
+    requeueDueEvents(events) {
+      requeued.push(...events);
+    }
+  };
+  const activeJobs = new Map();
+  let releaseFirst;
+  const firstRun = new Promise(resolve => {
+    releaseFirst = resolve;
+  });
+  let runCount = 0;
+  const runEvent = async () => {
+    runCount += 1;
+    await firstRun;
+  };
+
+  const firstProcessor = processScheduledEvents({ scheduler, activeJobs, runEvent });
+  await Promise.resolve();
+  await processScheduledEvents({ scheduler, activeJobs, runEvent });
+
+  assert.equal(runCount, 1);
+  assert.equal(requeued.length, 1);
+  releaseFirst();
+  await firstProcessor;
+  assert.equal(activeJobs.size, 0);
+});
+
+test('passes the scheduled thinking setting to the executor', async () => {
+  let executorOptions;
+  class FakeExecutor {
+    constructor(options) {
+      executorOptions = options;
+    }
+
+    async run() {}
+  }
+
+  await runScheduledEvent({
+    id: 'evt_1',
+    jobId: 'cron_1',
+    harnessId: '01-chat-bot',
+    prompt: 'check build',
+    modelRef: 'deepseek',
+    thinkingEnabled: true
+  }, {
+    activeJobs: new Map(),
+    loadHarness: async () => ({ id: '01-chat-bot' }),
+    loadSession: async () => ({ messages: [] }),
+    resolveModel: async () => ({ id: 'deepseek' }),
+    ExecutorClass: FakeExecutor
+  });
+
+  assert.equal(executorOptions.thinkingEnabled, true);
 });

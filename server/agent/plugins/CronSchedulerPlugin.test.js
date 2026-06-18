@@ -27,7 +27,7 @@ test('intercepts schedule_cron and scopes the job to the current harness', async
   };
 
   await plugin.preToolUse({
-    executor: { harnessId: '01-chat-bot', model: { id: 'deepseek' } },
+    executor: { harnessId: '01-chat-bot', model: { id: 'deepseek' }, thinkingEnabled: true },
     tool
   });
 
@@ -40,6 +40,7 @@ test('intercepts schedule_cron and scopes the job to the current harness', async
     recurring: true,
     durable: false,
     modelRef: 'deepseek',
+    thinkingEnabled: true,
     executionMode: 'main'
   }]);
 });

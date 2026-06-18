@@ -371,7 +371,9 @@ function broadcastEvent(harnessId, type, data) {
 await cronScheduler.loadDurableJobs();
 cronScheduler.start();
 startCronQueueProcessor({ scheduler: cronScheduler, activeJobs, broadcastEvent });
-const cronApi = createCronApiHandlers(cronScheduler);
+const cronApi = createCronApiHandlers(cronScheduler, {
+  harnessExists: async (harnessId) => Boolean(await findSafeHarnessPath(harnessId))
+});
 
 app.get('/api/harnesses/:harnessId/cron-jobs', cronApi.list);
 app.post('/api/harnesses/:harnessId/cron-jobs', cronApi.create);

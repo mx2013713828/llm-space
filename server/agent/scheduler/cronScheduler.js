@@ -1,5 +1,5 @@
 import { cronMatches, validateCron } from './cronExpression.js';
-import { deleteJob, loadJobs, saveJobs, upsertJob } from './cronStore.js';
+import { loadJobs, saveJobs } from './cronStore.js';
 
 function makeId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -25,6 +25,7 @@ function normalizeJob(input, now) {
     enabled: input.enabled !== false,
     executionMode: input.executionMode || 'main',
     modelRef: input.modelRef || null,
+    thinkingEnabled: input.thinkingEnabled === true,
     createdAt: input.createdAt || now.toISOString(),
     lastFiredAt: input.lastFiredAt || null
   };
@@ -38,10 +39,13 @@ export function createCronScheduler(options = {}) {
   const lastFiredMarkers = new Map();
   const queuedJobIds = new Set();
   let timer = null;
+  let persistenceQueue = Promise.resolve();
 
-  const persistDurableJobs = async () => {
+  const queuePersistence = () => {
     const durableJobs = [...jobs.values()].filter(job => job.durable);
-    await saveJobs(durableJobs, storePath);
+    const write = () => saveJobs(durableJobs, storePath);
+    persistenceQueue = persistenceQueue.then(write, write);
+    return persistenceQueue;
   };
 
   const scheduler = {
@@ -64,7 +68,7 @@ export function createCronScheduler(options = {}) {
       const job = normalizeJob(input, now());
       jobs.set(job.id, job);
       if (job.durable) {
-        await upsertJob(job, storePath);
+        await queuePersistence();
       }
       return job;
     },
@@ -83,7 +87,7 @@ export function createCronScheduler(options = {}) {
         if (dueEvents[index].jobId === jobId) dueEvents.splice(index, 1);
       }
       if (job.durable) {
-        await deleteJob(jobId, storePath);
+        await queuePersistence();
       }
       return true;
     },
@@ -91,6 +95,7 @@ export function createCronScheduler(options = {}) {
     tick() {
       const currentDate = now();
       const marker = minuteMarker(currentDate);
+      let durableStateChanged = false;
 
       for (const job of [...jobs.values()]) {
         try {
@@ -99,6 +104,7 @@ export function createCronScheduler(options = {}) {
 
           const firedAt = currentDate.toISOString();
           job.lastFiredAt = firedAt;
+          durableStateChanged ||= job.durable;
           lastFiredMarkers.set(job.id, marker);
           queuedJobIds.add(job.id);
           dueEvents.push({
@@ -108,7 +114,8 @@ export function createCronScheduler(options = {}) {
             prompt: job.prompt,
             executionMode: job.executionMode,
             firedAt,
-            modelRef: job.modelRef
+            modelRef: job.modelRef,
+            thinkingEnabled: job.thinkingEnabled
           });
 
           if (!job.recurring) {
@@ -117,6 +124,9 @@ export function createCronScheduler(options = {}) {
         } catch (err) {
           console.error(`[cron scheduler] failed to tick job ${job.id}:`, err);
         }
+      }
+      if (durableStateChanged) {
+        queuePersistence().catch(err => console.error('[cron scheduler] persist failed:', err));
       }
     },
 
@@ -137,14 +147,13 @@ export function createCronScheduler(options = {}) {
     },
 
     async persist() {
-      await persistDurableJobs();
+      await queuePersistence();
     },
 
     start(intervalMs = 1000) {
       if (timer) return;
       timer = setInterval(() => {
         this.tick();
-        this.persist().catch(err => console.error('[cron scheduler] persist failed:', err));
       }, intervalMs);
       timer.unref?.();
     },

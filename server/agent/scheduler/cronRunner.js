@@ -40,11 +40,15 @@ export async function runScheduledEvent(event, {
   broadcastEvent = () => {},
   harnessDir,
   sessionsDir,
+  loadHarness: loadHarnessFn = loadHarness,
+  loadSession: loadSessionFn = loadSession,
+  resolveModel = resolveModelConfig,
+  reservation,
   ExecutorClass = AgentExecutor,
 } = {}) {
-  const harness = await loadHarness(event.harnessId, harnessDir);
-  const session = await loadSession(event.harnessId, sessionsDir);
-  const model = await resolveModelConfig(event.modelRef);
+  const harness = await loadHarnessFn(event.harnessId, harnessDir);
+  const session = await loadSessionFn(event.harnessId, sessionsDir);
+  const model = await resolveModel(event.modelRef);
   const messages = Array.isArray(session.messages) ? [...session.messages] : [];
   const turn = nextTurn(messages);
 
@@ -68,23 +72,26 @@ export async function runScheduledEvent(event, {
     model,
     temperature: harness.model?.temperature ?? 1,
     maxTokens: harness.model?.max_tokens ?? 8192,
-    thinkingEnabled: !!harness.model?.thinking,
+    thinkingEnabled: event.thinkingEnabled === true,
     skills: harness.skills || [],
     onEvent: (type, data) => broadcastEvent(event.harnessId, type, data)
   });
 
-  activeJobs?.set(event.harnessId, { executor, clients: new Set() });
+  const executionJob = { executor, clients: reservation?.clients || new Set(), source: 'cron' };
+  activeJobs?.set(event.harnessId, executionJob);
   try {
     await executor.run();
   } finally {
-    activeJobs?.delete(event.harnessId);
+    if (activeJobs?.get(event.harnessId) === executionJob) {
+      activeJobs.delete(event.harnessId);
+    }
   }
 }
 
 export async function processScheduledEvents({
   scheduler,
   activeJobs,
-  runEvent = (event) => runScheduledEvent(event, { activeJobs }),
+  runEvent = (event, reservation) => runScheduledEvent(event, { activeJobs, reservation }),
   limit = 1,
 } = {}) {
   const events = scheduler.drainDueEvents(limit);
@@ -93,7 +100,15 @@ export async function processScheduledEvents({
       scheduler.requeueDueEvents([event]);
       continue;
     }
-    await runEvent(event);
+    const reservation = { executor: null, clients: new Set(), source: 'cron-reservation' };
+    activeJobs?.set(event.harnessId, reservation);
+    try {
+      await runEvent(event, reservation);
+    } finally {
+      if (activeJobs?.get(event.harnessId) === reservation) {
+        activeJobs.delete(event.harnessId);
+      }
+    }
   }
 }
 
@@ -107,7 +122,11 @@ export function startCronQueueProcessor({
     processScheduledEvents({
       scheduler,
       activeJobs,
-      runEvent: (event) => runScheduledEvent(event, { activeJobs, broadcastEvent })
+      runEvent: (event, reservation) => runScheduledEvent(event, {
+        activeJobs,
+        broadcastEvent,
+        reservation
+      })
     }).catch(err => console.error('[cron runner] failed to process scheduled event:', err));
   }, intervalMs);
   timer.unref?.();
