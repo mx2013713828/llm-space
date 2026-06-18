@@ -4,6 +4,19 @@ import { compactMessages, buildApiMessages } from '../messageBuilder.js';
 import { COMPACT_PROMPT } from '../compactPrompt.js';
 import { HARD_COMPACT_TOKEN_THRESHOLD } from '../AgentExecutor.js';
 
+export function foldThinkingForDisplay(executor) {
+  if (!executor.features?.context_compaction?.thinking_compaction) return false;
+  let changed = false;
+  for (const message of executor.messages) {
+    if (message.type === 'thinking' && !message.folded) {
+      message.folded = true;
+      changed = true;
+    }
+  }
+  if (changed) executor.onEvent('messages_update', { messages: executor.messages });
+  return changed;
+}
+
 export const CompactionPlugin = {
   name: 'CompactionPlugin',
 
@@ -60,5 +73,13 @@ export const CompactionPlugin = {
         console.error('[CompactionPlugin] Failed to perform Hard-Compact:', compactErr);
       }
     }
+  },
+
+  async postToolUse({ executor }) {
+    foldThinkingForDisplay(executor);
+  },
+
+  async onLoopEnd({ executor }) {
+    foldThinkingForDisplay(executor);
   }
 };

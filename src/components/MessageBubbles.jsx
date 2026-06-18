@@ -5,7 +5,7 @@ import { MarkdownRenderer } from './MarkdownRenderer.jsx';
  * Thinking 气泡组件
  * 展示 agent 的内部思考过程，支持折叠/展开
  */
-export function ThinkingBubble({ content, tokens, duration, isCollapsed: defaultCollapsed = true }) {
+export function ThinkingBubble({ content, tokens, duration, folded = false, isCollapsed: defaultCollapsed = true }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   return (
@@ -34,7 +34,7 @@ export function ThinkingBubble({ content, tokens, duration, isCollapsed: default
 
       {!collapsed && (
         <div className="thinking-content animate-fade-in">
-          {content}
+          {folded ? '[Thinking folded]' : content}
           {tokens && (
             <div className="thinking-tokens">
               <div className="thinking-token-item">
