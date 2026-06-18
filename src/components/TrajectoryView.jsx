@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
+import { ScheduledTasksPanel } from './ScheduledTasksPanel';
 import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js';
 import { getUserMessagePresentation } from '../lib/messagePresentation.js';
 
@@ -69,6 +70,10 @@ export function TrajectoryView({
           harness?.features?.task_manager?.enable_background_tasks && {
             key: 'background_tasks',
             label: `⚙️ Background Tasks${backgroundTasks && backgroundTasks.length > 0 ? ` (${backgroundTasks.filter(t => t.status === 'running').length}/${backgroundTasks.length})` : ''}`
+          },
+          harness?.features?.enable_cron_scheduler && {
+            key: 'scheduled',
+            label: 'Scheduled'
           }
         ].filter(Boolean).map(tab => (
           <button key={tab.key}
@@ -265,6 +270,12 @@ export function TrajectoryView({
         {activeRightTab === 'background_tasks' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
             <BackgroundTasksPanel backgroundTasks={backgroundTasks} />
+          </div>
+        )}
+
+        {activeRightTab === 'scheduled' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+            <ScheduledTasksPanel key={harness?.id} harnessId={harness?.id} />
           </div>
         )}
       </div>
