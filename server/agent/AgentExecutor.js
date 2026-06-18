@@ -31,12 +31,6 @@ export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
 export const SOFT_COMPACT_TOKEN_THRESHOLD = 120000;
 export const HARD_COMPACT_TOKEN_THRESHOLD = 160000;
 
-function stripFoldedThinkingEcho(content) {
-  return String(content || '')
-    .replace(/^\[Thinking folded\]\s*(?:response)?\s*/i, '')
-    .trimStart();
-}
-
 /** Helper function: parse Markdown YAML frontmatter */
 
 /**
@@ -796,20 +790,7 @@ export class AgentExecutor {
 
     let currentBlockType = null;
     let currentMsg = null;
-    let lastRawThinkingContent = '';
     let stopReason = null;
-
-    const finalizeThinkingDisplay = () => {
-      if (currentMsg?.type !== 'thinking') return '';
-      const rawContent = currentMsg.content || '';
-      const visibleContent = stripFoldedThinkingEcho(rawContent);
-      lastRawThinkingContent = rawContent;
-      if (visibleContent !== rawContent) {
-        currentMsg.content = visibleContent;
-        this.onEvent('messages_update', { messages: this.messages });
-      }
-      return rawContent;
-    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -869,7 +850,6 @@ export class AgentExecutor {
             currentBlockType = blk.type;
 
             if (blk.type === 'thinking') {
-              lastRawThinkingContent = '';
               currentMsg = {
                 role: 'assistant',
                 type: 'thinking',
@@ -914,7 +894,6 @@ export class AgentExecutor {
             const delta = evt.delta;
             if (delta.type === 'thinking_delta') {
               if (currentMsg?.type !== 'thinking') {
-                lastRawThinkingContent = '';
                 currentMsg = {
                   role: 'assistant',
                   type: 'thinking',
@@ -932,14 +911,7 @@ export class AgentExecutor {
             } else if (delta.type === 'text_delta') {
               if (currentMsg?.type !== 'text') {
                 if (currentMsg?.type === 'thinking') {
-                  const thinkingMsg = currentMsg;
-                  finalizeThinkingDisplay();
                   this.onEvent('thinking_end', { text: currentMsg.content || '' });
-                  if (!thinkingMsg.content.trim()) {
-                    const thinkingIndex = this.messages.indexOf(thinkingMsg);
-                    if (thinkingIndex !== -1) this.messages.splice(thinkingIndex, 1);
-                    this.onEvent('messages_update', { messages: this.messages });
-                  }
                 }
                 currentMsg = isContinuation
                   ? this.messages.findLast(m => m.role === 'assistant' && m.type === 'text')
@@ -974,7 +946,6 @@ export class AgentExecutor {
 
           case 'content_block_stop':
             if (currentBlockType === 'thinking') {
-              finalizeThinkingDisplay();
               this.onEvent('thinking_end', { text: currentMsg?.content || '' });
             } else if (currentBlockType === 'text') {
               this.onEvent('text_end', { text: currentMsg?.content || '' });
@@ -986,11 +957,10 @@ export class AgentExecutor {
 
           case 'message_delta':
             if (evt.delta?.stop_reason === 'end_turn' && currentMsg?.type === 'thinking') {
-              const foldedResponse = /^\[Thinking folded\]\s*(?:response)?\s*([\s\S]+)$/i.exec(lastRawThinkingContent || currentMsg.content || '');
+              const foldedResponse = /^\[Thinking folded\]\s*(?:response)?\s*([\s\S]+)$/i.exec(currentMsg.content || '');
               const answer = foldedResponse?.[1]?.trim();
               if (answer) {
-                const thinkingIndex = this.messages.indexOf(currentMsg);
-                if (thinkingIndex !== -1) this.messages.splice(thinkingIndex, 1);
+                currentMsg.content = '[Thinking folded]';
                 currentMsg = {
                   role: 'assistant',
                   type: 'text',

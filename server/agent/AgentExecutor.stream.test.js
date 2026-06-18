@@ -75,6 +75,7 @@ test('recovers when a provider sends text_delta without starting a text block', 
   }, { continuation_tokens: [] });
 
   assert.deepEqual(executor.messages.map(({ type, content }) => ({ type, content })), [
+    { type: 'thinking', content: '[Thinking folded] response' },
     { type: 'text', content: 'Weather report.' }
   ]);
   assert.equal(emittedEvents.filter(type => type === 'text_start').length, 1);
@@ -107,40 +108,8 @@ test('promotes a folded-thinking response when the provider ends without text', 
   }, { continuation_tokens: [] });
 
   assert.deepEqual(executor.messages.map(({ type, content }) => ({ type, content })), [
+    { type: 'thinking', content: '[Thinking folded]' },
     { type: 'text', content: 'Weather report.' }
   ]);
   assert.equal(emittedEvents.includes('messages_update'), true);
-});
-
-test('hides folded markers while preserving visible thinking content', async (t) => {
-  const originalFetch = globalThis.fetch;
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
-  globalThis.fetch = async () => sseResponse([
-    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
-    { type: 'content_block_start', index: 0, content_block: { type: 'thinking', signature: '' } },
-    { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: '[Thinking folded]Getting fresh weather data.' } },
-    { type: 'content_block_stop', index: 0 },
-    { type: 'content_block_start', index: 1, content_block: { type: 'text' } },
-    { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: 'Weather report.' } },
-    { type: 'content_block_stop', index: 1 },
-    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 8 } }
-  ]);
-  const executor = new AgentExecutor({
-    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
-    thinkingEnabled: true
-  });
-
-  await executor._callLLM({
-    apiMessages: [{ role: 'user', content: 'weather' }],
-    turnIndex: 1,
-    systemPrompt: '',
-    tools: []
-  }, { continuation_tokens: [] });
-
-  assert.deepEqual(executor.messages.map(({ type, content }) => ({ type, content })), [
-    { type: 'thinking', content: 'Getting fresh weather data.' },
-    { type: 'text', content: 'Weather report.' }
-  ]);
 });
