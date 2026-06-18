@@ -956,6 +956,23 @@ export class AgentExecutor {
             break;
 
           case 'message_delta':
+            if (evt.delta?.stop_reason === 'end_turn' && currentMsg?.type === 'thinking') {
+              const foldedResponse = /^\[Thinking folded\]\s*(?:response)?\s*([\s\S]+)$/i.exec(currentMsg.content || '');
+              const answer = foldedResponse?.[1]?.trim();
+              if (answer) {
+                currentMsg.content = '[Thinking folded]';
+                currentMsg = {
+                  role: 'assistant',
+                  type: 'text',
+                  turn: turnIndex,
+                  content: answer,
+                  tokens: { input: this._lastInputTokens || 0, output: 0 }
+                };
+                currentBlockType = 'text';
+                this.messages.push(currentMsg);
+                this.onEvent('messages_update', { messages: this.messages });
+              }
+            }
             if (currentMsg && evt.usage?.output_tokens) {
               currentMsg.tokens = { ...currentMsg.tokens, output: evt.usage.output_tokens };
             }
