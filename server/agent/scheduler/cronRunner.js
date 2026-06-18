@@ -1,0 +1,115 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+import { AgentExecutor } from '../AgentExecutor.js';
+import { resolveModelConfig } from './modelResolver.js';
+
+const cwd = globalThis.process?.cwd?.() || '.';
+const DEFAULT_HARNESS_DIR = path.join(cwd, 'harnesses');
+const DEFAULT_SESSIONS_DIR = path.join(cwd, 'server', 'sessions');
+
+async function loadHarness(harnessId, harnessDir = DEFAULT_HARNESS_DIR) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+    throw new Error(`Invalid harnessId: ${harnessId}`);
+  }
+  const files = await fs.readdir(harnessDir);
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const content = await fs.readFile(path.join(harnessDir, file), 'utf-8');
+    const harness = JSON.parse(content);
+    if (harness.id === harnessId) return harness;
+  }
+  throw new Error(`Harness not found: ${harnessId}`);
+}
+
+async function loadSession(harnessId, sessionsDir = DEFAULT_SESSIONS_DIR) {
+  const sessionPath = path.join(sessionsDir, `${harnessId}.json`);
+  const content = await fs.readFile(sessionPath, 'utf-8').catch(err => {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  });
+  return content ? JSON.parse(content) : { messages: [], todos: [], backgroundTasks: [] };
+}
+
+function nextTurn(messages) {
+  const turns = messages.map(msg => Number(msg.turn) || 1);
+  return turns.length > 0 ? Math.max(...turns) + 1 : 1;
+}
+
+export async function runScheduledEvent(event, {
+  activeJobs,
+  broadcastEvent = () => {},
+  harnessDir,
+  sessionsDir,
+  ExecutorClass = AgentExecutor,
+} = {}) {
+  const harness = await loadHarness(event.harnessId, harnessDir);
+  const session = await loadSession(event.harnessId, sessionsDir);
+  const model = await resolveModelConfig(event.modelRef);
+  const messages = Array.isArray(session.messages) ? [...session.messages] : [];
+  const turn = nextTurn(messages);
+
+  messages.push({
+    role: 'user',
+    type: 'scheduled',
+    content: `[Scheduled] ${event.prompt}`,
+    scheduledEventId: event.id,
+    scheduledJobId: event.jobId,
+    turn
+  });
+
+  const executor = new ExecutorClass({
+    harnessId: event.harnessId,
+    messages,
+    todos: session.todos || [],
+    backgroundTasks: session.backgroundTasks || [],
+    systemPrompt: harness.systemPrompt || '',
+    tools: harness.tools || [],
+    features: harness.features || {},
+    model,
+    temperature: harness.model?.temperature ?? 1,
+    maxTokens: harness.model?.max_tokens ?? 8192,
+    thinkingEnabled: !!harness.model?.thinking,
+    skills: harness.skills || [],
+    onEvent: (type, data) => broadcastEvent(event.harnessId, type, data)
+  });
+
+  activeJobs?.set(event.harnessId, { executor, clients: new Set() });
+  try {
+    await executor.run();
+  } finally {
+    activeJobs?.delete(event.harnessId);
+  }
+}
+
+export async function processScheduledEvents({
+  scheduler,
+  activeJobs,
+  runEvent = (event) => runScheduledEvent(event, { activeJobs }),
+  limit = 1,
+} = {}) {
+  const events = scheduler.drainDueEvents(limit);
+  for (const event of events) {
+    if (activeJobs?.has(event.harnessId)) {
+      scheduler.requeueDueEvents([event]);
+      continue;
+    }
+    await runEvent(event);
+  }
+}
+
+export function startCronQueueProcessor({
+  scheduler,
+  activeJobs,
+  broadcastEvent,
+  intervalMs = 200,
+} = {}) {
+  const timer = setInterval(() => {
+    processScheduledEvents({
+      scheduler,
+      activeJobs,
+      runEvent: (event) => runScheduledEvent(event, { activeJobs, broadcastEvent })
+    }).catch(err => console.error('[cron runner] failed to process scheduled event:', err));
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}

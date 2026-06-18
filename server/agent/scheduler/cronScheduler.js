@@ -128,6 +128,14 @@ export function createCronScheduler(options = {}) {
       return drained;
     },
 
+    requeueDueEvents(events) {
+      const validEvents = Array.isArray(events) ? events.filter(Boolean) : [];
+      for (const event of validEvents) {
+        queuedJobIds.add(event.jobId);
+      }
+      dueEvents.unshift(...validEvents);
+    },
+
     async persist() {
       await persistDurableJobs();
     },

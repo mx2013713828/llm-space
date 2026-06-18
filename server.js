@@ -19,6 +19,8 @@ import { alignRequestPayload, buildApiMessages } from './server/agent/messageBui
 import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
 import { normalizeUsageMetrics } from './server/agent/usageNormalizer.js';
 import { parseModelsConfig, upsertModelsConfig } from './server/modelConfig.js';
+import { cronScheduler } from './server/agent/scheduler/cronScheduler.js';
+import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -364,6 +366,10 @@ function broadcastEvent(harnessId, type, data) {
     }
   }
 }
+
+await cronScheduler.loadDurableJobs();
+cronScheduler.start();
+startCronQueueProcessor({ scheduler: cronScheduler, activeJobs, broadcastEvent });
 
 /** 获取所有 Harness 文件列表 */
 app.get('/api/harnesses', async (req, res) => {

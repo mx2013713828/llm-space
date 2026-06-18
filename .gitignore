@@ -33,6 +33,7 @@ dist-ssr
 __pycache__/
 *.cpython-310.pyc
 server/sessions/*
+server/scheduler/*.json
 !docs/superpowers/*
 !docs/memory/*
 harnesses/*
