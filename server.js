@@ -21,6 +21,7 @@ import { normalizeUsageMetrics } from './server/agent/usageNormalizer.js';
 import { parseModelsConfig, upsertModelsConfig } from './server/modelConfig.js';
 import { cronScheduler } from './server/agent/scheduler/cronScheduler.js';
 import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js';
+import { createCronApiHandlers } from './server/agent/scheduler/cronApi.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -370,6 +371,11 @@ function broadcastEvent(harnessId, type, data) {
 await cronScheduler.loadDurableJobs();
 cronScheduler.start();
 startCronQueueProcessor({ scheduler: cronScheduler, activeJobs, broadcastEvent });
+const cronApi = createCronApiHandlers(cronScheduler);
+
+app.get('/api/harnesses/:harnessId/cron-jobs', cronApi.list);
+app.post('/api/harnesses/:harnessId/cron-jobs', cronApi.create);
+app.delete('/api/harnesses/:harnessId/cron-jobs/:jobId', cronApi.remove);
 
 /** 获取所有 Harness 文件列表 */
 app.get('/api/harnesses', async (req, res) => {
