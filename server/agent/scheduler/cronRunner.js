@@ -35,6 +35,14 @@ function nextTurn(messages) {
   return turns.length > 0 ? Math.max(...turns) + 1 : 1;
 }
 
+async function updateSchedulerLifecycle(scheduler, method, ...args) {
+  try {
+    await scheduler?.[method]?.(...args);
+  } catch (err) {
+    console.error(`[cron runner] failed to record ${method}:`, err);
+  }
+}
+
 export async function runScheduledEvent(event, {
   activeJobs,
   broadcastEvent = () => {},
@@ -103,7 +111,12 @@ export async function processScheduledEvents({
     const reservation = { executor: null, clients: new Set(), source: 'cron-reservation' };
     activeJobs?.set(event.harnessId, reservation);
     try {
+      await updateSchedulerLifecycle(scheduler, 'markEventStarted', event);
       await runEvent(event, reservation);
+      await updateSchedulerLifecycle(scheduler, 'markEventSucceeded', event);
+    } catch (err) {
+      await updateSchedulerLifecycle(scheduler, 'markEventFailed', event, err);
+      throw err;
     } finally {
       if (activeJobs?.get(event.harnessId) === reservation) {
         activeJobs.delete(event.harnessId);

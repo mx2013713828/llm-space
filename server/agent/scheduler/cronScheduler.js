@@ -27,7 +27,15 @@ function normalizeJob(input, now) {
     modelRef: input.modelRef || null,
     thinkingEnabled: input.thinkingEnabled === true,
     createdAt: input.createdAt || now.toISOString(),
-    lastFiredAt: input.lastFiredAt || null
+    status: input.status || 'idle',
+    attemptCount: Number(input.attemptCount) || 0,
+    runCount: Number(input.runCount) || 0,
+    failureCount: Number(input.failureCount) || 0,
+    lastFiredAt: input.lastFiredAt || null,
+    lastStartedAt: input.lastStartedAt || null,
+    lastSucceededAt: input.lastSucceededAt || null,
+    lastFailedAt: input.lastFailedAt || null,
+    lastError: input.lastError || null
   };
 }
 
@@ -46,6 +54,14 @@ export function createCronScheduler(options = {}) {
     const write = () => saveJobs(durableJobs, storePath);
     persistenceQueue = persistenceQueue.then(write, write);
     return persistenceQueue;
+  };
+
+  const updateEventJob = async (event, update) => {
+    const job = jobs.get(event?.jobId);
+    if (!job) return null;
+    update(job, now().toISOString());
+    if (job.durable) await queuePersistence();
+    return job;
   };
 
   const scheduler = {
@@ -92,6 +108,33 @@ export function createCronScheduler(options = {}) {
       return true;
     },
 
+    async markEventStarted(event) {
+      return updateEventJob(event, (job, timestamp) => {
+        job.status = 'running';
+        job.attemptCount += 1;
+        job.lastStartedAt = timestamp;
+        job.lastError = null;
+      });
+    },
+
+    async markEventSucceeded(event) {
+      return updateEventJob(event, (job, timestamp) => {
+        job.status = 'succeeded';
+        job.runCount += 1;
+        job.lastSucceededAt = timestamp;
+        job.lastError = null;
+      });
+    },
+
+    async markEventFailed(event, error) {
+      return updateEventJob(event, (job, timestamp) => {
+        job.status = 'failed';
+        job.failureCount += 1;
+        job.lastFailedAt = timestamp;
+        job.lastError = error?.message || String(error || 'Unknown scheduled execution error');
+      });
+    },
+
     tick() {
       const currentDate = now();
       const marker = minuteMarker(currentDate);
@@ -104,6 +147,7 @@ export function createCronScheduler(options = {}) {
 
           const firedAt = currentDate.toISOString();
           job.lastFiredAt = firedAt;
+          job.status = 'queued';
           durableStateChanged ||= job.durable;
           lastFiredMarkers.set(job.id, marker);
           queuedJobIds.add(job.id);

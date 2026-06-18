@@ -9,7 +9,13 @@ function formatJob(job) {
     `  recurring: ${job.recurring}`,
     `  durable: ${job.durable}`,
     `  enabled: ${job.enabled}`,
-    `  lastFiredAt: ${job.lastFiredAt || 'never'}`
+    `  status: ${job.status || 'idle'}`,
+    `  attempts: ${job.attemptCount || 0}`,
+    `  successfulRuns: ${job.runCount || 0}`,
+    `  failedRuns: ${job.failureCount || 0}`,
+    `  lastTriggeredAt: ${job.lastFiredAt || 'never'}`,
+    `  lastSucceededAt: ${job.lastSucceededAt || 'never'}`,
+    `  lastError: ${job.lastError || 'none'}`
   ].join('\n');
 }
 

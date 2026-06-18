@@ -135,3 +135,45 @@ test('passes the scheduled thinking setting to the executor', async () => {
 
   assert.equal(executorOptions.thinkingEnabled, true);
 });
+
+test('updates scheduler lifecycle around a successful execution', async () => {
+  const calls = [];
+  const event = { id: 'evt_1', jobId: 'cron_1', harnessId: '01-chat-bot', prompt: 'check build' };
+  const scheduler = {
+    drainDueEvents: () => [event],
+    requeueDueEvents() {},
+    async markEventStarted() { calls.push('started'); },
+    async markEventSucceeded() { calls.push('succeeded'); },
+    async markEventFailed() { calls.push('failed'); }
+  };
+
+  await processScheduledEvents({
+    scheduler,
+    activeJobs: new Map(),
+    runEvent: async () => calls.push('run')
+  });
+
+  assert.deepEqual(calls, ['started', 'run', 'succeeded']);
+});
+
+test('records a failed scheduled execution', async () => {
+  const calls = [];
+  const error = new Error('model unavailable');
+  const scheduler = {
+    drainDueEvents: () => [{ id: 'evt_1', jobId: 'cron_1', harnessId: '01-chat-bot', prompt: 'check build' }],
+    requeueDueEvents() {},
+    async markEventStarted() { calls.push('started'); },
+    async markEventSucceeded() { calls.push('succeeded'); },
+    async markEventFailed(event, receivedError) {
+      calls.push(`failed:${receivedError.message}`);
+    }
+  };
+
+  await assert.rejects(() => processScheduledEvents({
+    scheduler,
+    activeJobs: new Map(),
+    runEvent: async () => { throw error; }
+  }), /model unavailable/);
+
+  assert.deepEqual(calls, ['started', 'failed:model unavailable']);
+});

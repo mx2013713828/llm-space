@@ -95,3 +95,57 @@ test('removes one-shot jobs after firing', async () => {
   assert.equal(scheduler.drainDueEvents().length, 1);
   assert.equal(scheduler.listJobs('01-chat-bot').length, 0);
 });
+
+test('tracks queued, running, and successful execution separately', async () => {
+  const times = [
+    new Date('2026-06-17T09:00:10+08:00'),
+    new Date('2026-06-17T09:00:11+08:00'),
+    new Date('2026-06-17T09:00:12+08:00')
+  ];
+  let timeIndex = 0;
+  const scheduler = createCronScheduler({ now: () => times[Math.min(timeIndex++, times.length - 1)] });
+  const job = await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'check build',
+    durable: false
+  });
+
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+  assert.equal(scheduler.listJobs()[0].status, 'queued');
+  assert.equal(scheduler.listJobs()[0].runCount, 0);
+
+  await scheduler.markEventStarted(event);
+  assert.equal(scheduler.listJobs()[0].status, 'running');
+  assert.equal(scheduler.listJobs()[0].attemptCount, 1);
+
+  await scheduler.markEventSucceeded(event);
+  const completed = scheduler.listJobs()[0];
+  assert.equal(completed.id, job.id);
+  assert.equal(completed.status, 'succeeded');
+  assert.equal(completed.runCount, 1);
+  assert.equal(completed.failureCount, 0);
+  assert.ok(completed.lastSucceededAt);
+});
+
+test('records failed execution without counting it as a successful run', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
+  await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'check build',
+    durable: false
+  });
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+
+  await scheduler.markEventStarted(event);
+  await scheduler.markEventFailed(event, new Error('model unavailable'));
+
+  const failed = scheduler.listJobs()[0];
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.runCount, 0);
+  assert.equal(failed.failureCount, 1);
+  assert.equal(failed.lastError, 'model unavailable');
+});
