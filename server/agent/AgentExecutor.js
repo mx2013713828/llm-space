@@ -863,8 +863,7 @@ export class AgentExecutor {
             } else if (blk.type === 'text') {
               if (isContinuation) {
                 currentMsg = this.messages.findLast(m => m.role === 'assistant' && m.type === 'text');
-              }
-              if (!currentMsg) {
+              } else {
                 currentMsg = {
                   role: 'assistant',
                   type: 'text',
