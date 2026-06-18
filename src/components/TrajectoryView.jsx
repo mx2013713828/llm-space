@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
 import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js';
+import { getUserMessagePresentation } from '../lib/messagePresentation.js';
 
 export function TrajectoryView({
   activeRightTab,
@@ -182,13 +183,19 @@ export function TrajectoryView({
                         </div>
                       );
                     }
-                    if (msg.role === 'user') return (
-                      <UserMessage 
-                        key={idx} 
-                        content={msg.content} 
-                        onRetry={isRunning ? null : () => handleRetryTurn(parseInt(turn, 10), msg.content)} 
-                      />
-                    );
+                    if (msg.role === 'user') {
+                      const presentation = getUserMessagePresentation(msg);
+                      return (
+                        <UserMessage
+                          key={idx}
+                          content={presentation.content}
+                          variant={presentation.variant}
+                          onRetry={isRunning || presentation.variant === 'scheduled'
+                            ? null
+                            : () => handleRetryTurn(parseInt(turn, 10), msg.content)}
+                        />
+                      );
+                    }
                     if (msg.type === 'system_alert') return (
                       <div key={idx} className="system-alert-bubble" style={{
                         margin: '8px 0',

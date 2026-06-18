@@ -152,7 +152,8 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
 /**
  * 用户消息气泡
  */
-export function UserMessage({ content, onRetry }) {
+export function UserMessage({ content, onRetry, variant = 'user' }) {
+  const isScheduled = variant === 'scheduled';
   return (
     <div className="msg-user-container">
       {onRetry && (
@@ -167,11 +168,12 @@ export function UserMessage({ content, onRetry }) {
           REWIND
         </button>
       )}
-      <div className="message-bubble msg-user animate-fade-in">
+      <div className={`message-bubble msg-user ${isScheduled ? 'msg-scheduled' : ''} animate-fade-in`}>
         <div className="msg-user-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>👤</span>
-            <span>User</span>
+            <span>{isScheduled ? '⏰' : '👤'}</span>
+            <span>{isScheduled ? 'Scheduler' : 'User'}</span>
+            {isScheduled && <span className="badge badge-cyan" style={{ fontSize: 10 }}>Scheduled</span>}
           </div>
         </div>
         <div style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>{content}</div>

@@ -384,6 +384,12 @@
   color: var(--text-primary);
   margin-left: 30px;
 }
+.msg-user.msg-scheduled {
+  margin-left: 0;
+  margin-right: 30px;
+  background: rgba(34, 211, 238, 0.06);
+  border-color: rgba(34, 211, 238, 0.3);
+}
 .msg-user-header {
   display: flex;
   align-items: center;
@@ -1145,4 +1151,3 @@
 .animate-spin-fast {
   animation: spin 0.8s linear infinite;
 }
-
