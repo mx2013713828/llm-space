@@ -3,6 +3,7 @@ import { estimateTokens } from '../lib/messageBuilder.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 import { shouldSubmitMessage } from '../lib/chatInput.js';
+import { fetchHarnessSession } from '../lib/sessionApi.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -103,6 +104,44 @@ export function useAgentLoop({
     setTodos(incoming.todos);
     setBackgroundTasks(incoming.backgroundTasks);
   }, [savedSession, harness, isRunning]);
+
+  const cronSchedulerEnabled = harness?.features?.enable_cron_scheduler === true;
+  useEffect(() => {
+    if (!cronSchedulerEnabled || !harness?.id || isRunning) return undefined;
+
+    let cancelled = false;
+    const syncScheduledMessages = async () => {
+      try {
+        const session = await fetchHarnessSession(harness.id);
+        if (cancelled || !session) return;
+
+        const incoming = {
+          messages: session.messages || [],
+          todos: session.todos || [],
+          backgroundTasks: session.backgroundTasks || []
+        };
+        const incomingStr = JSON.stringify(incoming);
+        if (lastSavedSessionRef.current === incomingStr) return;
+
+        lastSavedSessionRef.current = incomingStr;
+        lastReportedRef.current.messages = JSON.stringify(incoming.messages);
+        lastReportedRef.current.todos = JSON.stringify(incoming.todos);
+        lastReportedRef.current.backgroundTasks = JSON.stringify(incoming.backgroundTasks);
+        setMessages(incoming.messages);
+        setTodos(incoming.todos);
+        setBackgroundTasks(incoming.backgroundTasks);
+      } catch (err) {
+        if (!cancelled) console.error('Failed to sync scheduled messages:', err);
+      }
+    };
+
+    syncScheduledMessages();
+    const timer = setInterval(syncScheduledMessages, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [cronSchedulerEnabled, harness?.id, isRunning]);
 
   // 按 turn 分组
   const turns = {};
@@ -437,13 +476,16 @@ export function useAgentLoop({
     }
   };
 
-  // Detect background task state and auto-attach SSE stream
+  // Detect background agent state and auto-attach to scheduled executions.
   useEffect(() => {
-    if (!harness?.id) return;
-    
-    fetch(`http://localhost:3001/api/agent/status/${harness.id}`)
-      .then(res => res.json())
-      .then(data => {
+    if (!harness?.id || isRunning) return undefined;
+    let cancelled = false;
+
+    const attachIfRunning = async () => {
+      try {
+        const res = await fetch(`http://localhost:3001/api/agent/status/${harness.id}`);
+        const data = await res.json();
+        if (cancelled) return;
         if (data.pendingPermission) {
           setPendingPermission(data.pendingPermission);
         } else {
@@ -459,9 +501,18 @@ export function useAgentLoop({
           const latestTodos = savedSession?.todos || harness?.todos || [];
           runAgentLoop(latestMessages, latestTodos);
         }
-      })
-      .catch(err => console.error("Failed to fetch running status:", err));
-  }, [harness?.id]);
+      } catch (err) {
+        if (!cancelled) console.error('Failed to fetch running status:', err);
+      }
+    };
+
+    attachIfRunning();
+    const timer = setInterval(attachIfRunning, 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [harness?.id, isRunning]);
 
   /** 处理发送消息 */
   const handleSend = async () => {

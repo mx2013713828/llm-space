@@ -8,6 +8,14 @@ function formatLastRun(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function statusLabel(status) {
+  if (status === 'running') return 'Running';
+  if (status === 'queued') return 'Queued';
+  if (status === 'succeeded') return 'Succeeded';
+  if (status === 'failed') return 'Failed';
+  return 'Idle';
+}
+
 export function ScheduledTasksPanel({ harnessId }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +38,7 @@ export function ScheduledTasksPanel({ harnessId }) {
   useEffect(() => {
     if (!harnessId) return undefined;
     let cancelled = false;
-    fetchCronJobs(harnessId)
+    const refresh = () => fetchCronJobs(harnessId)
       .then(data => {
         if (cancelled) return;
         setJobs(data);
@@ -42,8 +50,11 @@ export function ScheduledTasksPanel({ harnessId }) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    refresh();
+    const timer = setInterval(refresh, 3000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [harnessId]);
 
@@ -94,10 +105,15 @@ export function ScheduledTasksPanel({ harnessId }) {
               <div className="scheduled-prompt">{job.prompt}</div>
               <div className="scheduled-meta">
                 <span>{job.id}</span>
-                <span>Last fired: {formatLastRun(job.lastFiredAt)}</span>
+                <span>Last success: {formatLastRun(job.lastSucceededAt)}</span>
+                <span>Runs: {job.runCount || 0}</span>
+                {job.failureCount > 0 && <span>Failed: {job.failureCount}</span>}
               </div>
             </div>
             <div className="scheduled-flags">
+              <span className={`scheduled-flag status-${job.status || 'idle'}`}>
+                {statusLabel(job.status)}
+              </span>
               <span className={`scheduled-flag ${job.recurring ? 'active' : ''}`}>
                 {job.recurring ? 'Recurring' : 'One-shot'}
               </span>

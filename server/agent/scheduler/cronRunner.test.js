@@ -136,6 +136,33 @@ test('passes the scheduled thinking setting to the executor', async () => {
   assert.equal(executorOptions.thinkingEnabled, true);
 });
 
+test('closes attached clients when scheduled execution finishes', async () => {
+  let ended = false;
+  class FakeExecutor {
+    async run() {}
+  }
+  const reservation = {
+    clients: new Set([{ end() { ended = true; } }])
+  };
+
+  await runScheduledEvent({
+    id: 'evt_1',
+    jobId: 'cron_1',
+    harnessId: '01-chat-bot',
+    prompt: 'check build',
+    modelRef: 'deepseek'
+  }, {
+    activeJobs: new Map(),
+    reservation,
+    loadHarness: async () => ({ id: '01-chat-bot' }),
+    loadSession: async () => ({ messages: [] }),
+    resolveModel: async () => ({ id: 'deepseek' }),
+    ExecutorClass: FakeExecutor
+  });
+
+  assert.equal(ended, true);
+});
+
 test('updates scheduler lifecycle around a successful execution', async () => {
   const calls = [];
   const event = { id: 'evt_1', jobId: 'cron_1', harnessId: '01-chat-bot', prompt: 'check build' };

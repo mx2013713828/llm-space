@@ -836,9 +836,11 @@ app.post('/api/agent/run', async (req, res) => {
     job.clients.add(res);
 
     // Synchronize current state to newly attached client
-    sendEvent(res, 'messages_update', { messages: job.executor.messages });
-    sendEvent(res, 'todo_update', { todos: job.executor.todos });
-    sendEvent(res, 'background_tasks_update', { tasks: job.executor.backgroundTasks || [] });
+    if (job.executor) {
+      sendEvent(res, 'messages_update', { messages: job.executor.messages });
+      sendEvent(res, 'todo_update', { todos: job.executor.todos });
+      sendEvent(res, 'background_tasks_update', { tasks: job.executor.backgroundTasks || [] });
+    }
 
     // Keep the request handler pending until client disconnects
     await new Promise((resolve) => {

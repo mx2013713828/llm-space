@@ -90,6 +90,9 @@ export async function runScheduledEvent(event, {
   try {
     await executor.run();
   } finally {
+    for (const client of executionJob.clients) {
+      client.end?.();
+    }
     if (activeJobs?.get(event.harnessId) === executionJob) {
       activeJobs.delete(event.harnessId);
     }

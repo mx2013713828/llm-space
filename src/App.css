@@ -729,6 +729,22 @@
   color: var(--green);
   border-color: rgba(34, 197, 94, 0.25);
 }
+
+.scheduled-flag.status-running,
+.scheduled-flag.status-queued {
+  color: var(--orange);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+}
+
+.scheduled-flag.status-succeeded {
+  color: var(--green);
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+}
+
+.scheduled-flag.status-failed {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+}
 .scheduled-error {
   padding: 9px 11px;
   color: var(--red);
