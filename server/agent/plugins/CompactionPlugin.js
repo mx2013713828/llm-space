@@ -1,7 +1,4 @@
-import path from 'path';
-import { promises as fs } from 'fs';
-import { compactMessages, buildApiMessages } from '../messageBuilder.js';
-import { COMPACT_PROMPT } from '../compactPrompt.js';
+import { compactMessages } from '../messageBuilder.js';
 import { HARD_COMPACT_TOKEN_THRESHOLD } from '../AgentExecutor.js';
 
 export function foldThinkingForDisplay(executor) {

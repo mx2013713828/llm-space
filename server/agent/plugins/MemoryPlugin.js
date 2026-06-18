@@ -4,6 +4,51 @@ import { selectAndLoadMemories } from '../memory/memorySelect.js';
 import { extractMemories } from '../memory/memoryExtract.js';
 import { tryConsolidateMemories } from '../memory/memoryConsolidate.js';
 
+const MEMORY_CONTEXT_PATTERN = /(?:<memory_context>[\s\S]*?<\/memory_context>\s*)+/g;
+
+function removeMemoryContext(value) {
+  return String(value || '').replace(MEMORY_CONTEXT_PATTERN, '').trimStart();
+}
+
+export function stripPersistedMemoryContexts(messages) {
+  let changed = false;
+  for (const message of messages || []) {
+    if (message.role !== 'user' || typeof message.content !== 'string') continue;
+    const cleanContent = removeMemoryContext(message.content);
+    if (cleanContent !== message.content) {
+      message.content = cleanContent;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+export function stripApiMemoryContexts(apiMessages) {
+  for (const message of apiMessages || []) {
+    if (message.role !== 'user' || !Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      if (block.type === 'text') block.text = removeMemoryContext(block.text);
+    }
+  }
+}
+
+export function injectMemoryContext(apiMessages, memoryContents) {
+  if (!Array.isArray(memoryContents) || memoryContents.length === 0) return false;
+  const memoryBlock =
+    `<memory_context>\n以下是与本轮对话相关的长期记忆，请参考：\n\n${memoryContents.join('\n\n')}\n</memory_context>\n\n`;
+
+  for (let i = apiMessages.length - 1; i >= 0; i--) {
+    const message = apiMessages[i];
+    if (message.role !== 'user' || !Array.isArray(message.content)) continue;
+    if (message.content.some(block => block.type === 'tool_result')) continue;
+    const textBlock = message.content.find(block => block.type === 'text');
+    if (!textBlock) continue;
+    textBlock.text = memoryBlock + removeMemoryContext(textBlock.text);
+    return true;
+  }
+  return false;
+}
+
 export const MemoryPlugin = {
   name: 'MemoryPlugin',
 
@@ -24,6 +69,11 @@ export const MemoryPlugin = {
     const harnessId = executor.harnessId;
     if (!harnessId) return;
 
+    if (stripPersistedMemoryContexts(executor.messages)) {
+      executor.onEvent('messages_update', { messages: executor.messages });
+    }
+    stripApiMemoryContexts(context.apiMessages);
+
     // ① 将 MEMORY.md 索引注入 system prompt（不含具体内容，仅清单，利于缓存）
     try {
       const index = await readIndex(harnessId);
@@ -42,37 +92,10 @@ export const MemoryPlugin = {
       const memoryContents = await selectAndLoadMemories(callLLM, harnessId, recentMessages);
 
       if (memoryContents.length > 0) {
-        const memoryBlock =
-          `<memory_context>\n以下是与本轮对话相关的长期记忆，请参考：\n\n${memoryContents.join('\n\n')}\n</memory_context>\n\n`;
-
-        // 找到 messages 中最后一条 user 消息，在其内容开头注入
-        // 注意：这里修改的是 executor.messages（内存中的原始消息），
-        // 而非 context.apiMessages（已构建的 API 消息），确保注入生效
-        const msgs = executor.messages;
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          if (msgs[i].role === 'user' && typeof msgs[i].content === 'string') {
-            msgs[i] = { ...msgs[i], content: memoryBlock + msgs[i].content };
-            break;
-          }
-        }
+        injectMemoryContext(context.apiMessages, memoryContents);
       }
     } catch (err) {
       console.error('[MemoryPlugin] 记忆选择注入失败:', err.message);
-    }
-
-    // 记忆注入完成后，重新构建 apiMessages（因为 messages 已修改）
-    // context.apiMessages 会在 _callLLM 中使用，需要从最新 executor.messages 构建
-    // 由于 AgentExecutor 在 preLLM 之后使用 context.apiMessages 发起请求，
-    // 我们需要同步更新 context.apiMessages
-    try {
-      const { buildApiMessages } = await import('../messageBuilder.js');
-      context.apiMessages = buildApiMessages(
-        executor.messages,
-        executor.thinkingEnabled,
-        executor.features.context_compaction
-      );
-    } catch (err) {
-      console.error('[MemoryPlugin] 重建 apiMessages 失败:', err.message);
     }
   },
 
