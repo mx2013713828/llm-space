@@ -893,9 +893,42 @@ export class AgentExecutor {
           case 'content_block_delta': {
             const delta = evt.delta;
             if (delta.type === 'thinking_delta') {
+              if (currentMsg?.type !== 'thinking') {
+                currentMsg = {
+                  role: 'assistant',
+                  type: 'thinking',
+                  turn: turnIndex,
+                  content: '',
+                  tokens: { input: this._lastInputTokens || 0, output: 0 },
+                  signature: ''
+                };
+                currentBlockType = 'thinking';
+                this.messages.push(currentMsg);
+                this.onEvent('thinking_start', { index: evt.index, signature: '', turn: turnIndex });
+              }
               if (currentMsg) currentMsg.content += delta.thinking;
               this.onEvent('thinking_delta', { text: delta.thinking });
             } else if (delta.type === 'text_delta') {
+              if (currentMsg?.type !== 'text') {
+                if (currentMsg?.type === 'thinking') {
+                  this.onEvent('thinking_end', { text: currentMsg.content || '' });
+                }
+                currentMsg = isContinuation
+                  ? this.messages.findLast(m => m.role === 'assistant' && m.type === 'text')
+                  : null;
+                if (!currentMsg) {
+                  currentMsg = {
+                    role: 'assistant',
+                    type: 'text',
+                    turn: turnIndex,
+                    content: '',
+                    tokens: { input: this._lastInputTokens || 0, output: 0 }
+                  };
+                  this.messages.push(currentMsg);
+                }
+                currentBlockType = 'text';
+                this.onEvent('text_start', { index: evt.index, turn: turnIndex, isContinuation });
+              }
               if (currentMsg) currentMsg.content += delta.text;
               if (isContinuation) {
                 newCharsGenerated += delta.text.length;
