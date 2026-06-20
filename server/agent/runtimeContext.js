@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 const PLATFORM_NAMES = {
   darwin: 'macOS',
   linux: 'Linux',

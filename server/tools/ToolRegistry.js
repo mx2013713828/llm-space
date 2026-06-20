@@ -15,6 +15,7 @@ import queryBackgroundTasks from './query_background_tasks.js';
 import scheduleCron from './schedule_cron.js';
 import listCrons from './list_crons.js';
 import cancelCron from './cancel_cron.js';
+import getCurrentTime from './get_current_time.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -40,6 +41,7 @@ class ToolRegistry {
       schedule_cron: scheduleCron,
       list_crons: listCrons,
       cancel_cron: cancelCron,
+      get_current_time: getCurrentTime,
     };
   }
 

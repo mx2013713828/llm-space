@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import process from 'node:process';
 
 import { AgentExecutor } from './AgentExecutor.js';
 
@@ -25,4 +26,12 @@ test('uses runtime context as the system prompt when the configured prompt is em
   const executor = createExecutor({ systemPrompt: '' });
 
   assert.match(executor.systemPrompt, /^<runtime_context>/);
+});
+
+test('adds the current-time tool exactly once to every executor', () => {
+  const withoutExplicitTool = createExecutor({ tools: [] });
+  const withExplicitTool = createExecutor({ tools: ['get_current_time'] });
+
+  assert.equal(withoutExplicitTool.tools.filter(name => name === 'get_current_time').length, 1);
+  assert.equal(withExplicitTool.tools.filter(name => name === 'get_current_time').length, 1);
 });

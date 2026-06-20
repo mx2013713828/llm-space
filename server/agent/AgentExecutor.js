@@ -102,6 +102,10 @@ export class AgentExecutor {
       });
     }
 
+    if (!this.tools.some(tool => tool === 'get_current_time' || tool?.name === 'get_current_time')) {
+      this.tools.push('get_current_time');
+    }
+
     this.model = model;
     this.temperature = temperature;
     this.maxTokens = maxTokens;
