@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cancelCronJob, fetchCronJobs } from './cronJobs.js';
+import { cancelCronJob, fetchCronJobs, fetchCronRuns } from './cronJobs.js';
 
 test('fetches cron jobs for a harness', async () => {
   const calls = [];
@@ -32,4 +32,16 @@ test('cancels a cron job for a harness', async () => {
 
   await cancelCronJob('01-chat-bot', 'cron_1', fetchImpl);
   assert.equal(calls[0].options.method, 'DELETE');
+});
+
+test('fetches execution history for a selected job', async () => {
+  const result = await fetchCronRuns('weather bot', { jobId: 'cron/1', limit: 10 }, async (url) => {
+    assert.equal(
+      url,
+      'http://localhost:3001/api/harnesses/weather%20bot/cron-runs?jobId=cron%2F1&limit=10'
+    );
+    return { ok: true, json: async () => [{ id: 'run_1' }] };
+  });
+
+  assert.deepEqual(result, [{ id: 'run_1' }]);
 });

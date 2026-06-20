@@ -31,6 +31,29 @@ test('lists cron jobs scoped to the requested harness', async () => {
   assert.deepEqual(res.body, [{ id: 'cron_1', harnessId: '01-chat-bot' }]);
 });
 
+test('lists execution history with job and limit filters', async () => {
+  const calls = [];
+  const handlers = createCronApiHandlers({
+    listRuns(harnessId, options) {
+      calls.push({ harnessId, options });
+      return [{ id: 'run_1', status: 'succeeded' }];
+    }
+  });
+  const res = createResponse();
+
+  await handlers.listRuns({
+    params: { harnessId: '01-chat-bot' },
+    query: { jobId: 'cron_1', limit: '12' }
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, [{ id: 'run_1', status: 'succeeded' }]);
+  assert.deepEqual(calls, [{
+    harnessId: '01-chat-bot',
+    options: { jobId: 'cron_1', limit: '12' }
+  }]);
+});
+
 test('returns 400 when creating a job with an invalid cron expression', async () => {
   const handlers = createCronApiHandlers({
     async scheduleJob() {

@@ -12,6 +12,17 @@ export function createCronApiHandlers(scheduler, { harnessExists = async () => t
       return res.json(scheduler.listJobs(harnessId));
     },
 
+    async listRuns(req, res) {
+      const { harnessId } = req.params;
+      if (!validHarnessId(harnessId)) {
+        return res.status(400).json({ error: 'Invalid harness ID' });
+      }
+      return res.json(scheduler.listRuns(harnessId, {
+        jobId: req.query?.jobId || undefined,
+        limit: req.query?.limit
+      }));
+    },
+
     async create(req, res) {
       const { harnessId } = req.params;
       if (!validHarnessId(harnessId)) {

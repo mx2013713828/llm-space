@@ -377,6 +377,7 @@ const cronApi = createCronApiHandlers(cronScheduler, {
 });
 
 app.get('/api/harnesses/:harnessId/cron-jobs', cronApi.list);
+app.get('/api/harnesses/:harnessId/cron-runs', cronApi.listRuns);
 app.post('/api/harnesses/:harnessId/cron-jobs', cronApi.create);
 app.delete('/api/harnesses/:harnessId/cron-jobs/:jobId', cronApi.remove);
 
