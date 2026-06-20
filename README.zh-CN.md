@@ -22,6 +22,7 @@
   - **Agent 自主管理任务**：通过 `schedule_cron`、`list_crons`、`cancel_cron` 创建、查看和取消当前 Harness 下的定时任务。
   - **持久化执行链路**：五字段 cron 表达式进入进程内事件队列，运行时解析最新模型配置，并复用现有 `AgentExecutor` 完成执行。
   - **可视化定时轨迹**：Scheduled Prompt、工具调用、最终回答、成功/失败次数和任务状态会显示在轨迹及 Scheduled Tasks 面板中。
+  - **持久化执行历史**：最近的运行记录会保存开始/结束时间、耗时、结果和错误，并可在服务重启后继续查看。
   - **安全的后台执行**：Harness 忙碌时任务进入队列，避免并发 Agent Loop；前端通过 SSE 自动附着和 session 同步展示后台结果。
 
 * **2026-06-13：可恢复的有向无环图任务系统 (DAG Task System) 🕸️**
@@ -95,14 +96,14 @@ PORT=3001
 - `list_crons`：查看任务及 queued/running/succeeded/failed 状态。
 - `cancel_cron`：取消当前 Harness 所属的任务。
 
-持久化任务定义保存在 `server/scheduler/tasks.json`。任务仅保存模型引用，不保存 API Key；每次执行时都会从 `.env` 解析最新的匹配模型配置。如果 Harness 正在运行，定时事件会排队等待，避免同时启动多个 Agent Loop。
+持久化任务定义保存在 `server/scheduler/tasks.json`，最近 500 条执行记录保存在 `server/scheduler/runs.json`。任务仅保存模型引用，不保存 API Key；每次执行时都会从 `.env` 解析最新的匹配模型配置。如果 Harness 正在运行，定时事件会排队等待，避免同时启动多个 Agent Loop。点击任务行的历史按钮可以查看运行状态、时间、耗时和错误。
 
 MVP 边界：
 
 - Cron 语法支持 `*`、`*/N`、固定值、范围和逗号分隔值。
 - 任务使用服务器本地时区。
 - 服务停止期间错过的任务不会补跑。
-- 当前仅支持 `main` 执行模式；隔离会话、失败重试和详细执行历史将在后续阶段实现。
+- 当前仅支持 `main` 执行模式；隔离会话、自动重试和告警将在后续阶段实现。
 
 ---
 

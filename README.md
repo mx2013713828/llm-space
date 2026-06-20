@@ -22,6 +22,7 @@ Many heavy Agent frameworks (such as LangChain) introduce massive black-box enca
   - **Agent-managed schedules**: Agents can create, inspect, and cancel Harness-scoped jobs with `schedule_cron`, `list_crons`, and `cancel_cron`.
   - **Durable execution pipeline**: Five-field cron expressions feed an in-process event queue, resolve the latest model configuration at run time, and execute through the existing `AgentExecutor`.
   - **Visible scheduled runs**: Scheduled prompts, tool calls, final answers, success/failure counts, and current job state appear in the trajectory and Scheduled Tasks panel.
+  - **Persistent execution history**: Recent runs retain start/completion timestamps, duration, outcome, and failure details across server restarts.
   - **Safer background behavior**: A busy Harness queues work instead of running concurrent agent loops, while session polling and SSE attachment surface background results in the active UI.
 
 * **2026-06-13: Recoverable Directed Acyclic Graph Task System (DAG Task System) 🕸️**
@@ -95,14 +96,14 @@ When enabled, the agent receives three tools:
 - `list_crons`: inspect jobs and their queued/running/succeeded/failed state.
 - `cancel_cron`: cancel a job owned by the current Harness.
 
-Durable definitions are stored in `server/scheduler/tasks.json`. Jobs store a model reference rather than an API key, so each run resolves the latest matching model configuration from `.env`. If the Harness is already running, the scheduled event stays queued until it becomes idle.
+Durable definitions are stored in `server/scheduler/tasks.json`, while the latest 500 execution records are stored in `server/scheduler/runs.json`. Jobs store a model reference rather than an API key, so each run resolves the latest matching model configuration from `.env`. If the Harness is already running, the scheduled event stays queued until it becomes idle. Use the history button on a task row to inspect run state, timing, duration, and errors.
 
 MVP boundaries:
 
 - Cron syntax supports `*`, `*/N`, exact values, ranges, and comma-separated values.
 - Jobs use the server's local timezone.
 - Missed runs while the server is stopped are not backfilled.
-- Execution mode is currently `main`; isolated sessions, retries, and detailed run history are planned for later phases.
+- Execution mode is currently `main`; isolated sessions, automatic retries, and alerting are planned for later phases.
 
 ---
 
