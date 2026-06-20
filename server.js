@@ -369,6 +369,7 @@ function broadcastEvent(harnessId, type, data) {
 }
 
 await cronScheduler.loadDurableJobs();
+await cronScheduler.loadRunHistory();
 cronScheduler.start();
 startCronQueueProcessor({ scheduler: cronScheduler, activeJobs, broadcastEvent });
 const cronApi = createCronApiHandlers(cronScheduler, {

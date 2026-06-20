@@ -149,3 +149,50 @@ test('records failed execution without counting it as a successful run', async (
   assert.equal(failed.failureCount, 1);
   assert.equal(failed.lastError, 'model unavailable');
 });
+
+test('records successful execution history with duration', async () => {
+  const times = [
+    new Date('2026-06-20T08:59:59.000Z'),
+    new Date('2026-06-20T09:00:00.000Z'),
+    new Date('2026-06-20T09:00:00.000Z'),
+    new Date('2026-06-20T09:00:02.500Z')
+  ];
+  let timeIndex = 0;
+  const scheduler = createCronScheduler({ now: () => times[Math.min(timeIndex++, times.length - 1)] });
+  await scheduler.scheduleJob({
+    harnessId: 'weather',
+    cron: '* * * * *',
+    prompt: 'check weather',
+    durable: false
+  });
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+
+  await scheduler.markEventStarted(event);
+  await scheduler.markEventSucceeded(event);
+
+  const [run] = scheduler.listRuns('weather');
+  assert.equal(run.jobId, event.jobId);
+  assert.equal(run.status, 'succeeded');
+  assert.equal(run.durationMs, 2500);
+  assert.equal(run.error, null);
+});
+
+test('records failed runs and filters history by job', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-20T09:00:00.000Z') });
+  const first = await scheduler.scheduleJob({ harnessId: 'weather', cron: '* * * * *', prompt: 'first', durable: false });
+  const second = await scheduler.scheduleJob({ harnessId: 'weather', cron: '* * * * *', prompt: 'second', durable: false });
+  scheduler.tick();
+  const events = scheduler.drainDueEvents();
+
+  await scheduler.markEventStarted(events[0]);
+  await scheduler.markEventFailed(events[0], new Error('provider timeout'));
+  await scheduler.markEventStarted(events[1]);
+  await scheduler.markEventSucceeded(events[1]);
+
+  const runs = scheduler.listRuns('weather', { jobId: first.id, limit: 10 });
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].status, 'failed');
+  assert.equal(runs[0].error, 'provider timeout');
+  assert.equal(scheduler.listRuns('weather', { jobId: second.id }).length, 1);
+});

@@ -1,5 +1,6 @@
 import { cronMatches, validateCron } from './cronExpression.js';
 import { loadJobs, saveJobs } from './cronStore.js';
+import { loadRuns, saveRuns } from './cronRunStore.js';
 
 function makeId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
@@ -42,12 +43,17 @@ function normalizeJob(input, now) {
 export function createCronScheduler(options = {}) {
   const now = options.now || (() => new Date());
   const storePath = options.storePath;
+  const runStorePath = options.runStorePath;
+  const maxRunHistory = options.maxRunHistory || 500;
   const jobs = new Map();
+  const runs = [];
+  const runIdsByEvent = new Map();
   const dueEvents = [];
   const lastFiredMarkers = new Map();
   const queuedJobIds = new Set();
   let timer = null;
   let persistenceQueue = Promise.resolve();
+  let runPersistenceQueue = Promise.resolve();
 
   const queuePersistence = () => {
     const durableJobs = [...jobs.values()].filter(job => job.durable);
@@ -56,12 +62,24 @@ export function createCronScheduler(options = {}) {
     return persistenceQueue;
   };
 
-  const updateEventJob = async (event, update) => {
+  const queueRunPersistence = () => {
+    const snapshot = runs.map(run => ({ ...run }));
+    const write = () => saveRuns(snapshot, runStorePath);
+    runPersistenceQueue = runPersistenceQueue.then(write, write);
+    return runPersistenceQueue;
+  };
+
+  const updateEventJob = async (event, update, timestamp = now().toISOString()) => {
     const job = jobs.get(event?.jobId);
     if (!job) return null;
-    update(job, now().toISOString());
+    update(job, timestamp);
     if (job.durable) await queuePersistence();
     return job;
+  };
+
+  const findEventRun = (event) => {
+    const runId = runIdsByEvent.get(event?.id);
+    return runId ? runs.find(run => run.id === runId) : null;
   };
 
   const scheduler = {
@@ -73,6 +91,26 @@ export function createCronScheduler(options = {}) {
         }
       }
       return this.listJobs();
+    },
+
+    async loadRunHistory() {
+      const storedRuns = await loadRuns(runStorePath);
+      const interruptedAt = now().toISOString();
+      let changed = false;
+      for (const storedRun of storedRuns.slice(-maxRunHistory)) {
+        const run = { ...storedRun };
+        if (run.status === 'running') {
+          run.status = 'interrupted';
+          run.completedAt = interruptedAt;
+          run.durationMs = Math.max(0, Date.parse(interruptedAt) - Date.parse(run.startedAt));
+          run.error = 'Server restarted before the scheduled run completed';
+          changed = true;
+        }
+        runs.push(run);
+        if (run.eventId) runIdsByEvent.set(run.eventId, run.id);
+      }
+      if (changed) await queueRunPersistence();
+      return this.listRuns();
     },
 
     async scheduleJob(input) {
@@ -94,6 +132,15 @@ export function createCronScheduler(options = {}) {
       return harnessId ? allJobs.filter(job => job.harnessId === harnessId) : allJobs;
     },
 
+    listRuns(harnessId, { jobId, limit = 25 } = {}) {
+      const safeLimit = Math.max(1, Math.min(Number(limit) || 25, 100));
+      return runs
+        .filter(run => (!harnessId || run.harnessId === harnessId) && (!jobId || run.jobId === jobId))
+        .slice()
+        .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
+        .slice(0, safeLimit);
+    },
+
     async cancelJob(jobId, harnessId) {
       const job = jobs.get(jobId);
       if (!job || (harnessId && job.harnessId !== harnessId)) return false;
@@ -109,30 +156,69 @@ export function createCronScheduler(options = {}) {
     },
 
     async markEventStarted(event) {
-      return updateEventJob(event, (job, timestamp) => {
-        job.status = 'running';
-        job.attemptCount += 1;
-        job.lastStartedAt = timestamp;
-        job.lastError = null;
-      });
+      const timestamp = now().toISOString();
+      const job = await updateEventJob(event, (targetJob) => {
+        targetJob.status = 'running';
+        targetJob.attemptCount += 1;
+        targetJob.lastStartedAt = timestamp;
+        targetJob.lastError = null;
+      }, timestamp);
+      const run = {
+        id: makeId('run'),
+        eventId: event.id,
+        jobId: event.jobId,
+        harnessId: event.harnessId,
+        prompt: event.prompt,
+        status: 'running',
+        triggeredAt: event.firedAt || timestamp,
+        startedAt: timestamp,
+        completedAt: null,
+        durationMs: null,
+        error: null
+      };
+      runs.push(run);
+      runIdsByEvent.set(event.id, run.id);
+      if (runs.length > maxRunHistory) runs.splice(0, runs.length - maxRunHistory);
+      await queueRunPersistence();
+      return job;
     },
 
     async markEventSucceeded(event) {
-      return updateEventJob(event, (job, timestamp) => {
-        job.status = 'succeeded';
-        job.runCount += 1;
-        job.lastSucceededAt = timestamp;
-        job.lastError = null;
-      });
+      const timestamp = now().toISOString();
+      const job = await updateEventJob(event, (targetJob) => {
+        targetJob.status = 'succeeded';
+        targetJob.runCount += 1;
+        targetJob.lastSucceededAt = timestamp;
+        targetJob.lastError = null;
+      }, timestamp);
+      const run = findEventRun(event);
+      if (run) {
+        run.status = 'succeeded';
+        run.completedAt = timestamp;
+        run.durationMs = Math.max(0, Date.parse(timestamp) - Date.parse(run.startedAt));
+        await queueRunPersistence();
+      }
+      return job;
     },
 
     async markEventFailed(event, error) {
-      return updateEventJob(event, (job, timestamp) => {
-        job.status = 'failed';
-        job.failureCount += 1;
-        job.lastFailedAt = timestamp;
-        job.lastError = error?.message || String(error || 'Unknown scheduled execution error');
-      });
+      const timestamp = now().toISOString();
+      const errorMessage = error?.message || String(error || 'Unknown scheduled execution error');
+      const job = await updateEventJob(event, (targetJob) => {
+        targetJob.status = 'failed';
+        targetJob.failureCount += 1;
+        targetJob.lastFailedAt = timestamp;
+        targetJob.lastError = errorMessage;
+      }, timestamp);
+      const run = findEventRun(event);
+      if (run) {
+        run.status = 'failed';
+        run.completedAt = timestamp;
+        run.durationMs = Math.max(0, Date.parse(timestamp) - Date.parse(run.startedAt));
+        run.error = errorMessage;
+        await queueRunPersistence();
+      }
+      return job;
     },
 
     tick() {
@@ -192,6 +278,7 @@ export function createCronScheduler(options = {}) {
 
     async persist() {
       await queuePersistence();
+      await queueRunPersistence();
     },
 
     start(intervalMs = 1000) {
