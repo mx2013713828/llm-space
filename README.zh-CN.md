@@ -18,6 +18,12 @@
 
 ## 🆕 最近更新 (Recent Updates)
 
+* **2026-06-20：进程内定时任务调度器 MVP**
+  - **Agent 自主管理任务**：通过 `schedule_cron`、`list_crons`、`cancel_cron` 创建、查看和取消当前 Harness 下的定时任务。
+  - **持久化执行链路**：五字段 cron 表达式进入进程内事件队列，运行时解析最新模型配置，并复用现有 `AgentExecutor` 完成执行。
+  - **可视化定时轨迹**：Scheduled Prompt、工具调用、最终回答、成功/失败次数和任务状态会显示在轨迹及 Scheduled Tasks 面板中。
+  - **安全的后台执行**：Harness 忙碌时任务进入队列，避免并发 Agent Loop；前端通过 SSE 自动附着和 session 同步展示后台结果。
+
 * **2026-06-13：可恢复的有向无环图任务系统 (DAG Task System) 🕸️**
   - **后端任务依赖流**：支持基于 DAG 的复杂任务系统，内置 Kahn 算法死锁检验、Claim 排他性文件锁并发保护、以及 Agent 异常崩溃退出时的物理看板租约自动回滚。
   - **缓存友好与去重装配**：重构插件 lifecycle (`preLLM`)。静动态状态 Diff 拆分注入以最大化提升模型 KV Cache（Prompt Cache）命中率，同时引入 XML 标签防重注入过滤。
@@ -72,6 +78,31 @@ TAVILY_API_KEY=tvly-你的KEY
 PORT=3001
 ```
 *(提示：大模型 API Key 可直接在前端 UI 左侧面板中动态添加，系统会自动将其存盘。)*
+
+---
+
+## 定时任务（Cron Scheduler MVP）
+
+在 Harness 的实验特性中开启 **Cron Scheduler**，然后直接使用自然语言让 Agent 创建任务，例如：
+
+```text
+每 10 分钟查询一次临沂天气并播报。
+```
+
+开启后，Agent 会获得三个工具：
+
+- `schedule_cron`：使用五字段 cron 表达式创建循环或单次任务。
+- `list_crons`：查看任务及 queued/running/succeeded/failed 状态。
+- `cancel_cron`：取消当前 Harness 所属的任务。
+
+持久化任务定义保存在 `server/scheduler/tasks.json`。任务仅保存模型引用，不保存 API Key；每次执行时都会从 `.env` 解析最新的匹配模型配置。如果 Harness 正在运行，定时事件会排队等待，避免同时启动多个 Agent Loop。
+
+MVP 边界：
+
+- Cron 语法支持 `*`、`*/N`、固定值、范围和逗号分隔值。
+- 任务使用服务器本地时区。
+- 服务停止期间错过的任务不会补跑。
+- 当前仅支持 `main` 执行模式；隔离会话、失败重试和详细执行历史将在后续阶段实现。
 
 ---
 

@@ -18,6 +18,12 @@ Many heavy Agent frameworks (such as LangChain) introduce massive black-box enca
 
 ## 🆕 Recent Updates
 
+* **2026-06-20: In-process Cron Scheduler MVP**
+  - **Agent-managed schedules**: Agents can create, inspect, and cancel Harness-scoped jobs with `schedule_cron`, `list_crons`, and `cancel_cron`.
+  - **Durable execution pipeline**: Five-field cron expressions feed an in-process event queue, resolve the latest model configuration at run time, and execute through the existing `AgentExecutor`.
+  - **Visible scheduled runs**: Scheduled prompts, tool calls, final answers, success/failure counts, and current job state appear in the trajectory and Scheduled Tasks panel.
+  - **Safer background behavior**: A busy Harness queues work instead of running concurrent agent loops, while session polling and SSE attachment surface background results in the active UI.
+
 * **2026-06-13: Recoverable Directed Acyclic Graph Task System (DAG Task System) 🕸️**
   - **Backend Task Dependency Stream**: Supports a complex task system based on DAG. Features built-in Kahn's algorithm cycle detection, Claim exclusive file locks for concurrency protection, and automatic rollback of physical board leases when the Agent crashes or exits unexpectedly.
   - **Cache-Friendly & Deduplicated Assembly**: Refactored the plugin lifecycle (`preLLM`). Splits and injects static/dynamic states to maximize LLM KV Cache (Prompt Cache) hit rate, while introducing XML tag deduplication filtering during injection.
@@ -72,6 +78,31 @@ TAVILY_API_KEY=tvly-your-key-here
 PORT=3001
 ```
 *(Tip: LLM API Keys can be dynamically added directly in the left panel of the frontend UI, and the system will automatically persist them.)*
+
+---
+
+## Scheduled Tasks (Cron Scheduler MVP)
+
+Enable **Cron Scheduler** in the Harness experimental features, then ask the agent to create a task in natural language, for example:
+
+```text
+Every 10 minutes, check the weather in Linyi and report it.
+```
+
+When enabled, the agent receives three tools:
+
+- `schedule_cron`: create a recurring or one-shot job with a five-field cron expression.
+- `list_crons`: inspect jobs and their queued/running/succeeded/failed state.
+- `cancel_cron`: cancel a job owned by the current Harness.
+
+Durable definitions are stored in `server/scheduler/tasks.json`. Jobs store a model reference rather than an API key, so each run resolves the latest matching model configuration from `.env`. If the Harness is already running, the scheduled event stays queued until it becomes idle.
+
+MVP boundaries:
+
+- Cron syntax supports `*`, `*/N`, exact values, ranges, and comma-separated values.
+- Jobs use the server's local timezone.
+- Missed runs while the server is stopped are not backfilled.
+- Execution mode is currently `main`; isolated sessions, retries, and detailed run history are planned for later phases.
 
 ---
 
