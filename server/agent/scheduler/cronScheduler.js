@@ -97,6 +97,7 @@ export function createCronScheduler(options = {}) {
       const storedRuns = await loadRuns(runStorePath);
       const interruptedAt = now().toISOString();
       let changed = false;
+      let jobStateChanged = false;
       for (const storedRun of storedRuns.slice(-maxRunHistory)) {
         const run = { ...storedRun };
         if (run.status === 'running') {
@@ -105,11 +106,19 @@ export function createCronScheduler(options = {}) {
           run.durationMs = Math.max(0, Date.parse(interruptedAt) - Date.parse(run.startedAt));
           run.error = 'Server restarted before the scheduled run completed';
           changed = true;
+          const job = jobs.get(run.jobId);
+          if (job?.status === 'running') {
+            job.status = 'interrupted';
+            job.lastFailedAt = interruptedAt;
+            job.lastError = run.error;
+            jobStateChanged = true;
+          }
         }
         runs.push(run);
         if (run.eventId) runIdsByEvent.set(run.eventId, run.id);
       }
       if (changed) await queueRunPersistence();
+      if (jobStateChanged) await queuePersistence();
       return this.listRuns();
     },
 
