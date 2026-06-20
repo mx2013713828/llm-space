@@ -17,6 +17,7 @@ import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
+import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -72,7 +73,8 @@ export class AgentExecutor {
     this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.backgroundTasks = Array.isArray(backgroundTasks) ? [...backgroundTasks] : [];
     this.pendingNotifications = [];
-    this.systemPrompt = systemPrompt;
+    const runtimeContext = formatRuntimeContext(getRuntimeMetadata());
+    this.systemPrompt = composeSystemPrompt(systemPrompt, runtimeContext);
     this.features = parseFeatures(features);
     this.tools = Array.isArray(tools) ? [...tools] : [];
 
