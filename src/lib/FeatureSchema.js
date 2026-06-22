@@ -57,24 +57,19 @@ export const FEATURE_SCHEMA = {
       },
     },
   },
-  task_manager: {
+  task_orchestration: {
     type: 'group',
-    label: 'Task Dashboard & Progress System',
-    description: 'Configure agent task planning and drive-to-completion workflow (automatically disables/masks underlying atomic tools when enabled, accessible via experimental toggles).',
+    label: 'Task Orchestration',
+    description: 'Configure task planning, delegation, background execution, and scheduled job management for the agent runtime.',
     defaultValue: true,
     failSafeValue: true,
+    preserveChildrenWhenDisabled: true,
     children: {
-      enable_background_tasks: {
-        type: 'boolean',
-        label: 'Enable Background Task Runner',
-        description: 'Enable non-blocking asynchronous task execution for slow operations. Provides real-time task notifications and white-box task monitoring in the UI.',
-        defaultValue: false,
-        failSafeValue: false,
-      },
       mode: {
         type: 'select',
-        label: 'Dashboard Operating Mode',
-        description: 'Choose the dashboard engine and dependency resolution mechanism.',
+        section: 'Planning & Tracking',
+        label: 'Task Operating Mode',
+        description: 'Choose the task board engine and dependency resolution mechanism.',
         defaultValue: 'todo',
         failSafeValue: 'todo',
         options: [
@@ -84,6 +79,7 @@ export const FEATURE_SCHEMA = {
       },
       todo_prompt: {
         type: 'text_area',
+        section: 'System Guidelines',
         label: 'Todo Mode System Guidelines (XML Format)',
         description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Todo mode.',
         defaultValue: `<todo_mode_guidelines>
@@ -96,6 +92,7 @@ You must use the \`write_todos\` tool to manage your development board to keep y
       },
       task_system_prompt: {
         type: 'text_area',
+        section: 'System Guidelines',
         label: 'Task System Guidelines (XML Format)',
         description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Task System mode.',
         defaultValue: `<task_system_guidelines>
@@ -108,7 +105,31 @@ When facing complex development tasks, you must use the task dependency system t
 6. Do not write code for multiple consecutive turns without updating the task board status.
 </task_system_guidelines>`,
         failSafeValue: ''
-      }
+      },
+      enable_background_tasks: {
+        type: 'boolean',
+        section: 'Execution',
+        label: 'Enable Background Task Runner',
+        description: 'Enable non-blocking asynchronous task execution for slow operations. Provides real-time task notifications and white-box task monitoring in the UI.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
+      enable_sub_agents: {
+        type: 'boolean',
+        section: 'Delegation',
+        label: 'Enable Sub-agent Delegation',
+        description: 'Allow the runtime to spawn and coordinate sub-agents for scoped work.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
+      enable_cron_scheduler: {
+        type: 'boolean',
+        section: 'Scheduling',
+        label: 'Cron Scheduler',
+        description: 'Allow the agent to create, list, and cancel in-process scheduled tasks for the current harness.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
     }
   },
   enable_skills: {
@@ -159,13 +180,6 @@ When facing complex development tasks, you must use the task dependency system t
         // 依赖约束：此子项须 memory_extract 开启才能生效（UI 层联动控制）
       },
     },
-  },
-  enable_cron_scheduler: {
-    type: 'boolean',
-    label: 'Cron Scheduler',
-    description: 'Allow the agent to create, list, and cancel in-process scheduled tasks for the current harness.',
-    defaultValue: false,
-    failSafeValue: false,
   },
   error_recovery: {
     type: 'group',
@@ -241,7 +255,14 @@ export function parseFeatures(inputFeatures) {
       if (meta.type === 'boolean') {
         parsed[key] = userVal !== undefined ? !!userVal : meta.defaultValue;
       } else if (meta.type === 'select') {
-        parsed[key] = userVal !== undefined ? userVal : meta.defaultValue;
+        const hasOptions = Array.isArray(meta.options) && meta.options.length > 0;
+        if (userVal === undefined) {
+          parsed[key] = meta.defaultValue;
+        } else if (!hasOptions || meta.options.some(option => option.value === userVal)) {
+          parsed[key] = userVal;
+        } else {
+          parsed[key] = meta.defaultValue;
+        }
       } else if (meta.type === 'group') {
         parsed[key] = {};
         const isGroupEnabled = typeof userVal === 'boolean'
@@ -259,12 +280,21 @@ export function parseFeatures(inputFeatures) {
             subVal = userVal?.[subKey];
           }
 
-          if (subMeta.type === 'select' || subMeta.type === 'text_area') {
-            parsed[key][subKey] = isGroupEnabled
+          if (subMeta.type === 'select') {
+            const hasOptions = Array.isArray(subMeta.options) && subMeta.options.length > 0;
+            const rawValue = subVal !== undefined ? subVal : subMeta.defaultValue;
+            const normalizedValue = !hasOptions || subMeta.options.some(option => option.value === rawValue)
+              ? rawValue
+              : subMeta.defaultValue;
+            parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
+              ? normalizedValue
+              : subMeta.defaultValue;
+          } else if (subMeta.type === 'text_area') {
+            parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
               ? (subVal !== undefined ? subVal : subMeta.defaultValue)
               : subMeta.defaultValue;
           } else {
-            parsed[key][subKey] = isGroupEnabled
+            parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
               ? (subVal !== undefined ? !!subVal : subMeta.defaultValue)
               : false;
           }
