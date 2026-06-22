@@ -81,22 +81,6 @@
       }
     },
     {
-      "name": "sub_agent",
-      "description": "Delegate a complex sub-task to a Sub-agent. The Sub-agent will start a completely new, clean context with no conversation history, and return a final summary when finished. Best used when you need extensive information gathering or multi-step experimentation without polluting your current memory with lengthy intermediate outputs. **WARNING: Since the sub-agent has NO context memory, you MUST explain the full context and background in the prompt.**",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "prompt": {
-            "type": "string",
-            "description": "Detailed instructions for the sub-agent. **CRITICALLY IMPORTANT**: The sub-agent has NO history of the main conversation! You MUST provide all necessary background information (e.g., current file paths, relevant code snippets, error messages, or conclusions you have reached) and clear acceptance criteria explicitly in this prompt."
-          }
-        },
-        "required": [
-          "prompt"
-        ]
-      }
-    },
-    {
       "name": "web_search",
       "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
       "input_schema": {
@@ -142,13 +126,6 @@
       "soft_compact": true,
       "hard_compact": true
     },
-    "task_manager": {
-      "enabled": true,
-      "enable_background_tasks": false,
-      "mode": "todo",
-      "todo_prompt": "<todo_mode_guidelines>\nYou must use the `write_todos` tool to manage your development board to keep your progress synchronized with the user:\n1. Upon receiving a complex request, immediately call `write_todos` to break down the task into 4-8 pending sub-tasks.\n2. Each time you complete a sub-task, call `write_todos` to mark its status as \"completed\".\n3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.\n</todo_mode_guidelines>",
-      "task_system_prompt": "<task_system_guidelines>\nWhen facing complex development tasks, you must use the task dependency system to organize your workflow:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Do not write code for multiple consecutive turns without updating the task board status.\n</task_system_guidelines>"
-    },
     "enable_skills": {
       "enabled": false,
       "enable_project_skills": false,
@@ -168,6 +145,15 @@
       "fallback_model_id": "",
       "diminishing_returns": true
     },
-    "parallel_tool_execution": true
+    "parallel_tool_execution": true,
+    "task_orchestration": {
+      "enabled": true,
+      "mode": "todo",
+      "todo_prompt": "<todo_mode_guidelines>\nYou must use the `write_todos` tool to manage your development board to keep your progress synchronized with the user:\n1. Upon receiving a complex request, immediately call `write_todos` to break down the task into 4-8 pending sub-tasks.\n2. Each time you complete a sub-task, call `write_todos` to mark its status as \"completed\".\n3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.\n</todo_mode_guidelines>",
+      "task_system_prompt": "<task_system_guidelines>\nWhen facing complex development tasks, you must use the task dependency system to organize your workflow:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Do not write code for multiple consecutive turns without updating the task board status.\n</task_system_guidelines>",
+      "enable_background_tasks": false,
+      "enable_sub_agents": true,
+      "enable_cron_scheduler": false
+    }
   }
 }

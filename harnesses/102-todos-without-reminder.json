@@ -1,0 +1,79 @@
+{
+  "id": "todos-no-reminder",
+  "name": "102-todos-without-reminder.json",
+  "description": "Todo 执行 agent（无提醒版）",
+  "category": "advanced",
+  "model": {
+    "name": "Claude Sonnet 4.5",
+    "response_format": "text",
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "top_p": 1
+  },
+  "tools": [
+    {
+      "name": "bash",
+      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The bash command to execute"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file from the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Write or overwrite contents into a file on the local filesystem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file"
+          },
+          "content": {
+            "type": "string",
+            "description": "The exact content to write to the file"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    }
+  ],
+  "systemPrompt": "你是一个高效的任务执行 agent。\n\n## 执行原则\n- 收到任务后，先用 write_todos 分解任务\n- 逐步执行每个子任务\n- 执行完毕后更新任务状态为 completed\n- 不要在所有任务完成前给出最终答案\n\n## 注意事项\n- 执行过程中如发现新的子任务，动态添加到 TODO 列表\n- 遇到错误立即标记为 failed 并尝试替代方案",
+  "skills": [],
+  "features": {
+    "task_orchestration": {
+      "enabled": true,
+      "mode": "todo",
+      "enable_background_tasks": false,
+      "enable_sub_agents": false,
+      "enable_cron_scheduler": false
+    }
+  }
+}

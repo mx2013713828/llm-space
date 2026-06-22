@@ -1,7 +1,7 @@
 {
-  "id": "02-bash",
-  "name": "System Bash Sandbox",
-  "description": "Provide bash shell command execution (with stream output) and web search tools.",
+  "id": "test-security",
+  "name": "test-security.json",
+  "description": "",
   "category": "basic",
   "model": {
     "name": "",
@@ -28,22 +28,6 @@
       }
     },
     {
-      "name": "read_file",
-      "description": "Read the contents of a file from the local filesystem.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "Absolute or relative path to the file"
-          }
-        },
-        "required": [
-          "path"
-        ]
-      }
-    },
-    {
       "name": "write_file",
       "description": "Write or overwrite contents into a file on the local filesystem.",
       "input_schema": {
@@ -65,55 +49,23 @@
       }
     },
     {
-      "name": "web_search",
-      "description": "Search the internet for up-to-date information. Returns structured results including titles, URLs, and content snippets. Use this for real-time information, news, or data queries.",
+      "name": "read_file",
+      "description": "Read the contents of a file from the local filesystem.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "query": {
+          "path": {
             "type": "string",
-            "description": "Search keyword or question (concise natural language is recommended)"
+            "description": "Absolute or relative path to the file"
           }
         },
         "required": [
-          "query"
-        ]
-      }
-    },
-    {
-      "name": "web_fetch",
-      "description": "Fetch the full main content of a specified web page (cleaned and converted to Markdown). Use this after finding a URL via web_search to read the full article.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "description": "The full URL of the web page to fetch (e.g., https://example.com/article)"
-          }
-        },
-        "required": [
-          "url"
-        ]
-      }
-    },
-    {
-      "name": "weather_report",
-      "description": "Get weather information for a specified city",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "city": {
-            "type": "string",
-            "description": "The city name (e.g., Beijing, Shanghai, New York)"
-          }
-        },
-        "required": [
-          "city"
+          "path"
         ]
       }
     }
   ],
-  "systemPrompt": "You are a friendly and helpful assistant. Please answer the user's questions accurately and concisely.",
+  "systemPrompt": "你是一个友好的智能助手，请准确、简洁地回答用户的问题。",
   "skills": [],
   "features": {
     "security_mode": "relaxed",
@@ -125,9 +77,9 @@
       "hard_compact": false
     },
     "enable_skills": {
-      "enabled": false,
-      "enable_project_skills": false,
-      "enable_global_skills": false
+      "enabled": true,
+      "enable_project_skills": true,
+      "enable_global_skills": true
     },
     "enable_memory": {
       "enabled": false,
@@ -135,13 +87,13 @@
       "memory_consolidate": false
     },
     "error_recovery": {
-      "enabled": false,
-      "max_tokens_escalation": false,
-      "reactive_compaction": false,
-      "http_retry": false,
-      "fallback_model": false,
+      "enabled": true,
+      "max_tokens_escalation": true,
+      "reactive_compaction": true,
+      "http_retry": true,
+      "fallback_model": true,
       "fallback_model_id": "",
-      "diminishing_returns": false
+      "diminishing_returns": true
     },
     "parallel_tool_execution": false,
     "task_orchestration": {
@@ -149,7 +101,7 @@
       "mode": "todo",
       "todo_prompt": "<todo_mode_guidelines>\nYou must use the `write_todos` tool to manage your development board to keep your progress synchronized with the user:\n1. Upon receiving a complex request, immediately call `write_todos` to break down the task into 4-8 pending sub-tasks.\n2. Each time you complete a sub-task, call `write_todos` to mark its status as \"completed\".\n3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.\n</todo_mode_guidelines>",
       "task_system_prompt": "<task_system_guidelines>\nWhen facing complex development tasks, you must use the task dependency system to organize your workflow:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Do not write code for multiple consecutive turns without updating the task board status.\n</task_system_guidelines>",
-      "enable_background_tasks": true,
+      "enable_background_tasks": false,
       "enable_sub_agents": false,
       "enable_cron_scheduler": false
     }
