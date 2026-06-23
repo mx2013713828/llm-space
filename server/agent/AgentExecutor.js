@@ -310,7 +310,7 @@ export class AgentExecutor {
   /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
-    async run() {
+    async run(maxTurns = 15) {
     // 2.2 优化：单次 Turn 级自愈状态隔离，防止跨轮次/实例并发污染
     const recoveryState = {
       consecutive_529: 0,
@@ -332,7 +332,7 @@ export class AgentExecutor {
 
       await this.saveSession();
 
-      for (let cycle = 0; cycle < 15; cycle++) {
+      for (let cycle = 0; cycle < maxTurns; cycle++) {
         // 构建流水线 Context
         const context = {
           executor: this,

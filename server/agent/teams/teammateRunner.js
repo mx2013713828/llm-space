@@ -1,0 +1,101 @@
+import { AgentExecutor } from '../AgentExecutor.js';
+import { getLastAssistantText } from '../subAgentProfile.js';
+import { createTeamBus } from './teamBus.js';
+import { createTeamStateStore } from './teamStateStore.js';
+import {
+  EMPTY_TEAMMATE_RESULT,
+  createTeammateFeatures,
+  createTeammateSystemPrompt,
+  selectTeammateTools,
+} from './teammateProfile.js';
+
+const defaultTeamBus = createTeamBus();
+const defaultTeamStateStore = createTeamStateStore();
+
+export async function runTeammate({
+  parentExecutor,
+  teamId,
+  teammateId,
+  name,
+  role,
+  initialPrompt,
+  cwd = process.cwd(),
+  maxTurns = 6,
+  ExecutorClass = AgentExecutor,
+  bus = defaultTeamBus,
+  stateStore = defaultTeamStateStore,
+}) {
+  await stateStore.updateTeammate({
+    harnessId: parentExecutor.harnessId,
+    teamId,
+    agentId: teammateId,
+    updates: { state: 'running' },
+  });
+
+  try {
+    const teammateExecutor = new ExecutorClass({
+      cwd,
+      harnessId: parentExecutor.harnessId,
+      runtimeRole: 'teammate',
+      teamContext: { teamId, agentId: teammateId, leadId: 'lead' },
+      messages: [{ role: 'user', content: initialPrompt }],
+      systemPrompt: createTeammateSystemPrompt({ name, role }),
+      tools: selectTeammateTools(parentExecutor.tools),
+      features: createTeammateFeatures(parentExecutor.features),
+      model: parentExecutor.model,
+      temperature: parentExecutor.temperature,
+      maxTokens: parentExecutor.maxTokens,
+      thinkingEnabled: parentExecutor.thinkingEnabled,
+      skills: parentExecutor.skills,
+      onEvent: parentExecutor.onEvent,
+    });
+
+    await teammateExecutor.run(maxTurns);
+
+    const content = getLastAssistantText(teammateExecutor.messages) ?? EMPTY_TEAMMATE_RESULT;
+
+    await bus.sendMessage({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      from: teammateId,
+      to: 'lead',
+      type: 'result',
+      payload: {
+        teammateId,
+        name,
+        role: role ?? null,
+        content,
+      },
+    });
+
+    await stateStore.updateTeammate({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      agentId: teammateId,
+      updates: { state: 'completed' },
+    });
+  } catch (error) {
+    await bus.sendMessage({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      from: teammateId,
+      to: 'lead',
+      type: 'error',
+      payload: {
+        teammateId,
+        name,
+        role: role ?? null,
+        error: error.message,
+      },
+    });
+
+    await stateStore.updateTeammate({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      agentId: teammateId,
+      updates: { state: 'failed', error: error.message },
+    });
+
+    throw error;
+  }
+}
