@@ -82,6 +82,47 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('spawn_teammate clamps maxTurns to a finite positive integer with safe defaults', async () => {
+  const fixture = await createFixture();
+  const runCalls = [];
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn(input) {
+      runCalls.push(input);
+    },
+  });
+
+  const hugeTool = createTool('spawn_teammate', {
+    name: 'reviewer',
+    prompt: 'Review the patch.',
+    maxTurns: 9999,
+  });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool: hugeTool,
+  });
+
+  const invalidTool = createTool('spawn_teammate', {
+    name: 'implementer',
+    prompt: 'Implement the patch.',
+    maxTurns: Number.NaN,
+  });
+  await plugin.preToolUse({
+    executor: {
+      harnessId: 'h1',
+      teamContext: { teamId: JSON.parse(hugeTool.toolOutput).teamId, agentId: 'lead', leadId: 'lead' },
+    },
+    tool: invalidTool,
+  });
+
+  assert.equal(runCalls.length, 2);
+  assert.equal(runCalls[0].maxTurns, 12);
+  assert.equal(runCalls[1].maxTurns, 6);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('send_team_message writes from lead by default and from teammate when team context exists', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
@@ -208,6 +249,54 @@ test('preLLM injects unread lead inbox into context once and consumes it', async
 
   const secondText = context.apiMessages[0].content[0].text;
   assert.equal((secondText.match(/<team_inbox>/g) || []).length, 1);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
+test('preLLM injects teammate inbox using teamContext agentId and consumes it once', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'lead',
+    to: 'teammate_reviewer',
+    type: 'message',
+    payload: { message: 'Please inspect commit 267ba6e.' },
+  });
+
+  const context = {
+    executor: {
+      harnessId: 'h1',
+      runtimeRole: 'teammate',
+      teamContext: { teamId: 'team_1', agentId: 'teammate_reviewer', leadId: 'lead' },
+    },
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'Review the patch.' }] }],
+  };
+
+  await plugin.preLLM(context);
+
+  const firstText = context.apiMessages[0].content[0].text;
+  assert.match(firstText, /<team_inbox>/);
+  assert.match(firstText, /Please inspect commit 267ba6e/);
+
+  await plugin.preLLM(context);
+
+  const secondText = context.apiMessages[0].content[0].text;
+  assert.equal((secondText.match(/<team_inbox>/g) || []).length, 1);
+  assert.deepEqual(
+    await fixture.bus.peekInbox({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      agentId: 'teammate_reviewer',
+    }),
+    [],
+  );
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });

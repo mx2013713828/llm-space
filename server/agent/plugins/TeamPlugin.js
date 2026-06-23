@@ -4,6 +4,8 @@ import { createTeamId, createTeammateId, validateAgentName } from '../teams/team
 import { runTeammate } from '../teams/teammateRunner.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'check_team_inbox']);
+const DEFAULT_TEAMMATE_MAX_TURNS = 6;
+const MAX_TEAMMATE_MAX_TURNS = 12;
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
 
@@ -47,6 +49,22 @@ function injectInboxBlock(apiMessages, block) {
   });
 }
 
+function resolveInboxAgentId(executor) {
+  if (executor.runtimeRole === 'teammate') {
+    return executor.teamContext?.agentId;
+  }
+  return executor.teamContext?.leadId ?? 'lead';
+}
+
+function sanitizeMaxTurns(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_TEAMMATE_MAX_TURNS;
+  }
+
+  return Math.min(MAX_TEAMMATE_MAX_TURNS, Math.floor(parsed));
+}
+
 async function ensureTeam({ executor, stateStore }) {
   const currentTeamId = executor.teamContext?.teamId;
   const teamId = currentTeamId || createTeamId();
@@ -82,15 +100,17 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
 
     async preLLM(context) {
       const { executor, apiMessages } = context;
-      if (!executor || executor.runtimeRole === 'teammate') return;
+      if (!executor) return;
 
       const teamId = executor.teamContext?.teamId;
       if (!teamId) return;
+      const agentId = resolveInboxAgentId(executor);
+      if (!agentId) return;
 
       const inboxMessages = await bus.readInbox({
         harnessId: executor.harnessId,
         teamId,
-        agentId: executor.teamContext?.leadId ?? 'lead',
+        agentId,
       });
 
       if (inboxMessages.length === 0) return;
@@ -135,7 +155,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
             name: args.name,
             role: args.role ?? null,
             initialPrompt: args.prompt,
-            maxTurns: args.maxTurns ?? 6,
+            maxTurns: sanitizeMaxTurns(args.maxTurns),
           })).catch(error => {
             console.error('[TeamPlugin] Teammate runner failed:', error);
           });

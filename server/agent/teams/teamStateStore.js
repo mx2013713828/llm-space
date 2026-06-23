@@ -29,6 +29,27 @@ export function getTeamPaths({ rootDir, harnessId, teamId, agentId }) {
 }
 
 export function createTeamStateStore({ rootDir = path.join(process.cwd(), 'server', 'sessions') } = {}) {
+  const teamWriteQueues = new Map();
+
+  function getTeamQueueKey({ harnessId, teamId }) {
+    return `${validateStorageId('harnessId', harnessId)}:${validateStorageId('teamId', teamId)}`;
+  }
+
+  async function queueTeamWrite({ harnessId, teamId, operation }) {
+    const queueKey = getTeamQueueKey({ harnessId, teamId });
+    const previous = teamWriteQueues.get(queueKey) ?? Promise.resolve();
+    const current = previous.catch(() => {}).then(operation);
+    teamWriteQueues.set(queueKey, current);
+
+    try {
+      return await current;
+    } finally {
+      if (teamWriteQueues.get(queueKey) === current) {
+        teamWriteQueues.delete(queueKey);
+      }
+    }
+  }
+
   async function loadState({ harnessId, teamId }) {
     const { statePath } = getTeamPaths({ rootDir, harnessId, teamId });
     try {
@@ -50,41 +71,59 @@ export function createTeamStateStore({ rootDir = path.join(process.cwd(), 'serve
   }
 
   async function createTeam({ harnessId, teamId = createTeamId(), teammates = [] }) {
-    const state = {
+    return queueTeamWrite({
+      harnessId,
       teamId,
-      teammates: normalizeTeammates(teammates),
-    };
-    return saveState({ harnessId, teamId, state });
+      operation: async () => {
+        const state = {
+          teamId,
+          teammates: normalizeTeammates(teammates),
+        };
+        return saveState({ harnessId, teamId, state });
+      },
+    });
   }
 
   async function upsertTeammate({ harnessId, teamId, teammate }) {
-    const current = (await loadState({ harnessId, teamId })) ?? {
+    return queueTeamWrite({
+      harnessId,
       teamId,
-      teammates: {},
-    };
-    const agentId = validateAgentName(teammate?.agentId);
-    current.teammates[agentId] = {
-      ...(current.teammates[agentId] ?? {}),
-      ...teammate,
-      agentId,
-    };
-    return saveState({ harnessId, teamId, state: current });
+      operation: async () => {
+        const current = (await loadState({ harnessId, teamId })) ?? {
+          teamId,
+          teammates: {},
+        };
+        const agentId = validateAgentName(teammate?.agentId);
+        current.teammates[agentId] = {
+          ...(current.teammates[agentId] ?? {}),
+          ...teammate,
+          agentId,
+        };
+        return saveState({ harnessId, teamId, state: current });
+      },
+    });
   }
 
   async function updateTeammate({ harnessId, teamId, agentId, updates }) {
-    const current = await loadState({ harnessId, teamId });
-    const teammateName = validateAgentName(agentId);
+    return queueTeamWrite({
+      harnessId,
+      teamId,
+      operation: async () => {
+        const current = await loadState({ harnessId, teamId });
+        const teammateName = validateAgentName(agentId);
 
-    if (!current?.teammates?.[teammateName]) {
-      throw new Error(`Unknown teammate: ${teammateName}`);
-    }
+        if (!current?.teammates?.[teammateName]) {
+          throw new Error(`Unknown teammate: ${teammateName}`);
+        }
 
-    current.teammates[teammateName] = {
-      ...current.teammates[teammateName],
-      ...(updates ?? {}),
-      agentId: teammateName,
-    };
-    return saveState({ harnessId, teamId, state: current });
+        current.teammates[teammateName] = {
+          ...current.teammates[teammateName],
+          ...(updates ?? {}),
+          agentId: teammateName,
+        };
+        return saveState({ harnessId, teamId, state: current });
+      },
+    });
   }
 
   return {

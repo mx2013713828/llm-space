@@ -25,14 +25,14 @@ export async function runTeammate({
   bus = defaultTeamBus,
   stateStore = defaultTeamStateStore,
 }) {
-  await stateStore.updateTeammate({
-    harnessId: parentExecutor.harnessId,
-    teamId,
-    agentId: teammateId,
-    updates: { state: 'running' },
-  });
-
   try {
+    await stateStore.updateTeammate({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      agentId: teammateId,
+      updates: { state: 'running' },
+    });
+
     const forwardChildEvent = (type, payload) => {
       if (type === 'messages_update') {
         return;
@@ -83,26 +83,34 @@ export async function runTeammate({
       updates: { state: 'completed' },
     });
   } catch (error) {
-    await bus.sendMessage({
-      harnessId: parentExecutor.harnessId,
-      teamId,
-      from: teammateId,
-      to: 'lead',
-      type: 'error',
-      payload: {
-        teammateId,
-        name,
-        role: role ?? null,
-        error: error.message,
-      },
-    });
+    try {
+      await bus.sendMessage({
+        harnessId: parentExecutor.harnessId,
+        teamId,
+        from: teammateId,
+        to: 'lead',
+        type: 'error',
+        payload: {
+          teammateId,
+          name,
+          role: role ?? null,
+          error: error.message,
+        },
+      });
+    } catch (sendError) {
+      console.error('[runTeammate] Failed to send teammate error envelope:', sendError);
+    }
 
-    await stateStore.updateTeammate({
-      harnessId: parentExecutor.harnessId,
-      teamId,
-      agentId: teammateId,
-      updates: { state: 'failed', error: error.message },
-    });
+    try {
+      await stateStore.updateTeammate({
+        harnessId: parentExecutor.harnessId,
+        teamId,
+        agentId: teammateId,
+        updates: { state: 'failed', error: error.message },
+      });
+    } catch (updateError) {
+      console.error('[runTeammate] Failed to mark teammate as failed:', updateError);
+    }
 
     throw error;
   }

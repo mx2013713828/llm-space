@@ -193,6 +193,68 @@ test('runTeammate marks failed and sends an error message when execution throws'
   ]);
 });
 
+test('runTeammate still reports failure to lead when initial running-state update fails', async () => {
+  const updates = [];
+  const sentMessages = [];
+
+  await assert.rejects(
+    runTeammate({
+      parentExecutor: createParentExecutor(),
+      teamId: 'team_1',
+      teammateId: 'reviewer',
+      name: 'Reviewer',
+      role: 'Critic',
+      initialPrompt: 'Review the patch.',
+      ExecutorClass: FakeExecutor,
+      stateStore: {
+        async updateTeammate(input) {
+          updates.push(input);
+          if (updates.length === 1) {
+            throw new Error('state write failed');
+          }
+        },
+      },
+      bus: {
+        async sendMessage(input) {
+          sentMessages.push(input);
+        },
+      },
+    }),
+    /state write failed/,
+  );
+
+  assert.deepEqual(sentMessages, [
+    {
+      harnessId: 'h1',
+      teamId: 'team_1',
+      from: 'reviewer',
+      to: 'lead',
+      type: 'error',
+      payload: {
+        teammateId: 'reviewer',
+        name: 'Reviewer',
+        role: 'Critic',
+        error: 'state write failed',
+      },
+    },
+  ]);
+
+  assert.deepEqual(updates, [
+    {
+      harnessId: 'h1',
+      teamId: 'team_1',
+      agentId: 'reviewer',
+      updates: { state: 'running' },
+    },
+    {
+      harnessId: 'h1',
+      teamId: 'team_1',
+      agentId: 'reviewer',
+      updates: { state: 'failed', error: 'state write failed' },
+    },
+  ]);
+});
+
 test('runTeammate isolates child harness state and suppresses raw child messages_update events', async () => {
   const forwardedEvents = [];
 

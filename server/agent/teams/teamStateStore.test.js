@@ -75,6 +75,34 @@ test('updateTeammate rejects missing teammates with a readable error', async () 
   await rm(rootDir, { recursive: true, force: true });
 });
 
+test('concurrent upsertTeammate calls for one team preserve both teammates', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const store = createTeamStateStore({ rootDir });
+
+  await store.createTeam({ harnessId: 'h1', teamId: 'team_1' });
+
+  await Promise.all([
+    store.upsertTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      teammate: { agentId: 'reviewer', status: 'busy' },
+    }),
+    store.upsertTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      teammate: { agentId: 'implementer', status: 'idle' },
+    }),
+  ]);
+
+  const saved = await store.loadState({ harnessId: 'h1', teamId: 'team_1' });
+  assert.deepEqual(saved.teammates, {
+    reviewer: { agentId: 'reviewer', status: 'busy' },
+    implementer: { agentId: 'implementer', status: 'idle' },
+  });
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
 test('saveState rejects team ids with path traversal', async () => {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
   const store = createTeamStateStore({ rootDir });
