@@ -30,7 +30,24 @@ async function parseInboxFile(inboxPath) {
   }
 }
 
-export function createTeamBus({ rootDir = path.join(process.cwd(), 'server', 'sessions') } = {}) {
+async function handOffInboxFile(inboxPath) {
+  const processingPath = `${inboxPath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.processing`;
+
+  try {
+    await fs.rename(inboxPath, processingPath);
+    return processingPath;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function createTeamBus({
+  rootDir = path.join(process.cwd(), 'server', 'sessions'),
+  _testHooks = {},
+} = {}) {
   async function sendMessage({ harnessId, ...input }) {
     const envelope = createMessageEnvelope(input);
     const { inboxPath } = getTeamPaths({
@@ -53,15 +70,28 @@ export function createTeamBus({ rootDir = path.join(process.cwd(), 'server', 'se
 
   async function readInbox({ harnessId, teamId, agentId }) {
     const { inboxPath } = getTeamPaths({ rootDir, harnessId, teamId, agentId });
-    const { validMessages, badLines } = await parseInboxFile(inboxPath);
+    const processingPath = await handOffInboxFile(inboxPath);
 
-    await fs.mkdir(path.dirname(inboxPath), { recursive: true });
-    await fs.writeFile(inboxPath, '', 'utf-8');
-    if (badLines.length > 0) {
-      await fs.appendFile(`${inboxPath}.bad`, badLines.join(''), 'utf-8');
+    if (!processingPath) {
+      return [];
     }
 
-    return validMessages;
+    try {
+      await fs.mkdir(path.dirname(inboxPath), { recursive: true });
+      await fs.appendFile(inboxPath, '', 'utf-8');
+
+      await _testHooks.afterInboxSnapshot?.({ inboxPath, processingPath });
+
+      const { validMessages, badLines } = await parseInboxFile(processingPath);
+
+      if (badLines.length > 0) {
+        await fs.appendFile(`${inboxPath}.bad`, badLines.join(''), 'utf-8');
+      }
+
+      return validMessages;
+    } finally {
+      await fs.rm(processingPath, { force: true });
+    }
   }
 
   return {

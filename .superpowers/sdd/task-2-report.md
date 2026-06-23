@@ -149,3 +149,54 @@ Exact result:
 - The fix preserves the existing requirement that `sendMessage()` receives `harnessId`.
 - The validator allows current normal IDs such as `h1`, `team_1`, and generated `team_<hex>` values while rejecting separators and traversal inputs like `../escape`.
 - The extra containment check keeps filesystem writes scoped under the configured sessions root even if future callers regress on validation.
+
+## Re-review Fix: Make inbox consumption append-safe
+
+### Files changed
+
+- `server/agent/teams/teamBus.js`
+- `server/agent/teams/teamBus.test.js`
+- `.superpowers/sdd/task-2-report.md`
+
+### What changed
+
+- Replaced `readInbox()`'s read-then-truncate flow with an append-safe handoff that atomically renames the inbox file to a unique processing snapshot.
+- Recreated the live inbox with append semantics immediately after handoff so later `sendMessage()` calls write into the fresh inbox instead of being truncated away.
+- Kept `peekInbox()` unchanged, continued parsing the handed-off snapshot for valid messages, copied malformed lines to `.bad`, and removed the temporary processing file after consumption.
+- Added a regression test seam via a private `_testHooks.afterInboxSnapshot` option on `createTeamBus()` and used it only in tests to prove a message appended after snapshot handoff is delivered on the next `readInbox()`.
+
+### Tests run
+
+RED command:
+
+```bash
+node --test server/agent/teams/teamBus.test.js
+```
+
+RED result:
+
+- Exit code: `1`
+- Tests: `5`
+- Passed: `4`
+- Failed: `1`
+- Failure: `readInbox keeps messages appended after snapshot handoff for the next read` expected the second read to contain the post-handoff message, but got `0`
+
+GREEN command:
+
+```bash
+node --test server/agent/teams/*.test.js
+```
+
+GREEN result:
+
+- Exit code: `0`
+- Tests: `14`
+- Passed: `14`
+- Failed: `0`
+- Duration: about `56.13ms`
+
+### Self-review
+
+- Scope stayed limited to the TeamBus implementation, its tests, and this report.
+- The consume protocol now isolates a stable snapshot for parsing, which closes the truncation race without changing the production `sendMessage`/`readInbox`/`peekInbox` surface.
+- The private hook is narrowly scoped to test orchestration and does not affect normal callers unless they deliberately opt into `_testHooks`.
