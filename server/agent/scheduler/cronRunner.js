@@ -128,6 +128,10 @@ export async function processScheduledEvents({
         // Eligibility lookup errors should flow into the normal execution path.
       }
     }
+    if (activeJobs?.has(event.harnessId)) {
+      scheduler.requeueDueEvents([event]);
+      continue;
+    }
     const reservation = { executor: null, clients: new Set(), source: 'cron-reservation' };
     activeJobs?.set(event.harnessId, reservation);
     try {

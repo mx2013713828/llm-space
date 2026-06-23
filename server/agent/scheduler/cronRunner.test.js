@@ -108,6 +108,68 @@ test('reserves a harness before awaiting scheduled event startup', async () => {
   assert.equal(activeJobs.size, 0);
 });
 
+test('rechecks active harness after async eligibility before reserving', async () => {
+  const event = {
+    id: 'evt_1',
+    jobId: 'cron_1',
+    harnessId: '01-chat-bot',
+    prompt: 'check build'
+  };
+  const requeued = [];
+  let drains = 0;
+  const scheduler = {
+    drainDueEvents() {
+      drains += 1;
+      return drains <= 2 ? [{ ...event, id: `evt_${drains}` }] : [];
+    },
+    requeueDueEvents(events) {
+      requeued.push(...events);
+    },
+    async markEventStarted() {},
+    async markEventSucceeded() {},
+    async markEventFailed() {}
+  };
+  const activeJobs = new Map();
+  const releaseEligibility = [];
+  const shouldRunEvent = async () => new Promise(resolve => {
+    releaseEligibility.push(() => resolve(true));
+  });
+  let releaseFirstRun;
+  const firstRun = new Promise(resolve => {
+    releaseFirstRun = resolve;
+  });
+  let markFirstRunStarted;
+  const firstRunStarted = new Promise(resolve => {
+    markFirstRunStarted = resolve;
+  });
+  const ranEvents = [];
+  const runEvent = async (receivedEvent) => {
+    ranEvents.push(receivedEvent.id);
+    markFirstRunStarted();
+    await firstRun;
+  };
+
+  const firstProcessor = processScheduledEvents({ scheduler, activeJobs, shouldRunEvent, runEvent });
+  await Promise.resolve();
+  const secondProcessor = processScheduledEvents({ scheduler, activeJobs, shouldRunEvent, runEvent });
+  await Promise.resolve();
+
+  assert.equal(releaseEligibility.length, 2);
+  releaseEligibility[0]();
+  await firstRunStarted;
+  assert.deepEqual(ranEvents, ['evt_1']);
+
+  releaseEligibility[1]();
+  await secondProcessor;
+  assert.deepEqual(ranEvents, ['evt_1']);
+  assert.equal(requeued.length, 1);
+  assert.equal(requeued[0].id, 'evt_2');
+
+  releaseFirstRun();
+  await firstProcessor;
+  assert.equal(activeJobs.size, 0);
+});
+
 test('passes the scheduled thinking setting to the executor', async () => {
   let executorOptions;
   class FakeExecutor {
