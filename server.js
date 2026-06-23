@@ -22,6 +22,7 @@ import { parseModelsConfig, upsertModelsConfig } from './server/modelConfig.js';
 import { cronScheduler } from './server/agent/scheduler/cronScheduler.js';
 import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js';
 import { createCronApiHandlers } from './server/agent/scheduler/cronApi.js';
+import { buildPersistedSessionState, readSessionState, resolveRunTeamContext } from './server/sessions/sessionState.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -828,6 +829,16 @@ app.post('/api/agent/run', async (req, res) => {
     return res.status(400).json({ error: '缺少 harnessId' });
   }
 
+  if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
+    return res.status(400).json({ error: '非法的 Harness ID' });
+  }
+
+  const effectiveTeamContext = await resolveRunTeamContext({
+    sessionsDir: SESSIONS_DIR,
+    harnessId,
+    requestedTeamContext: teamContext,
+  });
+
   // Branch 1: The job is already running
   if (activeJobs.has(harnessId)) {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -869,7 +880,7 @@ app.post('/api/agent/run', async (req, res) => {
   // Branch 2: The job is not running yet
   const executor = new AgentExecutor({
     harnessId,
-    teamContext,
+    teamContext: effectiveTeamContext,
     messages,
     todos,
     backgroundTasks,
@@ -1028,13 +1039,12 @@ app.get('/api/sessions/:harnessId', async (req, res) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
       return res.status(400).json({ error: '非法的 Harness ID' });
     }
-    const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
-    const content = await fs.readFile(sessionPath, 'utf-8');
-    res.json(JSON.parse(content));
-  } catch (err) {
-    if (err.code === 'ENOENT') {
+    const sessionState = await readSessionState(SESSIONS_DIR, harnessId);
+    if (!sessionState) {
       return res.json(null); // 不存在则返回 null
     }
+    res.json(sessionState);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -1048,28 +1058,14 @@ app.post('/api/sessions/:harnessId', async (req, res) => {
     }
     const { messages, todos, backgroundTasks, teamContext } = req.body;
     const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
-    let persistedTeamContext;
-    if (teamContext !== undefined) {
-      persistedTeamContext = teamContext;
-    } else {
-      try {
-        const existingSession = JSON.parse(await fs.readFile(sessionPath, 'utf-8'));
-        persistedTeamContext = existingSession?.teamContext;
-      } catch (err) {
-        if (err.code !== 'ENOENT') {
-          throw err;
-        }
-      }
-    }
-
-    const sessionState = {
+    const sessionState = await buildPersistedSessionState({
+      sessionsDir: SESSIONS_DIR,
+      harnessId,
       messages: messages || [],
       todos: todos || [],
       backgroundTasks: backgroundTasks || [],
-    };
-    if (persistedTeamContext) {
-      sessionState.teamContext = persistedTeamContext;
-    }
+      teamContext,
+    });
 
     await fs.writeFile(sessionPath, JSON.stringify(sessionState, null, 2), 'utf-8');
     res.json({ success: true });

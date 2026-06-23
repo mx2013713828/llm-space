@@ -194,7 +194,12 @@ function AppContent() {
   const handleSessionUpdate = useCallback((messages, todos, backgroundTasks) => {
     setSessions(prev => ({
       ...prev,
-      [activeHarnessId]: { messages, todos, backgroundTasks }
+      [activeHarnessId]: {
+        ...prev[activeHarnessId],
+        messages,
+        todos,
+        backgroundTasks,
+      }
     }));
     saveSessionToBackend(activeHarnessId, messages, todos, backgroundTasks);
   // eslint-disable-next-line react-hooks/exhaustive-deps

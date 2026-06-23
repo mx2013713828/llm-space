@@ -158,3 +158,58 @@ npm run build
 - Session sync is resilient now: backend saves include `teamContext`, and frontend autosaves no longer erase it if they post without that field.
 - The later-executor regression is covered directly at the plugin boundary, which is where lost `teamContext` previously broke lead inbox injection and implicit tool routing.
 - Teammate child execution remains isolated because child executors still run with `harnessId: ''`, so this fix does not widen session persistence scope.
+
+## Fix: recover team context server side
+
+### Files changed
+
+- `server.js`
+- `server/sessions/sessionState.js`
+- `server/sessions/sessionState.test.js`
+- `src/App.jsx`
+
+### What changed
+
+- Added server-side `/api/agent/run` fallback so when `req.body.teamContext` is `undefined` or `null`, the server loads `server/sessions/${harnessId}.json` and reuses persisted `teamContext` when available.
+- Kept the fallback benign for missing or malformed session files during `/api/agent/run`; the route now simply continues with `null` team context in those cases.
+- Moved the session-state merge logic into a focused helper so the existing `POST /api/sessions/:harnessId` preservation behavior stays intact while sharing the same persistence rules.
+- Updated `App.jsx` `handleSessionUpdate` to merge into the existing local session entry instead of replacing it, which preserves `sessions[activeHarnessId].teamContext` during normal messages/todos/backgroundTasks updates.
+- Left teammate child execution unchanged; child executors still use `harnessId: ''`.
+
+### Tests run and exact results
+
+Focused session helper tests:
+
+```bash
+node --test server/sessions/sessionState.test.js
+```
+
+- Exit code: `0`
+- `2` tests passed
+- `0` tests failed
+
+Required coverage command:
+
+```bash
+node --test server/agent/plugins/TeamPlugin.test.js server/agent/teams/*.test.js server/tools/ToolRegistry.test.js server/agent/AgentExecutor.orchestration.test.js server/sessions/sessionState.test.js
+```
+
+- Exit code: `0`
+- `38` tests passed
+- `0` tests failed
+
+Frontend build:
+
+```bash
+npm run build
+```
+
+- Exit code: `0`
+- Vite production build completed successfully
+
+### Self-review
+
+- The server now owns lead-context recovery, so rebuilt executors no longer depend on the client remembering to resend `teamContext`.
+- The fallback is intentionally narrow: it only applies when the run request omits `teamContext` or sends `null`, and it still preserves any explicit client-provided value.
+- `POST /api/sessions/:harnessId` keeps its prior semantics: omitted `teamContext` preserves the existing saved value, while explicit `null` still clears it.
+- The frontend fix is limited to the local session cache merge and does not widen session payload shape or alter run-loop behavior.
