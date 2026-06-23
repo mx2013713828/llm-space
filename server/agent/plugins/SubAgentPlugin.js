@@ -1,4 +1,5 @@
 import { AgentExecutor } from '../AgentExecutor.js';
+import { getToolName } from '../../../src/lib/taskOrchestration.js';
 
 export const SubAgentPlugin = {
   name: 'SubAgentPlugin',
@@ -8,11 +9,18 @@ export const SubAgentPlugin = {
     if (tool.toolName === 'sub_agent' && tool.toolInput?.prompt) {
       try {
         // 实例化子代理：继承主配置，但过滤掉 sub_agent 工具防套娃
+        const childTaskOrchestration = {
+          ...executor.features?.task_orchestration,
+          enable_sub_agents: false,
+        };
         const subExecutor = new AgentExecutor({
           messages: [{ role: 'user', content: tool.toolInput.prompt }],
           systemPrompt: '你是一个子代理（Sub-agent）。请根据用户的具体任务，利用工具完成研究或操作。完成任务后，请输出最终的总结报告。请尽力而为，如果尝试多次失败也请如实报告。',
-          tools: executor.tools.filter(t => t.name !== 'sub_agent'),
-          features: executor.features,
+          tools: executor.tools.filter(t => getToolName(t) !== 'sub_agent'),
+          features: {
+            ...executor.features,
+            task_orchestration: childTaskOrchestration,
+          },
           model: executor.model,
           temperature: executor.temperature,
           maxTokens: executor.maxTokens,
