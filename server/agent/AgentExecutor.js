@@ -56,6 +56,8 @@ export class AgentExecutor {
    */
   constructor({
     harnessId = '',
+    runtimeRole = 'lead',
+    teamContext = null,
     messages = [],
     todos = [],
     backgroundTasks = [],
@@ -70,6 +72,8 @@ export class AgentExecutor {
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
+    this.runtimeRole = runtimeRole;
+    this.teamContext = teamContext;
     this.messages = [...(Array.isArray(messages) ? messages : [])];
     this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.backgroundTasks = Array.isArray(backgroundTasks) ? [...backgroundTasks] : [];
@@ -81,7 +85,7 @@ export class AgentExecutor {
     const orchestrationEnabled = isOrchestrationEnabled(orchestration);
     const isTaskSystem = orchestrationEnabled && orchestration?.mode === 'task_system';
     const isTodoMode = orchestrationEnabled && orchestration?.mode === 'todo';
-    this.tools = resolveOrchestrationTools(tools, orchestration);
+    this.tools = resolveOrchestrationTools(tools, orchestration, { runtimeRole });
 
     if (!this.tools.some(tool => tool === 'get_current_time' || tool?.name === 'get_current_time')) {
       this.tools.push('get_current_time');

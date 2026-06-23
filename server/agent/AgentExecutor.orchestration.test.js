@@ -102,3 +102,31 @@ test('background and cron tools require the canonical parent and child switches 
   assert.equal(childEnabled.tools.includes('cancel_cron'), true);
   assert.equal(childEnabled.tools.filter(tool => tool === 'get_current_time').length, 1);
 });
+
+test('teammate runtime keeps team messaging but strips lead-only orchestration tools', () => {
+  const executor = createExecutor({
+    runtimeRole: 'teammate',
+    tools: [
+      'bash',
+      'write_todos',
+      'spawn_teammate',
+      'send_team_message',
+      'check_team_inbox',
+      'sub_agent',
+      'get_current_time',
+    ],
+    features: {
+      task_orchestration: {
+        enabled: true,
+        mode: 'todo',
+        enable_sub_agents: true,
+        enable_agent_teams: true,
+        enable_background_tasks: true,
+        enable_cron_scheduler: true,
+      },
+    },
+  });
+
+  assert.equal(executor.runtimeRole, 'teammate');
+  assert.deepEqual(executor.tools.sort(), ['bash', 'get_current_time', 'send_team_message'].sort());
+});

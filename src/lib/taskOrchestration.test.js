@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
+  TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
   getNextGroupFeatureState,
   getToolName,
   isOrchestrationEnabled,
@@ -42,6 +43,37 @@ test('mounts only the enabled orchestration capabilities without duplicates', ()
     'cancel_cron',
   ]);
   assert.equal(new Set(ORCHESTRATION_MANAGED_TOOL_NAMES).size, ORCHESTRATION_MANAGED_TOOL_NAMES.length);
+});
+
+test('lead gets team tools only when agent teams is enabled', () => {
+  assert.deepEqual(
+    resolveOrchestrationTools(['bash'], {
+      enabled: true,
+      mode: 'todo',
+      enable_agent_teams: true,
+    }),
+    ['bash', 'write_todos', 'spawn_teammate', 'send_team_message', 'check_team_inbox']
+  );
+});
+
+test('teammate only keeps team communication from orchestration tools', () => {
+  assert.deepEqual(
+    resolveOrchestrationTools([
+      'bash',
+      'write_todos',
+      'spawn_teammate',
+      'send_team_message',
+      'check_team_inbox',
+      'sub_agent',
+    ], {
+      enabled: true,
+      mode: 'todo',
+      enable_agent_teams: true,
+    }, {
+      runtimeRole: 'teammate',
+    }),
+    ['bash', 'send_team_message']
+  );
 });
 
 test('isolates task-system delegation without background or cron tools', () => {
@@ -204,6 +236,25 @@ test('managed orchestration tools hide delegation, background, task, and cron to
   assert.equal(ORCHESTRATION_MANAGED_TOOL_NAMES.includes('bash'), false);
 });
 
+test('hidden orchestration tools include teams tools for UI-managed filtering', () => {
+  assert.deepEqual(TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES, [
+    'write_todos',
+    'create_task',
+    'list_tasks',
+    'get_task',
+    'claim_task',
+    'complete_task',
+    'sub_agent',
+    'query_background_tasks',
+    'schedule_cron',
+    'list_crons',
+    'cancel_cron',
+    'spawn_teammate',
+    'check_team_inbox',
+    'send_team_message',
+  ]);
+});
+
 test('preserves task orchestration child values when parent is disabled and re-enabled', () => {
   const taskOrchestration = FEATURE_SCHEMA.task_orchestration;
   const previousValue = {
@@ -213,6 +264,7 @@ test('preserves task orchestration child values when parent is disabled and re-e
     task_system_prompt: '<task>custom</task>',
     enable_background_tasks: true,
     enable_sub_agents: true,
+    enable_agent_teams: true,
     enable_cron_scheduler: true,
   };
 

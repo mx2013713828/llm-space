@@ -10,6 +10,14 @@ test('exposes canonical task orchestration sections', () => {
   assert.equal(group.label, 'Task Orchestration');
   assert.equal(group.preserveChildrenWhenDisabled, true);
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
+  assert.deepEqual(group.children.enable_agent_teams, {
+    type: 'boolean',
+    section: 'Delegation',
+    label: 'Enable Agent Teams',
+    description: 'Allow the lead agent to spawn finite asynchronous teammates and exchange structured team messages.',
+    defaultValue: false,
+    failSafeValue: false,
+  });
   assert.equal(group.children.enable_cron_scheduler.section, 'Scheduling');
   assert.equal(FEATURE_SCHEMA[legacyTaskManagerKey], undefined);
   assert.equal(FEATURE_SCHEMA[legacyCronKey], undefined);
@@ -21,6 +29,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
       enabled: false,
       mode: 'task_system',
       enable_sub_agents: true,
+      enable_agent_teams: true,
       enable_cron_scheduler: true,
     }
   }).task_orchestration;
@@ -28,6 +37,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
   assert.equal(disabled.enabled, false);
   assert.equal(disabled.mode, 'task_system');
   assert.equal(disabled.enable_sub_agents, true);
+  assert.equal(disabled.enable_agent_teams, true);
   assert.equal(disabled.enable_cron_scheduler, true);
 
   const invalid = parseFeatures({ task_orchestration: { enabled: true, mode: 'invalid' } });

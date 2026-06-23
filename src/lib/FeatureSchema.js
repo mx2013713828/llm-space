@@ -122,6 +122,14 @@ When facing complex development tasks, you must use the task dependency system t
         defaultValue: false,
         failSafeValue: false,
       },
+      enable_agent_teams: {
+        type: 'boolean',
+        section: 'Delegation',
+        label: 'Enable Agent Teams',
+        description: 'Allow the lead agent to spawn finite asynchronous teammates and exchange structured team messages.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
       enable_cron_scheduler: {
         type: 'boolean',
         section: 'Scheduling',
