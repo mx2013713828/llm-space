@@ -16,6 +16,9 @@ import scheduleCron from './schedule_cron.js';
 import listCrons from './list_crons.js';
 import cancelCron from './cancel_cron.js';
 import getCurrentTime from './get_current_time.js';
+import spawnTeammate from './spawn_teammate.js';
+import sendTeamMessage from './send_team_message.js';
+import checkTeamInbox from './check_team_inbox.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -42,6 +45,9 @@ class ToolRegistry {
       list_crons: listCrons,
       cancel_cron: cancelCron,
       get_current_time: getCurrentTime,
+      spawn_teammate: spawnTeammate,
+      send_team_message: sendTeamMessage,
+      check_team_inbox: checkTeamInbox,
     };
   }
 

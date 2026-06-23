@@ -16,6 +16,7 @@ import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
+import { TeamPlugin } from './plugins/TeamPlugin.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
@@ -132,6 +133,9 @@ export class AgentExecutor {
     }
     this.hooks.register(CronSchedulerPlugin);
     this.hooks.register(SubAgentPlugin);
+    if (this.runtimeRole === 'teammate' || isOrchestrationEnabled(orchestration, 'enable_agent_teams')) {
+      this.hooks.register(TeamPlugin);
+    }
 
   }
 

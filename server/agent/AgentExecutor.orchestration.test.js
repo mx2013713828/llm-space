@@ -203,3 +203,72 @@ test('teammate runtime does not mount planning plugins in todo or task-system mo
   assert.equal(registeredPluginNames.includes('TodoNagPlugin'), false);
   assert.equal(registeredPluginNames.includes('TaskSystemPlugin'), false);
 });
+
+test('TeamPlugin mounts for lead only when agent teams is enabled', () => {
+  const originalRegister = HookManager.prototype.register;
+  const registeredPluginNames = [];
+
+  HookManager.prototype.register = function register(plugin) {
+    registeredPluginNames.push(plugin?.name ?? '(anonymous)');
+    return originalRegister.call(this, plugin);
+  };
+
+  try {
+    createExecutor({
+      runtimeRole: 'lead',
+      tools: ['bash'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: true,
+        },
+      },
+    });
+
+    createExecutor({
+      runtimeRole: 'lead',
+      tools: ['bash'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: false,
+        },
+      },
+    });
+  } finally {
+    HookManager.prototype.register = originalRegister;
+  }
+
+  const teamPluginRegistrations = registeredPluginNames.filter(name => name === 'TeamPlugin').length;
+  assert.equal(teamPluginRegistrations, 1);
+});
+
+test('TeamPlugin mounts for teammate runtime even when lead team orchestration is disabled', () => {
+  const originalRegister = HookManager.prototype.register;
+  const registeredPluginNames = [];
+
+  HookManager.prototype.register = function register(plugin) {
+    registeredPluginNames.push(plugin?.name ?? '(anonymous)');
+    return originalRegister.call(this, plugin);
+  };
+
+  try {
+    createExecutor({
+      runtimeRole: 'teammate',
+      tools: ['bash', 'send_team_message'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: false,
+        },
+      },
+    });
+  } finally {
+    HookManager.prototype.register = originalRegister;
+  }
+
+  assert.equal(registeredPluginNames.includes('TeamPlugin'), true);
+});
