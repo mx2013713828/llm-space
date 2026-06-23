@@ -1,0 +1,76 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+import { createTeamStateStore } from './teamStateStore.js';
+
+test('createTeam creates and persists initial team state', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const store = createTeamStateStore({ rootDir });
+
+  const created = await store.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'lead', status: 'idle' },
+      { agentId: 'reviewer', status: 'idle' },
+    ],
+  });
+
+  assert.equal(created.teamId, 'team_1');
+  assert.deepEqual(created.teammates, {
+    lead: { agentId: 'lead', status: 'idle' },
+    reviewer: { agentId: 'reviewer', status: 'idle' },
+  });
+  assert.deepEqual(await store.loadState({ harnessId: 'h1', teamId: 'team_1' }), created);
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
+test('upsertTeammate and updateTeammate create and update teammate status', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const store = createTeamStateStore({ rootDir });
+
+  await store.createTeam({ harnessId: 'h1', teamId: 'team_1' });
+  await store.upsertTeammate({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammate: { agentId: 'reviewer', status: 'idle' },
+  });
+
+  const updated = await store.updateTeammate({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    agentId: 'reviewer',
+    updates: { status: 'busy', lastSeenAt: '2026-06-23T00:00:00.000Z' },
+  });
+
+  assert.deepEqual(updated.teammates.reviewer, {
+    agentId: 'reviewer',
+    status: 'busy',
+    lastSeenAt: '2026-06-23T00:00:00.000Z',
+  });
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
+test('updateTeammate rejects missing teammates with a readable error', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const store = createTeamStateStore({ rootDir });
+
+  await store.createTeam({ harnessId: 'h1', teamId: 'team_1' });
+
+  await assert.rejects(
+    store.updateTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      agentId: 'ghost',
+      updates: { status: 'busy' },
+    }),
+    /Unknown teammate/,
+  );
+
+  await rm(rootDir, { recursive: true, force: true });
+});
