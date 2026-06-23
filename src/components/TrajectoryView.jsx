@@ -4,6 +4,8 @@ import { TodoList } from './TodoList';
 import { ScheduledTasksPanel } from './ScheduledTasksPanel';
 import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js';
 import { getUserMessagePresentation } from '../lib/messagePresentation.js';
+import { parseFeatures } from '../lib/FeatureSchema.js';
+import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 
 export function TrajectoryView({
   activeRightTab,
@@ -55,6 +57,7 @@ export function TrajectoryView({
     ? Math.round(cacheStats.hitTokens / totalCacheTokens * 100)
     : 0;
   const providerLabel = cacheStats.provider || '';
+  const orchestration = parseFeatures(harness?.features || {}).task_orchestration;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
@@ -67,11 +70,11 @@ export function TrajectoryView({
         {[
           { key: 'trajectory', label: '🔄 Run Trajectory' },
           { key: 'todos', label: `✅ TODO${todos.length > 0 ? ` (${todos.length})` : ''}` },
-          harness?.features?.task_manager?.enable_background_tasks && {
+          isOrchestrationEnabled(orchestration, 'enable_background_tasks') && {
             key: 'background_tasks',
             label: `⚙️ Background Tasks${backgroundTasks && backgroundTasks.length > 0 ? ` (${backgroundTasks.filter(t => t.status === 'running').length}/${backgroundTasks.length})` : ''}`
           },
-          harness?.features?.enable_cron_scheduler && {
+          isOrchestrationEnabled(orchestration, 'enable_cron_scheduler') && {
             key: 'scheduled',
             label: 'Scheduled'
           }

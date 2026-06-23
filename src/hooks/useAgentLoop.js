@@ -4,6 +4,7 @@ import { parseFeatures } from '../lib/FeatureSchema.js';
 import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 import { shouldSubmitMessage } from '../lib/chatInput.js';
 import { fetchHarnessSession } from '../lib/sessionApi.js';
+import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -44,6 +45,7 @@ export function useAgentLoop({
   const textareaRef = useRef(null);
   const isComposingRef = useRef(false);
   const [inputText, setInputText] = useState('');
+  const parsedFeatures = parseFeatures(harness?.features || {});
 
   // Track last reported content to avoid triggering onSessionUpdate unnecessarily
   const lastReportedRef = useRef({ messages: null, todos: null, backgroundTasks: null });
@@ -105,7 +107,7 @@ export function useAgentLoop({
     setBackgroundTasks(incoming.backgroundTasks);
   }, [savedSession, harness, isRunning]);
 
-  const cronSchedulerEnabled = harness?.features?.enable_cron_scheduler === true;
+  const cronSchedulerEnabled = isOrchestrationEnabled(parsedFeatures.task_orchestration, 'enable_cron_scheduler');
   useEffect(() => {
     if (!cronSchedulerEnabled || !harness?.id || isRunning) return undefined;
 

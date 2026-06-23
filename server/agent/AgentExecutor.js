@@ -18,6 +18,7 @@ import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
+import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -76,31 +77,11 @@ export class AgentExecutor {
     const runtimeContext = formatRuntimeContext(getRuntimeMetadata());
     this.systemPrompt = composeSystemPrompt(systemPrompt, runtimeContext);
     this.features = parseFeatures(features);
-    this.tools = Array.isArray(tools) ? [...tools] : [];
-
-    // 动态装配与净化任务看板工具
-    const isTaskManagerEnabled = this.features.task_manager?.enabled !== false;
-    const isTaskSystem = isTaskManagerEnabled && this.features.task_manager?.mode === 'task_system';
-    const isTodoMode = isTaskManagerEnabled && this.features.task_manager?.mode === 'todo';
-
-    const taskSystemTools = ['create_task', 'list_tasks', 'get_task', 'claim_task', 'complete_task'];
-    const allBoardTools = [...taskSystemTools, 'write_todos'];
-
-    // 首先清理从预设配置文件或外部传入的任何看板原子工具，防止配置冲突或残留
-    this.tools = this.tools.filter(t => !allBoardTools.includes(t) && !allBoardTools.some(bt => t?.name === bt));
-
-    // 根据运行模式，自动隐式向工具箱注入对应的底层工具
-    if (isTaskSystem) {
-      taskSystemTools.forEach(tName => this.tools.push(tName));
-    } else if (isTodoMode) {
-      this.tools.push('write_todos');
-    }
-
-    if (this.features.enable_cron_scheduler === true) {
-      ['schedule_cron', 'list_crons', 'cancel_cron'].forEach(tName => {
-        if (!this.tools.includes(tName)) this.tools.push(tName);
-      });
-    }
+    const orchestration = this.features.task_orchestration;
+    const orchestrationEnabled = isOrchestrationEnabled(orchestration);
+    const isTaskSystem = orchestrationEnabled && orchestration?.mode === 'task_system';
+    const isTodoMode = orchestrationEnabled && orchestration?.mode === 'todo';
+    this.tools = resolveOrchestrationTools(tools, orchestration);
 
     if (!this.tools.some(tool => tool === 'get_current_time' || tool?.name === 'get_current_time')) {
       this.tools.push('get_current_time');
@@ -512,7 +493,7 @@ export class AgentExecutor {
             await this.hooks.dispatch('preToolUse', toolContext);
 
             if (!tool.handled) {
-              const isBgEnabled = this.features.task_manager?.enabled !== false && this.features.task_manager?.enable_background_tasks === true;
+              const isBgEnabled = isOrchestrationEnabled(this.features.task_orchestration, 'enable_background_tasks');
               if (tool.toolName === 'query_background_tasks') {
                 const activeTasks = this.backgroundTasks.map(t => ({
                   id: t.id,
@@ -627,11 +608,6 @@ export class AgentExecutor {
 
       // 提取目前启用的工具清单并生成后端统一定义的 Schema
       const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
-      if (this.features.task_manager?.enable_background_tasks) {
-        if (!enabledToolNames.includes('query_background_tasks')) {
-          enabledToolNames.push('query_background_tasks');
-        }
-      }
       const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
 
       // 使用 alignRequestPayload 进行对齐 and 重排

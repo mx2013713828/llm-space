@@ -8,11 +8,11 @@ export const TodoNagPlugin = {
     const { executor } = context;
     if (!executor) return;
     // 动态提取并实时装配 todo_prompt (带 XML 去重判定)
-    const customPrompt = executor.features.task_manager?.todo_prompt;
+    const customPrompt = executor.features.task_orchestration?.todo_prompt;
     
     let promptToInject = customPrompt;
     if (promptToInject === undefined || promptToInject === null) {
-      promptToInject = FEATURE_SCHEMA.task_manager?.children?.todo_prompt?.defaultValue || '';
+      promptToInject = FEATURE_SCHEMA.task_orchestration?.children?.todo_prompt?.defaultValue || '';
     }
 
     if (promptToInject && !context.systemPrompt.includes('<todo_mode_guidelines>')) {

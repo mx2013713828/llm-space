@@ -10,10 +10,10 @@ export const TaskSystemPlugin = {
     const harnessId = executor.harnessId || 'default';
 
     // 注入自定义的 task_system_prompt (带 XML 去重)
-    const customPrompt = executor.features.task_manager?.task_system_prompt;
+    const customPrompt = executor.features.task_orchestration?.task_system_prompt;
     let promptToInject = customPrompt;
     if (promptToInject === undefined || promptToInject === null) {
-      promptToInject = FEATURE_SCHEMA.task_manager?.children?.task_system_prompt?.defaultValue || '';
+      promptToInject = FEATURE_SCHEMA.task_orchestration?.children?.task_system_prompt?.defaultValue || '';
     }
 
     if (promptToInject && !context.systemPrompt.includes('<task_system_guidelines>')) {
