@@ -19,6 +19,26 @@ export const ORCHESTRATION_MANAGED_TOOL_NAMES = [
   ...CRON_TOOLS,
 ];
 
+export function getNextGroupFeatureState(previousValue, groupMeta, enabled) {
+  const previousGroup = previousValue && typeof previousValue === 'object'
+    ? previousValue
+    : {};
+  const nextGroup = { enabled };
+
+  for (const [subKey, subMeta] of Object.entries(groupMeta?.children ?? {})) {
+    if (groupMeta?.preserveChildrenWhenDisabled) {
+      nextGroup[subKey] = previousGroup[subKey] ?? subMeta.defaultValue;
+      continue;
+    }
+
+    nextGroup[subKey] = enabled
+      ? (previousGroup.enabled ? (previousGroup[subKey] ?? subMeta.defaultValue) : subMeta.defaultValue)
+      : subMeta.defaultValue;
+  }
+
+  return nextGroup;
+}
+
 export function getToolName(tool) {
   if (typeof tool === 'string') {
     return tool;

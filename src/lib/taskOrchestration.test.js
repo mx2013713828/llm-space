@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
+  getNextGroupFeatureState,
   getToolName,
   isOrchestrationEnabled,
   resolveOrchestrationTools,
 } from './taskOrchestration.js';
+import { FEATURE_SCHEMA } from './FeatureSchema.js';
 
 test('removes every managed tool when orchestration is disabled', () => {
   const requested = ['bash', 'sub_agent', { name: 'schedule_cron' }, 'write_todos'];
@@ -182,4 +184,47 @@ test('normalizes tool names and guards orchestration by parent and child switche
   assert.equal(isOrchestrationEnabled({
     enabled: false,
   }), false);
+});
+
+test('managed orchestration tools hide delegation, background, task, and cron tools only', () => {
+  assert.deepEqual(ORCHESTRATION_MANAGED_TOOL_NAMES, [
+    'write_todos',
+    'create_task',
+    'list_tasks',
+    'get_task',
+    'claim_task',
+    'complete_task',
+    'sub_agent',
+    'query_background_tasks',
+    'schedule_cron',
+    'list_crons',
+    'cancel_cron',
+  ]);
+  assert.equal(ORCHESTRATION_MANAGED_TOOL_NAMES.includes('get_current_time'), false);
+  assert.equal(ORCHESTRATION_MANAGED_TOOL_NAMES.includes('bash'), false);
+});
+
+test('preserves task orchestration child values when parent is disabled and re-enabled', () => {
+  const taskOrchestration = FEATURE_SCHEMA.task_orchestration;
+  const previousValue = {
+    enabled: true,
+    mode: 'task_system',
+    todo_prompt: '<todo>custom</todo>',
+    task_system_prompt: '<task>custom</task>',
+    enable_background_tasks: true,
+    enable_sub_agents: true,
+    enable_cron_scheduler: true,
+  };
+
+  const disabledValue = getNextGroupFeatureState(previousValue, taskOrchestration, false);
+  assert.deepEqual(disabledValue, {
+    ...previousValue,
+    enabled: false,
+  });
+
+  const reenabledValue = getNextGroupFeatureState(disabledValue, taskOrchestration, true);
+  assert.deepEqual(reenabledValue, {
+    ...previousValue,
+    enabled: true,
+  });
 });

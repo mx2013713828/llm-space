@@ -1,14 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { FEATURE_SCHEMA, parseFeatures } from '../lib/FeatureSchema.js';
-
-const SYSTEM_HIDDEN_TOOLS = [
-  'write_todos',
-  'create_task',
-  'list_tasks',
-  'get_task',
-  'claim_task',
-  'complete_task'
-];
+import {
+  ORCHESTRATION_MANAGED_TOOL_NAMES,
+  getNextGroupFeatureState,
+} from '../lib/taskOrchestration.js';
 
 /**
  * Prompt Lab 页面
@@ -130,16 +125,7 @@ export function PromptLabPage({ harness, onSave }) {
       } else if (meta.type === 'select') {
         updated[key] = val;
       } else if (meta.type === 'group') {
-        updated[key] = {
-          enabled: val,
-          ...Object.keys(meta.children).reduce((acc, subKey) => {
-            // 如果是重新开启父开关，且上一次父开关不是开启状态 (说明是从关闭变为开启)，直接重置为 defaultValue 确保体验干净
-            acc[subKey] = val
-              ? (prev[key]?.enabled ? (prev[key]?.[subKey] ?? meta.children[subKey].defaultValue) : meta.children[subKey].defaultValue)
-              : meta.children[subKey].defaultValue;
-            return acc;
-          }, {})
-        };
+        updated[key] = getNextGroupFeatureState(prev[key], meta, val);
       }
       return updated;
     });
@@ -418,7 +404,7 @@ export function PromptLabPage({ harness, onSave }) {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
                 {availableTools
-                  .filter(tool => !SYSTEM_HIDDEN_TOOLS.includes(tool.name))
+                  .filter(tool => !ORCHESTRATION_MANAGED_TOOL_NAMES.includes(tool.name))
                   .map(tool => {
                     const active = selectedTools.some(t => t.name === tool.name);
                     return (
@@ -558,7 +544,26 @@ export function PromptLabPage({ harness, onSave }) {
                           transition: 'opacity 0.2s ease-in-out'
                         }}
                       >
-                        {Object.entries(meta.children).map(([subKey, subMeta]) => {
+                        {Object.entries(meta.children)
+                          .filter(([subKey, subMeta]) => {
+                            if (subMeta.type !== 'text_area') {
+                              return true;
+                            }
+
+                            if (subKey === 'todo_prompt') {
+                              return features[key]?.mode === 'todo';
+                            }
+
+                            if (subKey === 'task_system_prompt') {
+                              return features[key]?.mode === 'task_system';
+                            }
+
+                            return true;
+                          })
+                          .map(([subKey, subMeta], visibleIndex, visibleChildren) => {
+                          const previousSection = visibleChildren[visibleIndex - 1]?.[1]?.section;
+                          const shouldRenderSectionHeading = !!subMeta.section && previousSection !== subMeta.section;
+
                           if (subMeta.type === 'select') {
                             const selectedValue = features[key]?.[subKey] || subMeta.defaultValue;
                             const hasOptions = !!subMeta.options;
@@ -568,6 +573,19 @@ export function PromptLabPage({ harness, onSave }) {
 
                             return (
                               <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, width: '100%' }}>
+                                {shouldRenderSectionHeading && (
+                                  <div style={{
+                                    marginTop: 2,
+                                    paddingTop: 2,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.06em',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-muted)',
+                                  }}>
+                                    {subMeta.section}
+                                  </div>
+                                )}
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>{subMeta.description}</div>
                                 <select
@@ -598,14 +616,6 @@ export function PromptLabPage({ harness, onSave }) {
                           }
 
                           if (subMeta.type === 'text_area') {
-                            // 仅在匹配对应模式时，渲染指引词定制卡片
-                            if (subKey === 'todo_prompt' && features[key]?.mode !== 'todo') {
-                              return null;
-                            }
-                            if (subKey === 'task_system_prompt' && features[key]?.mode !== 'task_system') {
-                              return null;
-                            }
-
                             const currentSavedValue = features[key]?.[subKey] ?? subMeta.defaultValue;
                             const currentInputValue = localPrompts[subKey] !== undefined ? localPrompts[subKey] : currentSavedValue;
                             const isExpanded = !!expandedPrompts[subKey];
@@ -613,6 +623,19 @@ export function PromptLabPage({ harness, onSave }) {
 
                             return (
                               <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, width: '100%' }}>
+                                {shouldRenderSectionHeading && (
+                                  <div style={{
+                                    marginTop: 2,
+                                    paddingTop: 2,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.06em',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-muted)',
+                                  }}>
+                                    {subMeta.section}
+                                  </div>
+                                )}
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 4 }}>{subMeta.description}</div>
                                 
@@ -710,23 +733,38 @@ export function PromptLabPage({ harness, onSave }) {
                             );
                           }
 
-                          const isSubEnabled = isParentEnabled && !!features[key]?.[subKey];
+                          const isSubEnabled = !!features[key]?.[subKey];
                           return (
-                            <label key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>
-                              <input
-                                type="checkbox"
-                                disabled={!isParentEnabled}
-                                checked={isSubEnabled}
-                                onChange={(e) => handleSubFeatureChange(key, subKey, e.target.checked)}
-                                style={{ transform: 'scale(1.1)', marginTop: 3 }}
-                              />
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
-                                  {subMeta.description}
+                            <div key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {shouldRenderSectionHeading && (
+                                <div style={{
+                                  marginTop: 2,
+                                  paddingTop: 2,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  letterSpacing: '0.06em',
+                                  textTransform: 'uppercase',
+                                  color: 'var(--text-muted)',
+                                }}>
+                                  {subMeta.section}
                                 </div>
-                              </div>
-                            </label>
+                              )}
+                              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: isParentEnabled ? 'pointer' : 'not-allowed' }}>
+                                <input
+                                  type="checkbox"
+                                  disabled={!isParentEnabled}
+                                  checked={isSubEnabled}
+                                  onChange={(e) => handleSubFeatureChange(key, subKey, e.target.checked)}
+                                  style={{ transform: 'scale(1.1)', marginTop: 3 }}
+                                />
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-secondary)' }}>{subMeta.label}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
+                                    {subMeta.description}
+                                  </div>
+                                </div>
+                              </label>
+                            </div>
                           );
                         })}
                       </div>
