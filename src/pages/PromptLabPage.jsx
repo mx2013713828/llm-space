@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FEATURE_SCHEMA, parseFeatures } from '../lib/FeatureSchema.js';
 import {
-  ORCHESTRATION_MANAGED_TOOL_NAMES,
+  TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
   getNextGroupFeatureState,
 } from '../lib/taskOrchestration.js';
 
@@ -404,7 +404,7 @@ export function PromptLabPage({ harness, onSave }) {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
                 {availableTools
-                  .filter(tool => !ORCHESTRATION_MANAGED_TOOL_NAMES.includes(tool.name))
+                  .filter(tool => !TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES.includes(tool.name))
                   .map(tool => {
                     const active = selectedTools.some(t => t.name === tool.name);
                     return (

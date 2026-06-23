@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AgentExecutor } from './AgentExecutor.js';
+import { HookManager } from './HookManager.js';
 
 function createExecutor(overrides = {}) {
   return new AgentExecutor({
@@ -129,4 +130,35 @@ test('teammate runtime keeps team messaging but strips lead-only orchestration t
 
   assert.equal(executor.runtimeRole, 'teammate');
   assert.deepEqual(executor.tools.sort(), ['bash', 'get_current_time', 'send_team_message'].sort());
+});
+
+test('teammate runtime does not mount MemoryPlugin when memory is enabled', () => {
+  const originalRegister = HookManager.prototype.register;
+  const registeredPluginNames = [];
+
+  HookManager.prototype.register = function register(plugin) {
+    registeredPluginNames.push(plugin?.name ?? '(anonymous)');
+    return originalRegister.call(this, plugin);
+  };
+
+  try {
+    createExecutor({
+      runtimeRole: 'teammate',
+      tools: ['bash', 'send_team_message'],
+      features: {
+        enable_memory: {
+          enabled: true,
+        },
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: true,
+        },
+      },
+    });
+  } finally {
+    HookManager.prototype.register = originalRegister;
+  }
+
+  assert.equal(registeredPluginNames.includes('MemoryPlugin'), false);
 });

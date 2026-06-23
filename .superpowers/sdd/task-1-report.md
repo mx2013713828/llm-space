@@ -88,3 +88,61 @@ GREEN summary:
 
 - No functional concerns from the scoped Task 1 implementation.
 - The lead teams tool append order was implemented to match the exact test contract from the brief: `spawn_teammate`, then `send_team_message`, then `check_team_inbox`.
+
+## Fix report: Task 1 review findings
+
+### Findings addressed
+
+- Prevented teammate-role executors from registering `MemoryPlugin` even when `features.enable_memory.enabled` is true.
+- Updated the Prompt Lab tools picker to hide teams-managed tools with `TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES` instead of `ORCHESTRATION_MANAGED_TOOL_NAMES`.
+
+### Files changed
+
+- `server/agent/AgentExecutor.js`
+- `server/agent/AgentExecutor.orchestration.test.js`
+- `src/pages/PromptLabPage.jsx`
+
+### Tests run
+
+1. RED regression check before the fix:
+
+```bash
+node --test server/agent/AgentExecutor.orchestration.test.js src/lib/taskOrchestration.test.js src/lib/FeatureSchema.test.js
+```
+
+Result:
+
+- Exit code: `1`
+- Passed: `19`
+- Failed: `1`
+- Expected failure: `teammate runtime does not mount MemoryPlugin when memory is enabled`
+
+2. Required backend verification after the fix:
+
+```bash
+node --test server/agent/AgentExecutor.orchestration.test.js src/lib/taskOrchestration.test.js src/lib/FeatureSchema.test.js
+```
+
+Result:
+
+- Exit code: `0`
+- Passed: `20`
+- Failed: `0`
+- Duration: about `68.15ms`
+
+3. Required frontend/build verification after touching `PromptLabPage`:
+
+```bash
+npm run build
+```
+
+Result:
+
+- Exit code: `0`
+- Vite production build completed successfully in about `162ms`
+
+### Self-review
+
+- The new runtime-role guard is scoped to memory mounting only, so the role-aware tool resolver behavior from commit `0f17b5d` stays intact.
+- The teammate regression test asserts constructor-time plugin registration directly, which protects the exact review finding without widening coverage noise.
+- There was no existing focused frontend test pattern around `PromptLabPage`, so I kept the UI change to a constant swap and captured `npm run build` as the verification evidence.

@@ -127,7 +127,7 @@ export class AgentExecutor {
       this.hooks.register(OutputOffloadPlugin);
     }
     // 记忆系统插件（需 enable_memory 父开关开启）
-    if (this.features.enable_memory?.enabled) {
+    if (this.runtimeRole !== 'teammate' && this.features.enable_memory?.enabled) {
       this.hooks.register(MemoryPlugin);
     }
     this.hooks.register(CronSchedulerPlugin);
