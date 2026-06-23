@@ -164,6 +164,16 @@ export function useAgentLoop({
     let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
 
     try {
+      let persistedTeamContext = savedSession?.teamContext ?? null;
+      if (harness?.id) {
+        try {
+          const latestSession = await fetchHarnessSession(harness.id);
+          persistedTeamContext = latestSession?.teamContext ?? persistedTeamContext;
+        } catch (err) {
+          console.warn('Failed to refresh session before agent run:', err);
+        }
+      }
+
       const res = await fetch('http://localhost:3001/api/agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,6 +182,7 @@ export function useAgentLoop({
           messages: currentMessages,
           todos: currentTodos,
           backgroundTasks,
+          teamContext: persistedTeamContext,
           systemPrompt,
           tools: harness.tools,
           features: harness.features || {},

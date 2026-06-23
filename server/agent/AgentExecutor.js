@@ -163,11 +163,17 @@ export class AgentExecutor {
         await fs.mkdir(sessionsDir, { recursive: true });
 
         // Auto-save agent messages and todos state to session file
-        await fs.writeFile(
-          sessionPath,
-          JSON.stringify({ messages: this.messages, todos: this.todos, backgroundTasks: this.backgroundTasks }, null, 2),
-          'utf-8'
-        );
+        const sessionState = {
+          messages: this.messages,
+          todos: this.todos,
+          backgroundTasks: this.backgroundTasks,
+        };
+
+        if (this.teamContext) {
+          sessionState.teamContext = this.teamContext;
+        }
+
+        await fs.writeFile(sessionPath, JSON.stringify(sessionState, null, 2), 'utf-8');
       } catch (err) {
         console.error('[AgentExecutor] Failed to save session:', err);
       }

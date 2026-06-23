@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import { AgentExecutor } from './AgentExecutor.js';
 import { HookManager } from './HookManager.js';
@@ -271,4 +274,50 @@ test('TeamPlugin mounts for teammate runtime even when lead team orchestration i
   }
 
   assert.equal(registeredPluginNames.includes('TeamPlugin'), true);
+});
+
+test('saveSession persists lightweight teamContext only when present', async (t) => {
+  const originalCwd = process.cwd();
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-executor-session-'));
+  await mkdir(path.join(rootDir, 'server', 'sessions'), { recursive: true });
+  process.chdir(rootDir);
+
+  t.after(async () => {
+    process.chdir(originalCwd);
+    await rm(rootDir, { recursive: true, force: true });
+  });
+
+  const leadExecutor = createExecutor({
+    harnessId: 'persist-team-context',
+    messages: [{ role: 'user', content: 'hi' }],
+    todos: [{ id: '1', text: 'todo' }],
+    backgroundTasks: [{ id: 'bg-1', title: 'work' }],
+    teamContext: { teamId: 'team_1', agentId: 'lead', leadId: 'lead' },
+  });
+
+  await leadExecutor.saveSession();
+
+  const persistedLead = JSON.parse(
+    await readFile(path.join(rootDir, 'server', 'sessions', 'persist-team-context.json'), 'utf-8'),
+  );
+  assert.deepEqual(persistedLead.teamContext, {
+    teamId: 'team_1',
+    agentId: 'lead',
+    leadId: 'lead',
+  });
+  assert.deepEqual(persistedLead.messages, [{ role: 'user', content: 'hi' }]);
+  assert.deepEqual(persistedLead.todos, [{ id: '1', text: 'todo' }]);
+  assert.deepEqual(persistedLead.backgroundTasks, [{ id: 'bg-1', title: 'work' }]);
+
+  const plainExecutor = createExecutor({
+    harnessId: 'no-team-context',
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+
+  await plainExecutor.saveSession();
+
+  const persistedPlain = JSON.parse(
+    await readFile(path.join(rootDir, 'server', 'sessions', 'no-team-context.json'), 'utf-8'),
+  );
+  assert.equal('teamContext' in persistedPlain, false);
 });

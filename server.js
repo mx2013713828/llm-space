@@ -813,6 +813,7 @@ app.post('/api/agent/run', async (req, res) => {
     messages,
     todos,
     backgroundTasks,
+    teamContext,
     systemPrompt,
     tools,
     features,
@@ -868,6 +869,7 @@ app.post('/api/agent/run', async (req, res) => {
   // Branch 2: The job is not running yet
   const executor = new AgentExecutor({
     harnessId,
+    teamContext,
     messages,
     todos,
     backgroundTasks,
@@ -1044,9 +1046,32 @@ app.post('/api/sessions/:harnessId', async (req, res) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
       return res.status(400).json({ error: '非法的 Harness ID' });
     }
-    const { messages, todos, backgroundTasks } = req.body;
+    const { messages, todos, backgroundTasks, teamContext } = req.body;
     const sessionPath = path.join(SESSIONS_DIR, `${harnessId}.json`);
-    await fs.writeFile(sessionPath, JSON.stringify({ messages: messages || [], todos: todos || [], backgroundTasks: backgroundTasks || [] }, null, 2), 'utf-8');
+    let persistedTeamContext;
+    if (teamContext !== undefined) {
+      persistedTeamContext = teamContext;
+    } else {
+      try {
+        const existingSession = JSON.parse(await fs.readFile(sessionPath, 'utf-8'));
+        persistedTeamContext = existingSession?.teamContext;
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          throw err;
+        }
+      }
+    }
+
+    const sessionState = {
+      messages: messages || [],
+      todos: todos || [],
+      backgroundTasks: backgroundTasks || [],
+    };
+    if (persistedTeamContext) {
+      sessionState.teamContext = persistedTeamContext;
+    }
+
+    await fs.writeFile(sessionPath, JSON.stringify(sessionState, null, 2), 'utf-8');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

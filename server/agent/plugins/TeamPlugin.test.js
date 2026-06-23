@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { AgentExecutor } from '../AgentExecutor.js';
 import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
 import { createTeamPlugin } from './TeamPlugin.js';
@@ -209,4 +210,58 @@ test('preLLM injects unread lead inbox into context once and consumes it', async
   assert.equal((secondText.match(/<team_inbox>/g) || []).length, 1);
 
   await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
+test('persisted and reloaded lead teamContext lets a later executor inject lead inbox messages', async (t) => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  const originalCwd = process.cwd();
+  const sessionRoot = await mkdtemp(path.join(tmpdir(), 'team-plugin-session-'));
+  await mkdir(path.join(sessionRoot, 'server', 'sessions'), { recursive: true });
+  process.chdir(sessionRoot);
+
+  t.after(async () => {
+    process.chdir(originalCwd);
+    await rm(sessionRoot, { recursive: true, force: true });
+    await rm(fixture.rootDir, { recursive: true, force: true });
+  });
+
+  const leadExecutor = new AgentExecutor({
+    harnessId: 'h1',
+    runtimeRole: 'lead',
+    teamContext: { teamId: 'team_1', agentId: 'lead', leadId: 'lead' },
+  });
+  await leadExecutor.saveSession();
+
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'teammate_reviewer',
+    to: 'lead',
+    type: 'result',
+    payload: { content: 'Review complete.' },
+  });
+
+  const persistedSession = JSON.parse(
+    await readFile(path.join(sessionRoot, 'server', 'sessions', 'h1.json'), 'utf-8'),
+  );
+  const laterExecutor = {
+    harnessId: 'h1',
+    runtimeRole: 'lead',
+    teamContext: persistedSession.teamContext,
+  };
+  const context = {
+    executor: laterExecutor,
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'Continue.' }] }],
+  };
+
+  await plugin.preLLM(context);
+
+  assert.match(context.apiMessages[0].content[0].text, /<team_inbox>/);
+  assert.match(context.apiMessages[0].content[0].text, /Review complete/);
 });
