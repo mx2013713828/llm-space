@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 
+import { validateStorageId } from './teamPathGuards.js';
+
 const AGENT_NAME_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 
 export const TEAM_MESSAGE_TYPES = new Set([
@@ -33,9 +35,7 @@ export function createTeammateId(name) {
 export function createMessageEnvelope(input) {
   const { teamId, from, to, type, payload } = input ?? {};
 
-  if (typeof teamId !== 'string' || !teamId.trim()) {
-    throw new Error('Invalid teamId: expected a non-empty string.');
-  }
+  validateStorageId('teamId', teamId);
   validateAgentName(from);
   validateAgentName(to);
   if (!TEAM_MESSAGE_TYPES.has(type)) {

@@ -74,3 +74,19 @@ test('updateTeammate rejects missing teammates with a readable error', async () 
 
   await rm(rootDir, { recursive: true, force: true });
 });
+
+test('saveState rejects team ids with path traversal', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const store = createTeamStateStore({ rootDir });
+
+  await assert.rejects(
+    store.saveState({
+      harnessId: 'h1',
+      teamId: '../escape',
+      state: { teamId: '../escape', teammates: {} },
+    }),
+    /Invalid teamId/,
+  );
+
+  await rm(rootDir, { recursive: true, force: true });
+});

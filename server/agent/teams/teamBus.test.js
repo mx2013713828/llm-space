@@ -79,3 +79,22 @@ test('readInbox consumes valid messages and preserves malformed lines in .bad', 
 
   await rm(rootDir, { recursive: true, force: true });
 });
+
+test('sendMessage rejects harness ids with path traversal', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-bus-'));
+  const bus = createTeamBus({ rootDir });
+
+  await assert.rejects(
+    bus.sendMessage({
+      harnessId: '../escape',
+      teamId: 'team_1',
+      from: 'lead',
+      to: 'reviewer',
+      type: 'message',
+      payload: { text: 'hello' },
+    }),
+    /Invalid harnessId/,
+  );
+
+  await rm(rootDir, { recursive: true, force: true });
+});

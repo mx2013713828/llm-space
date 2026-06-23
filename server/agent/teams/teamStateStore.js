@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { createTeamId, validateAgentName } from './teamEnvelope.js';
+import { ensureWithinRoot, validateStorageId } from './teamPathGuards.js';
 
 function normalizeTeammates(teammates) {
   const entries = Array.isArray(teammates) ? teammates : [];
@@ -14,14 +15,9 @@ function normalizeTeammates(teammates) {
 }
 
 export function getTeamPaths({ rootDir, harnessId, teamId, agentId }) {
-  if (typeof harnessId !== 'string' || !harnessId.trim()) {
-    throw new Error('Invalid harnessId: expected a non-empty string.');
-  }
-  if (typeof teamId !== 'string' || !teamId.trim()) {
-    throw new Error('Invalid teamId: expected a non-empty string.');
-  }
-
-  const teamDir = path.join(rootDir, `${harnessId}_teams`, teamId);
+  const safeHarnessId = validateStorageId('harnessId', harnessId);
+  const safeTeamId = validateStorageId('teamId', teamId);
+  const teamDir = ensureWithinRoot(rootDir, path.join(rootDir, `${safeHarnessId}_teams`, safeTeamId));
   const inboxDir = path.join(teamDir, 'inboxes');
 
   return {
