@@ -166,12 +166,13 @@ export function createCronScheduler(options = {}) {
 
     async markEventStarted(event) {
       const timestamp = now().toISOString();
-      const job = await updateEventJob(event, (targetJob) => {
-        targetJob.status = 'running';
-        targetJob.attemptCount += 1;
-        targetJob.lastStartedAt = timestamp;
-        targetJob.lastError = null;
-      }, timestamp);
+      const job = jobs.get(event?.jobId);
+      if (job) {
+        job.status = 'running';
+        job.attemptCount += 1;
+        job.lastStartedAt = timestamp;
+        job.lastError = null;
+      }
       const run = {
         id: makeId('run'),
         eventId: event.id,
@@ -189,7 +190,23 @@ export function createCronScheduler(options = {}) {
       runIdsByEvent.set(event.id, run.id);
       if (runs.length > maxRunHistory) runs.splice(0, runs.length - maxRunHistory);
       await queueRunPersistence();
+
+      if (!job) return null;
+      if (!job.recurring) {
+        jobs.delete(job.id);
+      }
+      if (job.durable) {
+        await queuePersistence();
+      }
       return job;
+    },
+
+    async markEventSkipped(event) {
+      const timestamp = now().toISOString();
+      return updateEventJob(event, (targetJob) => {
+        targetJob.status = 'idle';
+        targetJob.lastError = null;
+      }, timestamp);
     },
 
     async markEventSucceeded(event) {
@@ -256,10 +273,6 @@ export function createCronScheduler(options = {}) {
             modelRef: job.modelRef,
             thinkingEnabled: job.thinkingEnabled
           });
-
-          if (!job.recurring) {
-            jobs.delete(job.id);
-          }
         } catch (err) {
           console.error(`[cron scheduler] failed to tick job ${job.id}:`, err);
         }

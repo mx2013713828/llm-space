@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { AgentExecutor } from '../AgentExecutor.js';
+import { parseFeatures } from '../FeatureParser.js';
 import { resolveModelConfig } from './modelResolver.js';
 
 const cwd = globalThis.process?.cwd?.() || '.';
@@ -41,6 +42,11 @@ async function updateSchedulerLifecycle(scheduler, method, ...args) {
   } catch (err) {
     console.error(`[cron runner] failed to record ${method}:`, err);
   }
+}
+
+export function isScheduledExecutionEnabled(harness) {
+  const orchestration = parseFeatures(harness?.features).task_orchestration;
+  return orchestration?.enabled === true && orchestration?.enable_cron_scheduler === true;
 }
 
 export async function runScheduledEvent(event, {
@@ -103,6 +109,7 @@ export async function processScheduledEvents({
   scheduler,
   activeJobs,
   runEvent = (event, reservation) => runScheduledEvent(event, { activeJobs, reservation }),
+  shouldRunEvent,
   limit = 1,
 } = {}) {
   const events = scheduler.drainDueEvents(limit);
@@ -110,6 +117,18 @@ export async function processScheduledEvents({
     if (activeJobs?.has(event.harnessId)) {
       scheduler.requeueDueEvents([event]);
       continue;
+    }
+    if (shouldRunEvent) {
+      let shouldRun = true;
+      try {
+        shouldRun = await shouldRunEvent(event);
+      } catch {
+        shouldRun = true;
+      }
+      if (shouldRun === false) {
+        await updateSchedulerLifecycle(scheduler, 'markEventSkipped', event);
+        continue;
+      }
     }
     const reservation = { executor: null, clients: new Set(), source: 'cron-reservation' };
     activeJobs?.set(event.harnessId, reservation);
@@ -132,15 +151,21 @@ export function startCronQueueProcessor({
   scheduler,
   activeJobs,
   broadcastEvent,
+  harnessDir,
   intervalMs = 200,
 } = {}) {
   const timer = setInterval(() => {
     processScheduledEvents({
       scheduler,
       activeJobs,
+      shouldRunEvent: async (event) => {
+        const harness = await loadHarness(event.harnessId, harnessDir);
+        return isScheduledExecutionEnabled(harness);
+      },
       runEvent: (event, reservation) => runScheduledEvent(event, {
         activeJobs,
         broadcastEvent,
+        harnessDir,
         reservation
       })
     }).catch(err => console.error('[cron runner] failed to process scheduled event:', err));

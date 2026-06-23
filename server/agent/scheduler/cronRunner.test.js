@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processScheduledEvents, runScheduledEvent } from './cronRunner.js';
+import { isScheduledExecutionEnabled, processScheduledEvents, runScheduledEvent } from './cronRunner.js';
 
 test('requeues scheduled events while the target harness is active', async () => {
   const requeued = [];
@@ -203,4 +203,90 @@ test('records a failed scheduled execution', async () => {
   }), /model unavailable/);
 
   assert.deepEqual(calls, ['started', 'failed:model unavailable']);
+});
+
+test('skips scheduled events that fail eligibility without reserving the harness', async () => {
+  const calls = [];
+  const scheduler = {
+    drainDueEvents: () => [{ id: 'evt_1', jobId: 'cron_1', harnessId: '01-chat-bot', prompt: 'check build' }],
+    requeueDueEvents() {},
+    async markEventSkipped(event) {
+      calls.push(`skipped:${event.id}`);
+    },
+    async markEventStarted() {
+      calls.push('started');
+    }
+  };
+  const activeJobs = new Map();
+
+  await processScheduledEvents({
+    scheduler,
+    activeJobs,
+    shouldRunEvent: async () => false,
+    runEvent: async () => {
+      calls.push('run');
+    }
+  });
+
+  assert.deepEqual(calls, ['skipped:evt_1']);
+  assert.equal(activeJobs.size, 0);
+});
+
+test('reports scheduled execution enabled for parent and cron-enabled child harnesses', () => {
+  assert.equal(isScheduledExecutionEnabled({
+    features: {
+      task_orchestration: {
+        enabled: true,
+        enable_cron_scheduler: true
+      }
+    }
+  }), true);
+
+  assert.equal(isScheduledExecutionEnabled({
+    features: {
+      task_orchestration: {
+        enabled: false,
+        enable_cron_scheduler: false
+      }
+    }
+  }), false);
+});
+
+test('reports scheduled execution disabled when cron is disabled on the harness', () => {
+  assert.equal(isScheduledExecutionEnabled({
+    features: {
+      task_orchestration: {
+        enabled: true,
+        enable_cron_scheduler: false
+      }
+    }
+  }), false);
+});
+
+test('continues into the normal failure path when eligibility lookup throws', async () => {
+  const calls = [];
+  const error = new Error('Harness not found: 01-chat-bot');
+  const scheduler = {
+    drainDueEvents: () => [{ id: 'evt_1', jobId: 'cron_1', harnessId: '01-chat-bot', prompt: 'check build' }],
+    requeueDueEvents() {},
+    async markEventStarted() {
+      calls.push('started');
+    },
+    async markEventFailed(event, receivedError) {
+      calls.push(`failed:${receivedError.message}`);
+    }
+  };
+
+  await assert.rejects(() => processScheduledEvents({
+    scheduler,
+    activeJobs: new Map(),
+    shouldRunEvent: async () => {
+      throw error;
+    },
+    runEvent: async () => {
+      throw error;
+    }
+  }), /Harness not found: 01-chat-bot/);
+
+  assert.deepEqual(calls, ['started', 'failed:Harness not found: 01-chat-bot']);
 });

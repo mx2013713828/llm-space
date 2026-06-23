@@ -82,9 +82,9 @@ test('scopes listing and cancellation by harness', async () => {
   assert.equal(scheduler.listJobs('01-chat-bot').length, 0);
 });
 
-test('removes one-shot jobs after firing', async () => {
+test('queues one-shot jobs after firing without removing them', async () => {
   const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
-  await scheduler.scheduleJob({
+  const job = await scheduler.scheduleJob({
     harnessId: '01-chat-bot',
     cron: '0 9 * * *',
     prompt: 'one shot',
@@ -95,7 +95,47 @@ test('removes one-shot jobs after firing', async () => {
   scheduler.tick();
 
   assert.equal(scheduler.drainDueEvents().length, 1);
+  assert.equal(scheduler.listJobs('01-chat-bot').length, 1);
+  assert.equal(scheduler.listJobs('01-chat-bot')[0].id, job.id);
+});
+
+test('keeps one-shot jobs registered after tick until execution starts', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
+  const job = await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'one shot',
+    recurring: false,
+    durable: false
+  });
+
+  scheduler.tick();
+
+  assert.equal(scheduler.drainDueEvents().length, 1);
+  assert.equal(scheduler.listJobs('01-chat-bot').length, 1);
+  assert.equal(scheduler.listJobs('01-chat-bot')[0].id, job.id);
+  assert.equal(scheduler.listJobs('01-chat-bot')[0].status, 'queued');
+});
+
+test('markEventStarted removes one-shot jobs after recording the running run', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
+  await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'one shot',
+    recurring: false,
+    durable: false
+  });
+
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+
+  await scheduler.markEventStarted(event);
+
   assert.equal(scheduler.listJobs('01-chat-bot').length, 0);
+  const [run] = scheduler.listRuns('01-chat-bot');
+  assert.equal(run.eventId, event.id);
+  assert.equal(run.status, 'running');
 });
 
 test('tracks queued, running, and successful execution separately', async () => {
@@ -150,6 +190,54 @@ test('records failed execution without counting it as a successful run', async (
   assert.equal(failed.runCount, 0);
   assert.equal(failed.failureCount, 1);
   assert.equal(failed.lastError, 'model unavailable');
+});
+
+test('markEventSkipped restores recurring jobs to idle without counting a run', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
+  const job = await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'check build',
+    recurring: true,
+    durable: false
+  });
+
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+
+  await scheduler.markEventSkipped(event);
+
+  const [skipped] = scheduler.listJobs('01-chat-bot');
+  assert.equal(skipped.id, job.id);
+  assert.equal(skipped.status, 'idle');
+  assert.equal(skipped.attemptCount, 0);
+  assert.equal(skipped.runCount, 0);
+  assert.equal(skipped.failureCount, 0);
+  assert.equal(scheduler.listRuns('01-chat-bot').length, 0);
+});
+
+test('markEventSkipped restores one-shot jobs to idle without deleting them', async () => {
+  const scheduler = createCronScheduler({ now: () => new Date('2026-06-17T09:00:10+08:00') });
+  const job = await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'one shot',
+    recurring: false,
+    durable: false
+  });
+
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+
+  await scheduler.markEventSkipped(event);
+
+  const [skipped] = scheduler.listJobs('01-chat-bot');
+  assert.equal(skipped.id, job.id);
+  assert.equal(skipped.status, 'idle');
+  assert.equal(skipped.attemptCount, 0);
+  assert.equal(skipped.runCount, 0);
+  assert.equal(skipped.failureCount, 0);
+  assert.equal(scheduler.listRuns('01-chat-bot').length, 0);
 });
 
 test('records successful execution history with duration', async () => {
