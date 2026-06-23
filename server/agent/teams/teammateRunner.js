@@ -33,9 +33,17 @@ export async function runTeammate({
   });
 
   try {
+    const forwardChildEvent = (type, payload) => {
+      if (type === 'messages_update') {
+        return;
+      }
+
+      parentExecutor.onEvent(type, payload);
+    };
+
     const teammateExecutor = new ExecutorClass({
       cwd,
-      harnessId: parentExecutor.harnessId,
+      harnessId: '',
       runtimeRole: 'teammate',
       teamContext: { teamId, agentId: teammateId, leadId: 'lead' },
       messages: [{ role: 'user', content: initialPrompt }],
@@ -47,7 +55,7 @@ export async function runTeammate({
       maxTokens: parentExecutor.maxTokens,
       thinkingEnabled: parentExecutor.thinkingEnabled,
       skills: parentExecutor.skills,
-      onEvent: parentExecutor.onEvent,
+      onEvent: forwardChildEvent,
     });
 
     await teammateExecutor.run(maxTurns);

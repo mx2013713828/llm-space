@@ -118,9 +118,9 @@ export class AgentExecutor {
     if (this.features.context_compaction && this.features.context_compaction.enabled) {
       this.hooks.register(CompactionPlugin);
     }
-    if (isTaskSystem) {
+    if (this.runtimeRole !== 'teammate' && isTaskSystem) {
       this.hooks.register(TaskSystemPlugin);
-    } else if (isTodoMode) {
+    } else if (this.runtimeRole !== 'teammate' && isTodoMode) {
       this.hooks.register(TodoNagPlugin);
     }
     if (this.features.context_compaction && this.features.context_compaction.enabled && this.features.context_compaction.output_offload) {

@@ -162,3 +162,44 @@ test('teammate runtime does not mount MemoryPlugin when memory is enabled', () =
 
   assert.equal(registeredPluginNames.includes('MemoryPlugin'), false);
 });
+
+test('teammate runtime does not mount planning plugins in todo or task-system modes', () => {
+  const originalRegister = HookManager.prototype.register;
+  const registeredPluginNames = [];
+
+  HookManager.prototype.register = function register(plugin) {
+    registeredPluginNames.push(plugin?.name ?? '(anonymous)');
+    return originalRegister.call(this, plugin);
+  };
+
+  try {
+    createExecutor({
+      runtimeRole: 'teammate',
+      tools: ['bash', 'send_team_message'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: true,
+        },
+      },
+    });
+
+    createExecutor({
+      runtimeRole: 'teammate',
+      tools: ['bash', 'send_team_message'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'task_system',
+          enable_agent_teams: true,
+        },
+      },
+    });
+  } finally {
+    HookManager.prototype.register = originalRegister;
+  }
+
+  assert.equal(registeredPluginNames.includes('TodoNagPlugin'), false);
+  assert.equal(registeredPluginNames.includes('TaskSystemPlugin'), false);
+});

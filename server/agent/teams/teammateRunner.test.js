@@ -192,3 +192,40 @@ test('runTeammate marks failed and sends an error message when execution throws'
     },
   ]);
 });
+
+test('runTeammate isolates child harness state and suppresses raw child messages_update events', async () => {
+  const forwardedEvents = [];
+
+  class EventingExecutor extends FakeExecutor {
+    async run() {
+      FakeExecutor.lastArgs.onEvent('messages_update', {
+        messages: [{ role: 'assistant', content: 'child transcript' }],
+      });
+      FakeExecutor.lastArgs.onEvent('tool_call', { tool: 'bash' });
+    }
+  }
+
+  await runTeammate({
+    parentExecutor: {
+      ...createParentExecutor(),
+      onEvent(type, payload) {
+        forwardedEvents.push({ type, payload });
+      },
+    },
+    teamId: 'team_1',
+    teammateId: 'reviewer',
+    name: 'Reviewer',
+    role: 'Critic',
+    initialPrompt: 'Review the patch.',
+    ExecutorClass: EventingExecutor,
+    stateStore: {
+      async updateTeammate() {}
+    },
+    bus: {
+      async sendMessage() {}
+    },
+  });
+
+  assert.equal(FakeExecutor.lastArgs.harnessId, '');
+  assert.deepEqual(forwardedEvents, [{ type: 'tool_call', payload: { tool: 'bash' } }]);
+});
