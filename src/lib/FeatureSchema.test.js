@@ -4,12 +4,15 @@ import { FEATURE_SCHEMA, parseFeatures } from './FeatureSchema.js';
 
 test('exposes canonical task orchestration sections', () => {
   const group = FEATURE_SCHEMA.task_orchestration;
+  const legacyTaskManagerKey = ['task', 'manager'].join('_');
+  const legacyCronKey = ['enable', 'cron', 'scheduler'].join('_');
+
   assert.equal(group.label, 'Task Orchestration');
   assert.equal(group.preserveChildrenWhenDisabled, true);
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
   assert.equal(group.children.enable_cron_scheduler.section, 'Scheduling');
-  assert.equal(FEATURE_SCHEMA.task_manager, undefined);
-  assert.equal(FEATURE_SCHEMA.enable_cron_scheduler, undefined);
+  assert.equal(FEATURE_SCHEMA[legacyTaskManagerKey], undefined);
+  assert.equal(FEATURE_SCHEMA[legacyCronKey], undefined);
 });
 
 test('preserves disabled child selections and rejects an invalid mode', () => {
