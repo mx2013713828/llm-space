@@ -119,15 +119,13 @@ export async function processScheduledEvents({
       continue;
     }
     if (shouldRunEvent) {
-      let shouldRun = true;
       try {
-        shouldRun = await shouldRunEvent(event);
+        if (await shouldRunEvent(event) === false) {
+          await updateSchedulerLifecycle(scheduler, 'markEventSkipped', event);
+          continue;
+        }
       } catch {
-        shouldRun = true;
-      }
-      if (shouldRun === false) {
-        await updateSchedulerLifecycle(scheduler, 'markEventSkipped', event);
-        continue;
+        // Eligibility lookup errors should flow into the normal execution path.
       }
     }
     const reservation = { executor: null, clients: new Set(), source: 'cron-reservation' };

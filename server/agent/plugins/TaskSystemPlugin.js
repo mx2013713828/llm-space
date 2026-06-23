@@ -5,7 +5,7 @@ export const TaskSystemPlugin = {
   name: 'TaskSystemPlugin',
 
   async preLLM(context) {
-    const { executor, apiMessages, turnIndex } = context;
+    const { executor, apiMessages } = context;
     if (!executor) return;
     const harnessId = executor.harnessId || 'default';
 
