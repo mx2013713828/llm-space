@@ -167,11 +167,18 @@ export function createCronScheduler(options = {}) {
     async markEventStarted(event) {
       const timestamp = now().toISOString();
       const job = jobs.get(event?.jobId);
+      let jobPersistence = null;
       if (job) {
         job.status = 'running';
         job.attemptCount += 1;
         job.lastStartedAt = timestamp;
         job.lastError = null;
+        if (!job.recurring) {
+          jobs.delete(job.id);
+          if (job.durable) {
+            jobPersistence = queuePersistence();
+          }
+        }
       }
       const run = {
         id: makeId('run'),
@@ -189,15 +196,10 @@ export function createCronScheduler(options = {}) {
       runs.push(run);
       runIdsByEvent.set(event.id, run.id);
       if (runs.length > maxRunHistory) runs.splice(0, runs.length - maxRunHistory);
+      if (jobPersistence) {
+        await jobPersistence;
+      }
       await queueRunPersistence();
-
-      if (!job) return null;
-      if (!job.recurring) {
-        jobs.delete(job.id);
-      }
-      if (job.durable) {
-        await queuePersistence();
-      }
       return job;
     },
 

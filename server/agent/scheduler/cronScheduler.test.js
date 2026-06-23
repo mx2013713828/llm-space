@@ -138,6 +138,63 @@ test('markEventStarted removes one-shot jobs after recording the running run', a
   assert.equal(run.status, 'running');
 });
 
+test('removes durable one-shot jobs before run persistence can yield', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cron-one-shot-'));
+  const storePath = path.join(directory, 'tasks.json');
+  const runStorePath = path.join(directory, 'runs.json');
+  const scheduler = createCronScheduler({
+    now: () => new Date('2026-06-17T09:00:10+08:00'),
+    storePath,
+    runStorePath
+  });
+  const job = await scheduler.scheduleJob({
+    harnessId: '01-chat-bot',
+    cron: '0 9 * * *',
+    prompt: 'durable one shot',
+    recurring: false,
+    durable: true
+  });
+
+  scheduler.tick();
+  const event = scheduler.drainDueEvents()[0];
+  await scheduler.persist();
+
+  const originalWriteFile = fs.writeFile;
+  const writeOrder = [];
+  let releaseRunWrite;
+  const runWritePaused = new Promise(resolve => {
+    releaseRunWrite = resolve;
+  });
+
+  fs.writeFile = async (filePath, ...args) => {
+    writeOrder.push(filePath);
+    if (filePath === runStorePath) {
+      await runWritePaused;
+    }
+    return originalWriteFile.call(fs, filePath, ...args);
+  };
+
+  try {
+    const started = scheduler.markEventStarted(event);
+
+    assert.equal(scheduler.listJobs('01-chat-bot').length, 0);
+
+    scheduler.tick();
+    assert.equal(scheduler.drainDueEvents().length, 0);
+
+    releaseRunWrite();
+    await started;
+
+    assert.equal(scheduler.listJobs('01-chat-bot').length, 0);
+    assert.equal(scheduler.listRuns('01-chat-bot')[0].eventId, event.id);
+    assert.equal(writeOrder[0], storePath);
+    assert.equal(writeOrder[1], runStorePath);
+    assert.equal(job.id, event.jobId);
+  } finally {
+    fs.writeFile = originalWriteFile;
+  }
+});
+
 test('tracks queued, running, and successful execution separately', async () => {
   const times = [
     new Date('2026-06-17T09:00:10+08:00'),
