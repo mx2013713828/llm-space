@@ -23,6 +23,7 @@ const trackedHarnessExpectations = {
     mode: 'todo',
     enable_background_tasks: false,
     enable_sub_agents: false,
+    enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
   '02-bash.json': {
@@ -30,6 +31,7 @@ const trackedHarnessExpectations = {
     mode: 'todo',
     enable_background_tasks: true,
     enable_sub_agents: false,
+    enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
   '03-deep-research.json': {
@@ -37,6 +39,7 @@ const trackedHarnessExpectations = {
     mode: 'todo',
     enable_background_tasks: false,
     enable_sub_agents: false,
+    enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
   '04-subagent.json': {
@@ -44,6 +47,7 @@ const trackedHarnessExpectations = {
     mode: 'todo',
     enable_background_tasks: false,
     enable_sub_agents: true,
+    enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
   '05-task-system.json': {
@@ -51,6 +55,7 @@ const trackedHarnessExpectations = {
     mode: 'task_system',
     enable_background_tasks: true,
     enable_sub_agents: false,
+    enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
 };
@@ -85,6 +90,11 @@ test('hard-migrates orchestration harnesses to canonical features', async () => 
       `${file}: raw sub-agent toggle`,
     );
     assert.equal(
+      harness.features.task_orchestration.enable_agent_teams,
+      expected.enable_agent_teams,
+      `${file}: raw agent teams toggle`,
+    );
+    assert.equal(
       harness.features.task_orchestration.enable_cron_scheduler,
       expected.enable_cron_scheduler,
       `${file}: raw cron toggle`,
@@ -103,6 +113,11 @@ test('hard-migrates orchestration harnesses to canonical features', async () => 
       parsedTaskOrchestration.enable_sub_agents,
       expected.enable_sub_agents,
       `${file}: parsed sub-agent toggle`,
+    );
+    assert.equal(
+      parsedTaskOrchestration.enable_agent_teams,
+      expected.enable_agent_teams,
+      `${file}: parsed agent teams toggle`,
     );
     assert.equal(
       parsedTaskOrchestration.enable_cron_scheduler,

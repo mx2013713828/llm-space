@@ -153,6 +153,7 @@
       "task_system_prompt": "<task_system_guidelines>\nWhen facing complex development tasks, you must use the task dependency system to organize your workflow:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Do not write code for multiple consecutive turns without updating the task board status.\n</task_system_guidelines>",
       "enable_background_tasks": false,
       "enable_sub_agents": true,
+      "enable_agent_teams": false,
       "enable_cron_scheduler": false
     }
   }
