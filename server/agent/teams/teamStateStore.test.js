@@ -103,6 +103,35 @@ test('concurrent upsertTeammate calls for one team preserve both teammates', asy
   await rm(rootDir, { recursive: true, force: true });
 });
 
+test('concurrent upsertTeammate calls across store instances preserve both teammates', async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
+  const leadStore = createTeamStateStore({ rootDir });
+  const runnerStore = createTeamStateStore({ rootDir });
+
+  await leadStore.createTeam({ harnessId: 'h1', teamId: 'team_1' });
+
+  await Promise.all([
+    leadStore.upsertTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      teammate: { agentId: 'reviewer', status: 'busy' },
+    }),
+    runnerStore.upsertTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      teammate: { agentId: 'implementer', status: 'idle' },
+    }),
+  ]);
+
+  const saved = await leadStore.loadState({ harnessId: 'h1', teamId: 'team_1' });
+  assert.deepEqual(saved.teammates, {
+    reviewer: { agentId: 'reviewer', status: 'busy' },
+    implementer: { agentId: 'implementer', status: 'idle' },
+  });
+
+  await rm(rootDir, { recursive: true, force: true });
+});
+
 test('saveState rejects team ids with path traversal', async () => {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'team-state-'));
   const store = createTeamStateStore({ rootDir });

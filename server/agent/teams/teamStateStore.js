@@ -4,6 +4,8 @@ import path from 'node:path';
 import { createTeamId, validateAgentName } from './teamEnvelope.js';
 import { ensureWithinRoot, validateStorageId } from './teamPathGuards.js';
 
+const teamWriteQueues = new Map();
+
 function normalizeTeammates(teammates) {
   const entries = Array.isArray(teammates) ? teammates : [];
   return Object.fromEntries(
@@ -29,10 +31,9 @@ export function getTeamPaths({ rootDir, harnessId, teamId, agentId }) {
 }
 
 export function createTeamStateStore({ rootDir = path.join(process.cwd(), 'server', 'sessions') } = {}) {
-  const teamWriteQueues = new Map();
-
   function getTeamQueueKey({ harnessId, teamId }) {
-    return `${validateStorageId('harnessId', harnessId)}:${validateStorageId('teamId', teamId)}`;
+    const safeRootDir = path.resolve(rootDir);
+    return `${safeRootDir}:${validateStorageId('harnessId', harnessId)}:${validateStorageId('teamId', teamId)}`;
   }
 
   async function queueTeamWrite({ harnessId, teamId, operation }) {
