@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildStrategyContextBlock,
+  buildStrategyIndexBlock,
   getMissingRequiredPrimitives,
   listExecutionStrategies,
   loadExecutionStrategy,
@@ -70,4 +71,13 @@ test('reports missing required primitives without granting capabilities', async 
 
   assert.deepEqual(getMissingRequiredPrimitives(strategy, features), ['sub_agent']);
   assert.match(buildStrategyContextBlock(strategy, features), /Missing required primitives: sub_agent/);
+});
+
+test('builds a compact strategy index without guideline bodies', async () => {
+  const strategies = await listExecutionStrategies();
+  const index = buildStrategyIndexBlock(strategies);
+
+  assert.match(index, /<available_execution_strategies>/);
+  assert.match(index, /sequential_subagent: Sequential Sub-agent Workflow/);
+  assert.doesNotMatch(index, /<execution_strategy id=/);
 });

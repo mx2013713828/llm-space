@@ -1,4 +1,9 @@
-import { buildStrategyContextBlock, loadExecutionStrategy } from '../strategies/strategyRegistry.js';
+import {
+  buildStrategyContextBlock,
+  buildStrategyIndexBlock,
+  listExecutionStrategies,
+  loadExecutionStrategy,
+} from '../strategies/strategyRegistry.js';
 
 function appendTextContext(apiMessages, text) {
   if (!text) return;
@@ -24,7 +29,16 @@ export const ExecutionStrategyPlugin = {
     const { executor, apiMessages } = context;
     const selectedStrategyId = executor?.selectedStrategyId;
 
-    if (!executor || !apiMessages || !selectedStrategyId || selectedStrategyId === 'custom') {
+    if (!executor || !apiMessages) {
+      return;
+    }
+
+    if (executor.features?.task_orchestration?.enabled !== false && !context.systemPrompt.includes('<available_execution_strategies>')) {
+      const strategies = await listExecutionStrategies();
+      context.systemPrompt += `\n\n${buildStrategyIndexBlock(strategies)}`;
+    }
+
+    if (!selectedStrategyId || selectedStrategyId === 'custom') {
       return;
     }
 

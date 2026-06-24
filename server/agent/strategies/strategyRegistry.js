@@ -162,3 +162,17 @@ export function buildStrategyContextBlock(strategy, features = {}) {
 ${strategy.body}${compatibility}
 </active_execution_strategy>`;
 }
+
+export function buildStrategyIndexBlock(strategies = []) {
+  const lines = strategies
+    .map(strategy => {
+      const required = (strategy.requiredPrimitives || []).join(', ') || 'none';
+      return `- ${strategy.id}: ${strategy.name} | requires: ${required} | ${strategy.description}`;
+    })
+    .join('\n');
+
+  return `<available_execution_strategies>
+These are high-level orchestration strategies. They guide behavior only; mounted tools and runtime policy remain authoritative.
+${lines}
+</available_execution_strategies>`;
+}
