@@ -58,6 +58,7 @@ export function TrajectoryView({
     : 0;
   const providerLabel = cacheStats.provider || '';
   const orchestration = parseFeatures(harness?.features || {}).task_orchestration;
+  const taskBoardLabel = orchestration?.mode === 'task_system' ? 'Task DAG' : 'TODO';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
@@ -69,7 +70,7 @@ export function TrajectoryView({
       }}>
         {[
           { key: 'trajectory', label: '🔄 Run Trajectory' },
-          { key: 'todos', label: `✅ TODO${todos.length > 0 ? ` (${todos.length})` : ''}` },
+          { key: 'todos', label: `✅ ${taskBoardLabel}${todos.length > 0 ? ` (${todos.length})` : ''}` },
           isOrchestrationEnabled(orchestration, 'enable_background_tasks') && {
             key: 'background_tasks',
             label: `⚙️ Background Tasks${backgroundTasks && backgroundTasks.length > 0 ? ` (${backgroundTasks.filter(t => t.status === 'running').length}/${backgroundTasks.length})` : ''}`
