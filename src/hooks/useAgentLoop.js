@@ -186,6 +186,7 @@ export function useAgentLoop({
           systemPrompt,
           tools: harness.tools,
           features: harness.features || {},
+          selectedStrategyId: parsedFeatures.task_orchestration?.strategy || 'custom',
           model: {
             name: selectedModel?.name || '',
             modelId: selectedModel?.modelId || 'claude-sonnet-4-5',

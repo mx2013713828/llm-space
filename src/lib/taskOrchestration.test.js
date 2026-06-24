@@ -259,6 +259,7 @@ test('preserves task orchestration child values when parent is disabled and re-e
   const taskOrchestration = FEATURE_SCHEMA.task_orchestration;
   const previousValue = {
     enabled: true,
+    strategy: 'sequential_subagent',
     mode: 'task_system',
     todo_prompt: '<todo>custom</todo>',
     task_system_prompt: '<task>custom</task>',

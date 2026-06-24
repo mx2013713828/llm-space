@@ -9,6 +9,8 @@ test('exposes canonical task orchestration sections', () => {
 
   assert.equal(group.label, 'Task Orchestration');
   assert.equal(group.preserveChildrenWhenDisabled, true);
+  assert.equal(group.children.strategy.section, 'Execution Strategy');
+  assert.equal(group.children.strategy.defaultValue, 'custom');
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
   assert.deepEqual(group.children.enable_agent_teams, {
     type: 'boolean',
@@ -27,6 +29,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
   const disabled = parseFeatures({
     task_orchestration: {
       enabled: false,
+      strategy: 'sequential_subagent',
       mode: 'task_system',
       enable_sub_agents: true,
       enable_agent_teams: true,
@@ -35,6 +38,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
   }).task_orchestration;
 
   assert.equal(disabled.enabled, false);
+  assert.equal(disabled.strategy, 'sequential_subagent');
   assert.equal(disabled.mode, 'task_system');
   assert.equal(disabled.enable_sub_agents, true);
   assert.equal(disabled.enable_agent_teams, true);
@@ -42,4 +46,5 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
 
   const invalid = parseFeatures({ task_orchestration: { enabled: true, mode: 'invalid' } });
   assert.equal(invalid.task_orchestration.mode, 'todo');
+  assert.equal(parseFeatures({ task_orchestration: { strategy: 'unknown' } }).task_orchestration.strategy, 'custom');
 });

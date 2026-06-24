@@ -17,6 +17,7 @@ import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
 import { TeamPlugin } from './plugins/TeamPlugin.js';
+import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
@@ -69,6 +70,7 @@ export class AgentExecutor {
     temperature = 1,
     maxTokens = 8192,
     thinkingEnabled = false,
+    selectedStrategyId = '',
     skills = [],
     onEvent = () => {}
   }) {
@@ -96,6 +98,7 @@ export class AgentExecutor {
     this.temperature = temperature;
     this.maxTokens = maxTokens;
     this.thinkingEnabled = thinkingEnabled;
+    this.selectedStrategyId = String(selectedStrategyId || '').trim();
     this.skills = [...skills];
     this.onEvent = onEvent;
 
@@ -115,6 +118,7 @@ export class AgentExecutor {
     
     // Skills 插件默认开启（它内部会判断 this.features.enable_skills）
     this.hooks.register(SkillsPlugin);
+    this.hooks.register(ExecutionStrategyPlugin);
     
     if (this.features.context_compaction && this.features.context_compaction.enabled) {
       this.hooks.register(CompactionPlugin);

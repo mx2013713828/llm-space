@@ -65,6 +65,20 @@ export const FEATURE_SCHEMA = {
     failSafeValue: true,
     preserveChildrenWhenDisabled: true,
     children: {
+      strategy: {
+        type: 'select',
+        section: 'Execution Strategy',
+        label: 'Execution Strategy',
+        description: 'Choose a high-level orchestration preset. Advanced primitive switches remain editable for experimentation.',
+        defaultValue: 'custom',
+        failSafeValue: 'custom',
+        options: [
+          { value: 'custom', label: 'Custom / Manual' },
+          { value: 'inline', label: 'Inline Execution' },
+          { value: 'sequential_subagent', label: 'Sequential Sub-agent Workflow' },
+          { value: 'async_teams', label: 'Async Agent Teams' }
+        ]
+      },
       mode: {
         type: 'select',
         section: 'Planning & Tracking',

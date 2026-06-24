@@ -324,6 +324,63 @@ Each preset should expose a preview of enabled and disabled primitives, such as 
 
 This layer is intentionally an orchestration pattern, not a new primitive. It composes existing primitives such as `write_todo`, Task System, `sub_agent`, Agent Teams, reviewer roles, and cron scheduling.
 
+The next implementation phase should use a **Strategy-as-Skill / lazy-loaded strategy** model:
+
+- The stable system prompt only needs a compact strategy index: ids, names, descriptions, and required primitives.
+- Full strategy guidelines are loaded only when a user or run config selects a strategy.
+- The selected guideline is injected as run-level task context, not permanently embedded in the base system prompt.
+- Strategy guidelines must not grant capabilities. Runtime policy still controls which tools are actually mounted.
+
+Built-in strategies should be represented as local markdown assets:
+
+```text
+server/agent/strategies/
+├─ inline.md
+├─ sequential-subagent.md
+├─ async-teams.md
+└─ custom.md
+```
+
+Each strategy file contains metadata plus body text:
+
+```yaml
+---
+id: sequential_subagent
+name: Sequential Sub-agent Workflow
+description: Plan, delegate one task at a time, review, fix, then advance.
+required_primitives:
+  - task_orchestration
+  - sub_agent
+recommended_primitives:
+  - task_system
+---
+<execution_strategy id="sequential_subagent">
+...
+</execution_strategy>
+```
+
+The MVP should expose built-in strategy metadata to the frontend and model, but defer a user-editable strategy marketplace/editor until later. The loader boundary should already make that future simple: strategy definitions are data files, not hard-coded switch statements scattered through UI and runtime code.
+
+Run-level injection rules:
+
+- `selectedStrategyId` is sent with `/api/agent/run` or resolved from saved session/run state.
+- The backend validates the id against the strategy registry.
+- The backend loads the guideline body and injects it near the active user task as a synthetic context message.
+- If required primitives are missing, inject a short compatibility note instead of pretending unavailable tools exist.
+- If no strategy is selected, do not inject a full guideline; only the compact strategy index remains available.
+
+Strategy state should be lightweight and recoverable:
+
+- Harness config may store the default strategy preset.
+- Session/run state may store the selected strategy for the current task.
+- Manual primitive edits should mark the preset as `modified` or `custom` instead of silently rewriting the user's choices.
+
+This keeps the system suitable for both guided use and research:
+
+- New users can start from known-good presets.
+- Advanced users can inspect and modify primitives.
+- Future phases can add strategy recommendation, user-authored strategies, protocol-aware strategies, and worktree-aware strategies without replacing the primitive layer.
+
 ### v3: Team Protocols
 
 Add a request-response protocol layer:

@@ -658,6 +658,36 @@ Selecting a preset writes recommended `task_orchestration` feature values. Users
 
 This keeps the platform experimental: users can start from a known-good orchestration pattern, then deliberately break it apart to test their own mode.
 
+Implementation direction:
+
+- Treat strategies like lightweight built-in skills.
+- Keep a stable, compact strategy index available to the runtime.
+- Lazy-load full strategy guidelines only when a strategy is selected for a run.
+- Inject the selected guideline as run-level task context rather than as permanent base system prompt.
+- Keep runtime policy authoritative: strategy text can guide behavior, but cannot grant tools that feature flags did not enable.
+
+Built-in strategy files:
+
+```text
+server/agent/strategies/
+├─ inline.md
+├─ sequential-subagent.md
+├─ async-teams.md
+└─ custom.md
+```
+
+Each file should include metadata (`id`, `name`, `description`, `required_primitives`, `recommended_primitives`) plus a guideline body. The registry exposes metadata without loading all full bodies into every run.
+
+v2 implementation checkpoints:
+
+1. Add a strategy registry and tests for metadata loading, invalid ids, and lazy body loading.
+2. Add a lightweight Task Orchestration strategy selector, stored with harness features but still editable through primitive switches.
+3. Pass `selectedStrategyId` through `/api/agent/run`, falling back to the harness feature value when no run override exists.
+4. Inject selected strategy guidance near the active task as synthetic run context.
+5. Add primitive compatibility notes when a strategy asks for unavailable capabilities.
+6. Preserve `Custom / Manual` as the no-guideline mode for pure experimentation.
+7. Leave room for later user-authored strategies, recommendation, protocol-aware strategies, and worktree-aware strategies.
+
 ### v3: Team Protocols
 
 Add message protocol semantics without changing TeamBus storage:

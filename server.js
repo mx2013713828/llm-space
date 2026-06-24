@@ -23,6 +23,7 @@ import { cronScheduler } from './server/agent/scheduler/cronScheduler.js';
 import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js';
 import { createCronApiHandlers } from './server/agent/scheduler/cronApi.js';
 import { buildPersistedSessionState, readSessionState, resolveRunTeamContext } from './server/sessions/sessionState.js';
+import { listExecutionStrategies, resolveSelectedStrategyId } from './server/agent/strategies/strategyRegistry.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -577,6 +578,7 @@ app.post('/api/harnesses/:harnessId/dry-run', async (req, res) => {
       temperature,
       maxTokens,
       thinkingEnabled,
+      selectedStrategyId,
       skills
     } = req.body || {};
 
@@ -595,6 +597,7 @@ app.post('/api/harnesses/:harnessId/dry-run', async (req, res) => {
       temperature: temperature ?? 1,
       maxTokens: maxTokens ?? 8192,
       thinkingEnabled: !!thinkingEnabled,
+      selectedStrategyId: resolveSelectedStrategyId({ explicitStrategyId: selectedStrategyId, features }),
       skills: safeSkills,
       onEvent: () => {}
     });
@@ -802,6 +805,15 @@ app.get('/api/skills', async (req, res) => {
   }
 });
 
+/** 获取内置执行策略元数据 */
+app.get('/api/execution-strategies', async (req, res) => {
+  try {
+    res.json(await listExecutionStrategies());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** 获取后端注册的所有工具 Schema */
 app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
@@ -822,6 +834,7 @@ app.post('/api/agent/run', async (req, res) => {
     temperature,
     maxTokens,
     thinkingEnabled,
+    selectedStrategyId,
     skills
   } = req.body;
 
@@ -891,6 +904,7 @@ app.post('/api/agent/run', async (req, res) => {
     temperature,
     maxTokens,
     thinkingEnabled,
+    selectedStrategyId: resolveSelectedStrategyId({ explicitStrategyId: selectedStrategyId, features }),
     skills,
     onEvent: (type, data) => {
       broadcastEvent(harnessId, type, data);
