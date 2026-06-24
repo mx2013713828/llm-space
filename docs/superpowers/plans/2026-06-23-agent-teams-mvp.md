@@ -627,7 +627,38 @@ If there are no code/doc changes after verification, do not create an empty comm
 
 ## Future Evolution Map
 
-### v2: Team Protocols
+### v2: Execution Strategy Layer
+
+Add a higher-level strategy selector while preserving primitive-level experimentation.
+
+Principle:
+
+```text
+Execution Strategy = explainable preset
+Advanced Primitives = editable experimental components
+Runtime Policy = final effective tool mounting
+```
+
+Initial presets:
+
+- `Inline Execution`
+- `Sequential Sub-agent Workflow`
+- `Async Agent Teams`
+- `Custom / Manual`
+
+The presets should compose existing primitives instead of hiding them:
+
+- `write_todo` / Task System for planning and tracking
+- `sub_agent` for synchronous one-off delegation
+- Agent Teams for async teammate collaboration
+- reviewer roles as a reusable role pattern
+- cron for scheduling when explicitly enabled
+
+Selecting a preset writes recommended `task_orchestration` feature values. Users can still open the advanced primitive controls and modify the underlying switches. If a user edits any primitive after selecting a preset, the UI should show `modified` or `custom` rather than forcing the preset back into shape.
+
+This keeps the platform experimental: users can start from a known-good orchestration pattern, then deliberately break it apart to test their own mode.
+
+### v3: Team Protocols
 
 Add message protocol semantics without changing TeamBus storage:
 
@@ -637,7 +668,7 @@ Add message protocol semantics without changing TeamBus storage:
 - `plan_approval_request`, `plan_approval_response`
 - stricter formatting helpers for protocol messages
 
-### v3: Autonomous Teams
+### v4: Autonomous Teams
 
 Extend runner lifecycle:
 
@@ -647,7 +678,7 @@ Extend runner lifecycle:
 - task auto-claim from task-system DAG
 - bounded wakeups instead of infinite loops
 
-### v4: Worktree Isolation
+### v5: Worktree Isolation
 
 Extend teammate state:
 

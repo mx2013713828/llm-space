@@ -303,7 +303,28 @@ Future UI can add:
 
 ## Future Evolution
 
-### v2: Team Protocols
+### v2: Execution Strategy Layer
+
+Add a higher-level execution strategy selector above the existing Task Orchestration primitives.
+
+The design principle is **preset-first, primitive-editable**:
+
+- Presets help users quickly choose an orchestration pattern.
+- Primitives remain visible and manually editable because this is an experimental platform, not a fully sealed commercial workflow.
+- Runtime policy still decides the final effective tool mounting; presets only write feature configuration.
+
+Initial strategy presets:
+
+- `Inline Execution`: Lead works directly with todo/task-system planning.
+- `Sequential Sub-agent Workflow`: Lead follows a task plan, delegates each step to a one-off `sub_agent`, and may use reviewer passes before advancing.
+- `Async Agent Teams`: Lead spawns finite async teammates and coordinates through TeamBus.
+- `Custom / Manual`: user chooses primitives directly.
+
+Each preset should expose a preview of enabled and disabled primitives, such as planning mode, `sub_agent`, Agent Teams, cron, and future worktree isolation. If the user changes any primitive after choosing a preset, the UI marks the strategy as `modified` or `custom` instead of forcing the preset back into shape.
+
+This layer is intentionally an orchestration pattern, not a new primitive. It composes existing primitives such as `write_todo`, Task System, `sub_agent`, Agent Teams, reviewer roles, and cron scheduling.
+
+### v3: Team Protocols
 
 Add a request-response protocol layer:
 
@@ -313,9 +334,9 @@ Add a request-response protocol layer:
 - plan approval request/response
 - eventually permission request/response
 
-The MVP envelope already carries `requestId`, `type`, and structured payloads, so v2 adds routing and state transitions rather than a storage migration.
+The MVP envelope already carries `requestId`, `type`, and structured payloads, so this phase adds routing and state transitions rather than a storage migration.
 
-### v3: Autonomous Teams
+### v4: Autonomous Teams
 
 Add an idle loop:
 
@@ -325,9 +346,9 @@ Add an idle loop:
 - task board scan and auto-claim
 - timeout-based graceful completion
 
-The MVP runner already has `maxTurns`, teammate state, and inbox injection points. v3 extends the runner lifecycle instead of replacing it.
+The MVP runner already has `maxTurns`, teammate state, and inbox injection points. This phase extends the runner lifecycle instead of replacing it.
 
-### v4: Worktree Isolation
+### v5: Worktree Isolation
 
 Add workspace isolation:
 
