@@ -38,6 +38,30 @@ Many heavy Agent frameworks (such as LangChain) introduce massive black-box enca
 
 ---
 
+## 📖 Project Overview
+
+**LLM Space** is an open-source, browser-based visual workbench for building, debugging, and experimenting with AI Agents. Unlike heavy Agent frameworks that wrap every detail in abstractions, LLM Space exposes the full execution lifecycle — every thought, every tool call, every response — in real time.
+
+### 🎯 What Problem Does It Solve?
+
+- **Framework fatigue**: Frameworks like LangChain introduce hundreds of concepts (Chains, Agents, Tools, Memory, Callbacks...) that obscure what's actually happening. LLM Space strips away all framework abstraction — you see raw HTTP requests, streaming responses, and tool execution output directly.
+- **Debugging difficulty**: When an Agent produces an unexpected result, traditional frameworks give you a final answer with zero visibility into the decision path. LLM Space provides a complete visual trajectory of every single step.
+- **Configuration overhead**: Switching between Agent configurations usually means editing YAML files and restarting servers. LLM Space supports one-click hot-swapping of Harness presets with zero downtime.
+
+### 👥 Who Is It For?
+
+- **AI/LLM learners** who want to understand how Agents really work under the hood
+- **Prompt engineers** who need rapid iteration on system prompts with instant visual feedback
+- **Tool developers** who want to prototype and test new Agent capabilities in 30 seconds
+- **Researchers** exploring multi-agent collaboration, DAG task decomposition, and Agent safety
+
+### 📊 Key Numbers
+
+- **5** built-in Harness presets (from basic chatbot to DAG task system)
+- **30 seconds** to develop and register a custom Tool
+- **3 minutes** from zero to running your first Agent experiment
+- **0** framework dependencies — pure Node.js + vanilla JavaScript
+
 ## 💡 Core Design Philosophy
 
 ### 🧱 Modular Sandbox (LEGO-style plug-and-play config)
