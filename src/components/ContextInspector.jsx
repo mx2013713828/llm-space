@@ -121,7 +121,15 @@ export function ContextInspector({
   const systemSummaryText = Array.isArray(alignedData.system)
     ? alignedData.system.map(block => block?.text || '').join('\n')
     : String(alignedData.system || '');
-  const messagesSummaryText = JSON.stringify(alignedData.messages || []);
+  const messagesSummaryText = (alignedData.messages || [])
+    .flatMap(msg => Array.isArray(msg.content) ? msg.content : [{ type: 'text', text: String(msg.content || '') }])
+    .map(block => {
+      if (typeof block?.text === 'string') return block.text;
+      if (typeof block?.content === 'string') return block.content;
+      if (typeof block?.thinking === 'string') return block.thinking;
+      return '';
+    })
+    .join('\n');
   const activeStrategyMatch = messagesSummaryText.match(/<active_execution_strategy id="([^"]+)"/);
   const strategySummary = {
     selectedStrategyId,
