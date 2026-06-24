@@ -4,6 +4,7 @@ import {
   TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
   applyExecutionStrategyPreset,
   getNextGroupFeatureState,
+  getMissingStrategyPrimitives,
   getStrategyAfterPrimitiveEdit,
 } from '../lib/taskOrchestration.js';
 
@@ -588,6 +589,12 @@ export function PromptLabPage({ harness, onSave }) {
                               : null;
                             const selectOptions = registryOptions || subMeta.options;
                             const hasOptions = !!selectOptions;
+                            const selectedStrategy = key === 'task_orchestration' && subKey === 'strategy'
+                              ? availableStrategies.find(strategy => strategy.id === selectedValue)
+                              : null;
+                            const missingPrimitives = selectedStrategy
+                              ? getMissingStrategyPrimitives(selectedStrategy, features[key])
+                              : [];
                             const isDisabled = hasOptions 
                               ? !isParentEnabled 
                               : (!isParentEnabled || (subKey === 'fallback_model_id' && !features[key]?.fallback_model));
@@ -631,6 +638,28 @@ export function PromptLabPage({ harness, onSave }) {
                                 </select>
                                 {!hasOptions && features[key]?.fallback_model && !selectedValue && (
                                   <div style={{ color: 'var(--orange)', fontSize: 10 }}>⚠️ Please select a valid fallback model to enable failover</div>
+                                )}
+                                {selectedStrategy && (
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 4,
+                                    padding: '8px 10px',
+                                    border: `1px solid ${missingPrimitives.length > 0 ? 'var(--orange)' : 'var(--border)'}`,
+                                    borderRadius: 6,
+                                    background: missingPrimitives.length > 0 ? 'rgba(234, 179, 8, 0.06)' : 'var(--bg-elevated)',
+                                  }}>
+                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                      {selectedStrategy.description}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: missingPrimitives.length > 0 ? 'var(--orange)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                                      {selectedStrategy.id === 'custom'
+                                        ? 'manual mode: no full strategy guideline is injected'
+                                        : missingPrimitives.length > 0
+                                          ? `missing primitives: ${missingPrimitives.join(', ')}`
+                                          : 'required primitives satisfied'}
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             );

@@ -100,6 +100,27 @@ export function getStrategyAfterPrimitiveEdit(orchestration, subKey, nextValue) 
   return preset[subKey] === nextValue ? currentStrategy : 'custom';
 }
 
+export function getMissingStrategyPrimitives(strategy, orchestration = {}) {
+  if (!strategy || strategy.id === 'custom') return [];
+
+  const requiredPrimitives = strategy.requiredPrimitives || strategy.required_primitives || [];
+  return requiredPrimitives.filter(primitive => {
+    if (primitive === 'task_orchestration') {
+      return !isOrchestrationEnabled(orchestration);
+    }
+    if (primitive === 'sub_agent') {
+      return !isOrchestrationEnabled(orchestration, 'enable_sub_agents');
+    }
+    if (primitive === 'agent_teams') {
+      return !isOrchestrationEnabled(orchestration, 'enable_agent_teams');
+    }
+    if (primitive === 'cron') {
+      return !isOrchestrationEnabled(orchestration, 'enable_cron_scheduler');
+    }
+    return false;
+  });
+}
+
 export function getToolName(tool) {
   if (typeof tool === 'string') {
     return tool;

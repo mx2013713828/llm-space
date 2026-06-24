@@ -5,6 +5,7 @@ import {
   TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
   applyExecutionStrategyPreset,
   getNextGroupFeatureState,
+  getMissingStrategyPrimitives,
   getStrategyAfterPrimitiveEdit,
   getToolName,
   isOrchestrationEnabled,
@@ -324,4 +325,21 @@ test('manual primitive edits move presets back to custom only when diverging', (
   assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'enable_sub_agents', true), 'sequential_subagent');
   assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'enable_sub_agents', false), 'custom');
   assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'todo_prompt', '<custom />'), 'sequential_subagent');
+});
+
+test('reports missing strategy primitives from current orchestration settings', () => {
+  const strategy = {
+    id: 'sequential_subagent',
+    requiredPrimitives: ['task_orchestration', 'sub_agent'],
+  };
+
+  assert.deepEqual(getMissingStrategyPrimitives(strategy, {
+    enabled: true,
+    enable_sub_agents: false,
+  }), ['sub_agent']);
+
+  assert.deepEqual(getMissingStrategyPrimitives(strategy, {
+    enabled: true,
+    enable_sub_agents: true,
+  }), []);
 });

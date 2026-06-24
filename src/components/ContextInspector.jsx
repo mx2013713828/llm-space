@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseFeatures } from '../lib/FeatureSchema.js';
 
 export function ContextInspector({ 
   harness,
@@ -35,6 +36,7 @@ export function ContextInspector({
 
     // 前端简化参数：工具只传名称即可，后端会自动匹配 Schema，避免前端做复杂的 schema 组装
     const toolNames = (tools || []).map(t => typeof t === 'string' ? t : t.name);
+    const selectedStrategyId = parseFeatures(harness?.features || {}).task_orchestration?.strategy || 'custom';
 
     fetch(`http://localhost:3001/api/harnesses/${harness.id}/dry-run`, {
       method: 'POST',
@@ -47,6 +49,7 @@ export function ContextInspector({
         systemPrompt,
         tools: toolNames, // 直接发送工具名称序列
         features: harness.features || {},
+        selectedStrategyId,
         model: modelConfig,
         temperature: modelConfig?.temperature,
         maxTokens: modelConfig?.max_tokens,
@@ -113,6 +116,19 @@ export function ContextInspector({
   };
   const totalChars = JSON.stringify(fullContext).length;
   const displayTokens = currentTokens || Math.round(totalChars / 4);
+  const parsedFeatures = parseFeatures(harness?.features || {});
+  const selectedStrategyId = parsedFeatures.task_orchestration?.strategy || 'custom';
+  const systemSummaryText = Array.isArray(alignedData.system)
+    ? alignedData.system.map(block => block?.text || '').join('\n')
+    : String(alignedData.system || '');
+  const messagesSummaryText = JSON.stringify(alignedData.messages || []);
+  const activeStrategyMatch = messagesSummaryText.match(/<active_execution_strategy id="([^"]+)"/);
+  const strategySummary = {
+    selectedStrategyId,
+    hasStrategyIndex: systemSummaryText.includes('<available_execution_strategies>'),
+    activeStrategyId: activeStrategyMatch?.[1] || null,
+    hasCompatibilityNote: messagesSummaryText.includes('<strategy_compatibility_note>'),
+  };
 
   // 角色颜色映射
   const roleStyle = (role) => ({
@@ -255,6 +271,47 @@ export function ContextInspector({
     );
   };
 
+  const renderStrategySummary = () => {
+    const rows = [
+      {
+        label: 'Selected',
+        value: strategySummary.selectedStrategyId,
+        ok: true,
+      },
+      {
+        label: 'Compact Index',
+        value: strategySummary.hasStrategyIndex ? 'present in system prompt' : 'not injected',
+        ok: strategySummary.hasStrategyIndex,
+      },
+      {
+        label: 'Full Guideline',
+        value: strategySummary.activeStrategyId ? `active: ${strategySummary.activeStrategyId}` : 'not injected',
+        ok: strategySummary.selectedStrategyId === 'custom' ? !strategySummary.activeStrategyId : !!strategySummary.activeStrategyId,
+      },
+      {
+        label: 'Compatibility',
+        value: strategySummary.hasCompatibilityNote ? 'primitive mismatch note injected' : 'no mismatch note',
+        ok: !strategySummary.hasCompatibilityNote,
+      },
+    ];
+
+    return (
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid var(--blue)', borderRadius: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--blue)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🧭</span> Execution Strategy
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          {rows.map(row => (
+            <div key={row.label} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{row.label}</div>
+              <div style={{ fontSize: 12, color: row.ok ? 'var(--text-secondary)' : 'var(--orange)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>{row.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowContextInspector(false)}>
       {/* 半透明遮罩 */}
@@ -316,6 +373,9 @@ export function ContextInspector({
             <>
               {/* System Prompt */}
               {renderSystemPrompt()}
+
+              {/* Execution Strategy */}
+              {renderStrategySummary()}
 
               {/* Tools */}
               {renderTools()}
