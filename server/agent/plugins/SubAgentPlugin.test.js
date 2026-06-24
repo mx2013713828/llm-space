@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SubAgentPlugin } from './SubAgentPlugin.js';
+import {
+  SUB_AGENT_STREAM_TEXT_LIMIT,
+  SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT,
+} from '../subAgentProfile.js';
 
 test('sub-agent plugin spawns isolated one-off executor and returns the final assistant text', async () => {
   const spawned = {
@@ -156,4 +160,57 @@ test('sub-agent plugin converts child executor errors into tool output', async (
 
   assert.equal(tool.toolOutput, '[子代理异常崩溃]\nchild exploded');
   assert.equal(tool.handled, true);
+});
+
+test('sub-agent plugin forwards only bounded child trajectory previews', async () => {
+  const hugeText = 'x'.repeat(SUB_AGENT_STREAM_TEXT_LIMIT + 500);
+  const hugeOutput = 'y'.repeat(SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT + 500);
+
+  class FakeExecutor {
+    constructor(args) {
+      this.args = args;
+      this.messages = [
+        { role: 'assistant', type: 'text', content: 'Final report remains available' },
+      ];
+    }
+
+    async run() {
+      this.args.onEvent('messages_update', { messages: [{ type: 'text', content: hugeText }] });
+      this.args.onEvent('text_start', { turn: 1 });
+      this.args.onEvent('text_delta', { text: hugeText });
+      this.args.onEvent('tool_exec_chunk', { id: 'child_tool', content: hugeOutput });
+      this.args.onEvent('tool_exec_done', { id: 'child_tool', output: hugeOutput });
+    }
+  }
+
+  const parentEvents = [];
+  const tool = {
+    id: 'tool_huge',
+    toolName: 'sub_agent',
+    toolInput: { prompt: 'Produce a huge result.' },
+  };
+
+  await SubAgentPlugin.preToolUse({
+    executor: {
+      tools: ['bash'],
+      features: {},
+      model: {},
+      temperature: 0,
+      maxTokens: 256,
+      thinkingEnabled: false,
+      skills: [],
+      onEvent(type, payload) {
+        parentEvents.push({ type, payload });
+      },
+    },
+    tool,
+    ExecutorClass: FakeExecutor,
+  });
+
+  assert.equal(parentEvents.some(event => event.type === 'messages_update'), false);
+  assert.equal(parentEvents.find(event => event.type === 'text_delta').payload.text.length, SUB_AGENT_STREAM_TEXT_LIMIT);
+  assert.ok(parentEvents.some(event => event.type === 'text_delta' && event.payload.text.includes('preview truncated')));
+  assert.equal(parentEvents.find(event => event.type === 'tool_exec_chunk').payload.content.length, SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT);
+  assert.match(parentEvents.find(event => event.type === 'tool_exec_done').payload.output, /preview truncated/);
+  assert.equal(tool.toolOutput, 'Final report remains available');
 });

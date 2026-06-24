@@ -132,6 +132,9 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
             <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
               <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
                 <span>🤖</span> Sub-agent Trajectory
+                <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>
+                  preview, bounded for UI responsiveness
+                </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {subMessages.map((msg, idx) => {
