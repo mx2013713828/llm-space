@@ -224,7 +224,7 @@ export function TrajectoryView({
                       </div>
                     );
                     if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} />;
                     if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
                     return null;
                   })}

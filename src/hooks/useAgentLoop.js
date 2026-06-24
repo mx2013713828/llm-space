@@ -285,6 +285,54 @@ export function useAgentLoop({
               setTodos(evt.todos);
               break;
 
+            case 'sub_agent_status':
+              updateMessages(null, (list) => {
+                return list.map(m => {
+                  if (m.id === evt.id) {
+                    return {
+                      ...m,
+                      subAgentStatus: {
+                        ...(m.subAgentStatus || {}),
+                        status: evt.status,
+                        phase: evt.phase,
+                        currentAction: evt.currentAction,
+                        currentTool: evt.currentTool,
+                        toolCount: evt.toolCount,
+                        previewTruncated: evt.previewTruncated,
+                        startedAt: evt.startedAt,
+                        completedAt: evt.completedAt,
+                      }
+                    };
+                  }
+                  return m;
+                });
+              });
+              break;
+
+            case 'sub_agent_trace_ready':
+              updateMessages(null, (list) => {
+                return list.map(m => {
+                  if (m.id === evt.id) {
+                    return {
+                      ...m,
+                      subAgentStatus: {
+                        ...(m.subAgentStatus || {}),
+                        status: evt.status,
+                        phase: evt.phase,
+                        currentAction: evt.currentAction,
+                        finalPreview: evt.finalPreview,
+                        toolCount: evt.toolCount,
+                        startedAt: evt.startedAt,
+                        completedAt: evt.completedAt,
+                      },
+                      subAgentTrace: evt.trace,
+                    };
+                  }
+                  return m;
+                });
+              });
+              break;
+
             case 'message_start':
               lastInputTokens = evt.inputTokens || 0;
               setContextTokens(evt.totalInputTokens ?? (

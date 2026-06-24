@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 
 import { SubAgentPlugin } from './SubAgentPlugin.js';
-import {
-  SUB_AGENT_STREAM_TEXT_LIMIT,
-  SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT,
-} from '../subAgentProfile.js';
+import { loadSubAgentTrace } from '../subagents/subAgentTraceStore.js';
 
 test('sub-agent plugin spawns isolated one-off executor and returns the final assistant text', async () => {
   const spawned = {
@@ -47,6 +46,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
         enabled: true,
       },
     },
+    harnessId: 'subagent-plugin-test',
     model: { id: 'test-model' },
     temperature: 0.2,
     maxTokens: 1024,
@@ -77,16 +77,58 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
   assert.match(spawned.constructorArgs.systemPrompt, /forbidden to delegate/i);
   assert.deepEqual(parentEvents, [
     {
-      type: 'tool_exec_start',
+      type: 'sub_agent_status',
       payload: {
-        id: 'child_tool',
-        toolName: 'bash',
+        id: 'tool_123',
+        status: 'running',
+        phase: 'starting',
+        currentAction: 'Investigate the repository state.',
+        toolCount: 0,
+        previewTruncated: false,
+        startedAt: parentEvents[0].payload.startedAt,
+        parentToolCallId: 'tool_123',
+      },
+    },
+    {
+      type: 'sub_agent_status',
+      payload: {
+        id: 'tool_123',
+        status: 'running',
+        phase: 'tool_use',
+        currentAction: 'executing bash',
+        currentTool: 'bash',
+        toolCount: 0,
+        previewTruncated: false,
+        startedAt: parentEvents[1].payload.startedAt,
+        parentToolCallId: 'tool_123',
+      },
+    },
+    {
+      type: 'sub_agent_trace_ready',
+      payload: {
+        id: 'tool_123',
+        status: 'completed',
+        phase: 'completed',
+        currentAction: 'completed',
+        finalPreview: 'Final report',
+        trace: parentEvents[2].payload.trace,
+        toolCount: 0,
+        startedAt: parentEvents[2].payload.startedAt,
+        completedAt: parentEvents[2].payload.completedAt,
         parentToolCallId: 'tool_123',
       },
     },
   ]);
+  assert.equal(parentEvents[2].payload.trace.traceId, 'tool_123');
   assert.equal(tool.toolOutput, 'Final report');
+  assert.equal(tool.subAgentTrace.traceId, 'tool_123');
   assert.equal(tool.handled, true);
+
+  const trace = await loadSubAgentTrace('subagent-plugin-test', 'tool_123');
+  assert.equal(trace.finalAnswer, 'Final report');
+  assert.equal(trace.summary.messageCount, 2);
+
+  await rm(path.join(process.cwd(), 'server', 'sessions', 'subagent-plugin-test_subagents'), { recursive: true, force: true });
 });
 
 test('sub-agent plugin falls back when child returns no final assistant text', async () => {
@@ -109,6 +151,7 @@ test('sub-agent plugin falls back when child returns no final assistant text', a
 
   await SubAgentPlugin.preToolUse({
     executor: {
+      harnessId: 'subagent-empty-test',
       tools: ['bash'],
       features: {},
       model: {},
@@ -124,6 +167,8 @@ test('sub-agent plugin falls back when child returns no final assistant text', a
 
   assert.equal(tool.toolOutput, '(子代理运行完毕，未返回任何文字总结)');
   assert.equal(tool.handled, true);
+
+  await rm(path.join(process.cwd(), 'server', 'sessions', 'subagent-empty-test_subagents'), { recursive: true, force: true });
 });
 
 test('sub-agent plugin converts child executor errors into tool output', async () => {
@@ -142,9 +187,11 @@ test('sub-agent plugin converts child executor errors into tool output', async (
     toolName: 'sub_agent',
     toolInput: { prompt: 'Trigger an error.' },
   };
+  const parentEvents = [];
 
   await SubAgentPlugin.preToolUse({
     executor: {
+      harnessId: 'subagent-fail-test',
       tools: ['bash'],
       features: {},
       model: {},
@@ -152,20 +199,22 @@ test('sub-agent plugin converts child executor errors into tool output', async (
       maxTokens: 256,
       thinkingEnabled: false,
       skills: [],
-      onEvent() {},
+      onEvent(type, payload) {
+        parentEvents.push({ type, payload });
+      },
     },
     tool,
     ExecutorClass: FakeExecutor,
   });
 
   assert.equal(tool.toolOutput, '[子代理异常崩溃]\nchild exploded');
+  assert.ok(parentEvents.some(event => event.type === 'sub_agent_trace_ready' && event.payload.status === 'failed'));
   assert.equal(tool.handled, true);
+
+  await rm(path.join(process.cwd(), 'server', 'sessions', 'subagent-fail-test_subagents'), { recursive: true, force: true });
 });
 
 test('sub-agent plugin forwards only bounded child trajectory previews', async () => {
-  const hugeText = 'x'.repeat(SUB_AGENT_STREAM_TEXT_LIMIT + 500);
-  const hugeOutput = 'y'.repeat(SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT + 500);
-
   class FakeExecutor {
     constructor(args) {
       this.args = args;
@@ -175,11 +224,11 @@ test('sub-agent plugin forwards only bounded child trajectory previews', async (
     }
 
     async run() {
-      this.args.onEvent('messages_update', { messages: [{ type: 'text', content: hugeText }] });
+      this.args.onEvent('messages_update', { messages: [{ type: 'text', content: 'hidden full update' }] });
       this.args.onEvent('text_start', { turn: 1 });
-      this.args.onEvent('text_delta', { text: hugeText });
-      this.args.onEvent('tool_exec_chunk', { id: 'child_tool', content: hugeOutput });
-      this.args.onEvent('tool_exec_done', { id: 'child_tool', output: hugeOutput });
+      this.args.onEvent('text_delta', { text: 'streamed child text that should not enter parent messages' });
+      this.args.onEvent('tool_start', { id: 'child_tool', name: 'bash' });
+      this.args.onEvent('tool_exec_done', { id: 'child_tool', output: 'large child output stored in trace only' });
     }
   }
 
@@ -192,6 +241,7 @@ test('sub-agent plugin forwards only bounded child trajectory previews', async (
 
   await SubAgentPlugin.preToolUse({
     executor: {
+      harnessId: 'subagent-preview-test',
       tools: ['bash'],
       features: {},
       model: {},
@@ -208,9 +258,11 @@ test('sub-agent plugin forwards only bounded child trajectory previews', async (
   });
 
   assert.equal(parentEvents.some(event => event.type === 'messages_update'), false);
-  assert.equal(parentEvents.find(event => event.type === 'text_delta').payload.text.length, SUB_AGENT_STREAM_TEXT_LIMIT);
-  assert.ok(parentEvents.some(event => event.type === 'text_delta' && event.payload.text.includes('preview truncated')));
-  assert.equal(parentEvents.find(event => event.type === 'tool_exec_chunk').payload.content.length, SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT);
-  assert.match(parentEvents.find(event => event.type === 'tool_exec_done').payload.output, /preview truncated/);
+  assert.equal(parentEvents.some(event => event.type === 'text_delta'), false);
+  assert.equal(parentEvents.some(event => event.type === 'tool_exec_done'), false);
+  assert.ok(parentEvents.some(event => event.type === 'sub_agent_status' && event.payload.phase === 'tool_use'));
+  assert.ok(parentEvents.some(event => event.type === 'sub_agent_trace_ready'));
   assert.equal(tool.toolOutput, 'Final report remains available');
+
+  await rm(path.join(process.cwd(), 'server', 'sessions', 'subagent-preview-test_subagents'), { recursive: true, force: true });
 });

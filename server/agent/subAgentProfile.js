@@ -3,6 +3,7 @@ import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
   getToolName,
 } from '../../src/lib/taskOrchestration.js';
+import { saveSubAgentTrace } from './subagents/subAgentTraceStore.js';
 
 const EMPTY_SUB_AGENT_RESULT = '(子代理运行完毕，未返回任何文字总结)';
 export const SUB_AGENT_STREAM_TEXT_LIMIT = 6000;
@@ -55,23 +56,32 @@ export function getLastAssistantText(messages) {
   return null;
 }
 
-function createSubAgentEventForwarder(parentExecutor, parentToolCallId) {
-  const textLengths = new Map();
-  const toolOutputLengths = new Map();
-  const truncatedKeys = new Set();
+function summarizePrompt(prompt = '') {
+  const text = String(prompt || '').replace(/\s+/g, ' ').trim();
+  return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+}
 
-  const forward = (type, payload) => {
+function createSubAgentEventForwarder(parentExecutor, parentToolCallId, startedAt) {
+  let toolCount = 0;
+  let previewTruncated = false;
+
+  const forward = (type, payload = {}) => {
     parentExecutor.onEvent(type, {
       ...payload,
       parentToolCallId,
     });
   };
 
-  const emitTruncationNotice = (key, message) => {
-    if (truncatedKeys.has(key)) return;
-    truncatedKeys.add(key);
-    forward('text_start', { turn: 0 });
-    forward('text_delta', { text: message });
+  const emitStatus = (patch) => {
+    forward('sub_agent_status', {
+      id: parentToolCallId,
+      status: 'running',
+      phase: 'running',
+      toolCount,
+      previewTruncated,
+      startedAt,
+      ...patch,
+    });
   };
 
   return (subType, subPayload = {}) => {
@@ -79,72 +89,69 @@ function createSubAgentEventForwarder(parentExecutor, parentToolCallId) {
       return;
     }
 
-    if (subType === 'thinking_delta' || subType === 'text_delta') {
-      const key = subType;
-      const limit = SUB_AGENT_STREAM_TEXT_LIMIT;
-      const currentLength = textLengths.get(key) || 0;
-      const incoming = String(subPayload.text || '');
-      const remaining = limit - currentLength;
-
-      if (remaining <= 0) {
-        emitTruncationNotice(
-          `${key}:truncated`,
-          '\n\n[Sub-agent preview truncated to keep the UI responsive. See the parent tool output for the final result.]'
-        );
-        return;
-      }
-
-      const nextText = incoming.slice(0, remaining);
-      textLengths.set(key, currentLength + nextText.length);
-      forward(subType, { ...subPayload, text: nextText });
-
-      if (incoming.length > remaining) {
-        emitTruncationNotice(
-          `${key}:truncated`,
-          '\n\n[Sub-agent preview truncated to keep the UI responsive. See the parent tool output for the final result.]'
-        );
-      }
+    if (subType === 'thinking_start') {
+      emitStatus({ phase: 'thinking', currentAction: 'thinking' });
       return;
     }
 
-    if (subType === 'tool_exec_chunk') {
-      const key = subPayload.id || 'unknown-tool';
-      const currentLength = toolOutputLengths.get(key) || 0;
-      const incoming = String(subPayload.content || '');
-      const remaining = SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT - currentLength;
+    if (subType === 'text_start') {
+      emitStatus({ phase: 'finalizing', currentAction: 'writing final answer' });
+      return;
+    }
 
-      if (remaining <= 0) return;
+    if (subType === 'tool_start') {
+      toolCount += 1;
+      emitStatus({
+        phase: 'tool_use',
+        currentAction: subPayload.name ? `calling ${subPayload.name}` : 'calling tool',
+        currentTool: subPayload.name || '',
+      });
+      return;
+    }
 
-      const nextContent = incoming.slice(0, remaining);
-      toolOutputLengths.set(key, currentLength + nextContent.length);
-      forward(subType, { ...subPayload, content: nextContent });
+    if (subType === 'tool_exec_start') {
+      emitStatus({
+        phase: 'tool_use',
+        currentAction: subPayload.toolName ? `executing ${subPayload.toolName}` : 'executing tool',
+        currentTool: subPayload.toolName || '',
+      });
+      return;
+    }
 
-      if (incoming.length > remaining) {
-        forward('tool_exec_chunk', {
-          ...subPayload,
-          content: '\n\n[Sub-agent tool output preview truncated to keep the UI responsive.]',
-        });
+    if (subType === 'tool_exec_done') {
+      if (typeof subPayload.output === 'string' && subPayload.output.length > SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT) {
+        previewTruncated = true;
       }
+      emitStatus({
+        phase: 'tool_result',
+        currentAction: subPayload.toolName ? `finished ${subPayload.toolName}` : 'received tool result',
+      });
       return;
     }
 
-    if (subType === 'tool_exec_done' && typeof subPayload.output === 'string') {
-      const output = subPayload.output;
-      const preview = output.length > SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT
-        ? `${output.slice(0, SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT)}\n\n[Sub-agent tool output preview truncated to keep the UI responsive.]`
-        : output;
-      forward(subType, { ...subPayload, output: preview });
-      return;
+    if ((subType === 'thinking_delta' || subType === 'text_delta') && String(subPayload.text || '').length > SUB_AGENT_STREAM_TEXT_LIMIT) {
+      previewTruncated = true;
     }
-
-    forward(subType, subPayload);
   };
 }
 
 export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentExecutor }) {
-  const forwardSubAgentEvent = createSubAgentEventForwarder(parentExecutor, tool.id);
+  const startedAt = new Date().toISOString();
+  const prompt = tool.toolInput.prompt;
+  parentExecutor.onEvent('sub_agent_status', {
+    id: tool.id,
+    status: 'running',
+    phase: 'starting',
+    currentAction: summarizePrompt(prompt),
+    toolCount: 0,
+    previewTruncated: false,
+    startedAt,
+    parentToolCallId: tool.id,
+  });
+
+  const forwardSubAgentEvent = createSubAgentEventForwarder(parentExecutor, tool.id, startedAt);
   const subExecutor = new ExecutorClass({
-    messages: [{ role: 'user', content: tool.toolInput.prompt }],
+    messages: [{ role: 'user', content: prompt }],
     systemPrompt: SUB_AGENT_SYSTEM_PROMPT,
     tools: selectSubAgentTools(parentExecutor.tools),
     features: createSubAgentFeatures(parentExecutor.features),
@@ -156,7 +163,75 @@ export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentE
     onEvent: forwardSubAgentEvent,
   });
 
-  await subExecutor.run();
+  try {
+    await subExecutor.run();
+  } catch (err) {
+    const completedAt = new Date().toISOString();
+    const finalAnswer = `[子代理异常崩溃]\n${err.message}`;
+    try {
+      const traceRef = await saveSubAgentTrace({
+        harnessId: parentExecutor.harnessId || 'default',
+        parentToolCallId: tool.id,
+        prompt,
+        messages: subExecutor.messages,
+        finalAnswer,
+        startedAt,
+        completedAt,
+        status: 'failed',
+      });
 
-  tool.toolOutput = getLastAssistantText(subExecutor.messages) ?? EMPTY_SUB_AGENT_RESULT;
+      tool.subAgentTrace = traceRef;
+      parentExecutor.onEvent('sub_agent_trace_ready', {
+        id: tool.id,
+        status: 'failed',
+        phase: 'failed',
+        currentAction: err.message,
+        finalPreview: summarizePrompt(finalAnswer),
+        trace: traceRef,
+        toolCount: traceRef.summary.toolCallCount,
+        startedAt,
+        completedAt,
+        parentToolCallId: tool.id,
+      });
+    } catch {
+      parentExecutor.onEvent('sub_agent_status', {
+        id: tool.id,
+        status: 'failed',
+        phase: 'failed',
+        currentAction: err.message,
+        startedAt,
+        completedAt,
+        parentToolCallId: tool.id,
+      });
+    }
+    throw err;
+  }
+
+  const completedAt = new Date().toISOString();
+  const finalAnswer = getLastAssistantText(subExecutor.messages) ?? EMPTY_SUB_AGENT_RESULT;
+  const traceRef = await saveSubAgentTrace({
+    harnessId: parentExecutor.harnessId || 'default',
+    parentToolCallId: tool.id,
+    prompt,
+    messages: subExecutor.messages,
+    finalAnswer,
+    startedAt,
+    completedAt,
+    status: 'completed',
+  });
+
+  tool.subAgentTrace = traceRef;
+  tool.toolOutput = finalAnswer;
+  parentExecutor.onEvent('sub_agent_trace_ready', {
+    id: tool.id,
+    status: 'completed',
+    phase: 'completed',
+    currentAction: 'completed',
+    finalPreview: summarizePrompt(finalAnswer),
+    trace: traceRef,
+    toolCount: traceRef.summary.toolCallCount,
+    startedAt,
+    completedAt,
+    parentToolCallId: tool.id,
+  });
 }

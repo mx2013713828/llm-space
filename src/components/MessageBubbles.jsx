@@ -64,8 +64,13 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
  * 工具调用卡片
  * 展示工具名称、输入参数、输出结果，支持折叠
  */
-export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
+export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, subAgentStatus, subAgentTrace }) {
   const [expanded, setExpanded] = useState(false);
+  const [traceExpanded, setTraceExpanded] = useState(false);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceError, setTraceError] = useState('');
+  const [loadedTrace, setLoadedTrace] = useState(null);
+  const [traceVisibleCount, setTraceVisibleCount] = useState(20);
 
   const TOOL_ICONS = {
     web_search: '🔍', web_fetch: '🌐', write_todos: '✅',
@@ -73,6 +78,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
     execute_command: '⚡',
   };
   const icon = TOOL_ICONS[toolName] || '🔧';
+  const isSubAgent = toolName === 'sub_agent';
 
   const formatJson = (obj) => {
     try {
@@ -95,12 +101,81 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
     return processedLines.join('\n');
   };
 
+  const loadSubAgentTrace = async () => {
+    if (!subAgentTrace?.traceId || !subAgentTrace?.path || loadedTrace || traceLoading) return;
+
+    const match = subAgentTrace.path.match(/^server\/sessions\/([^/]+)_subagents\/([^/]+)\.json$/);
+    if (!match) {
+      setTraceError('Trace reference is not readable.');
+      return;
+    }
+
+    setTraceLoading(true);
+    setTraceError('');
+    try {
+      const res = await fetch(`http://localhost:3001/api/sub-agent-traces/${match[1]}/${match[2]}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setLoadedTrace(await res.json());
+      setTraceVisibleCount(20);
+    } catch (err) {
+      setTraceError(err.message || 'Failed to load trace');
+    } finally {
+      setTraceLoading(false);
+    }
+  };
+
+  const renderSubAgentStatus = () => {
+    if (!isSubAgent || !subAgentStatus) return null;
+    const status = subAgentStatus.status || 'running';
+    const isDone = status === 'completed';
+    const color = isDone ? 'var(--green)' : status === 'failed' ? 'var(--red)' : 'var(--blue)';
+    const elapsedSeconds = subAgentStatus.startedAt
+      ? Math.max(0, Math.round(((subAgentStatus.completedAt ? new Date(subAgentStatus.completedAt) : new Date()) - new Date(subAgentStatus.startedAt)) / 1000))
+      : null;
+
+    return (
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 6,
+        marginLeft: 'auto',
+        minWidth: 0,
+        color,
+        fontSize: 11,
+      }}>
+        <span className="badge" style={{ color, border: `1px solid ${color}`, background: 'transparent', fontSize: 10 }}>
+          {status}
+        </span>
+        {subAgentStatus.currentAction && (
+          <span style={{ color: 'var(--text-muted)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subAgentStatus.currentAction}
+          </span>
+        )}
+        {Number.isFinite(subAgentStatus.toolCount) && (
+          <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {subAgentStatus.toolCount} tools
+          </span>
+        )}
+        {elapsedSeconds !== null && (
+          <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {elapsedSeconds}s
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="message-bubble msg-tool animate-fade-in" style={{ padding: 0 }}>
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
         <span style={{ fontSize: 15 }}>{icon}</span>
         <span className="tool-call-name">{toolName}</span>
         <span className="badge badge-cyan" style={{ fontSize: 10 }}>Tool Call</span>
+        {renderSubAgentStatus()}
         <svg
           className={`chevron ${expanded ? 'open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -140,11 +215,62 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages }) {
                 {subMessages.map((msg, idx) => {
                   if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
                   if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} />;
+                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} />;
                   if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
                   return null;
                 })}
               </div>
+            </div>
+          )}
+          {isSubAgent && subAgentTrace && (
+            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+              <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
+                <span>🗂️</span> Full Sub-agent Trace
+                {subAgentTrace.summary && (
+                  <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>
+                    {subAgentTrace.summary.messageCount} messages · {subAgentTrace.summary.toolCallCount} tools
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  const nextExpanded = !traceExpanded;
+                  setTraceExpanded(nextExpanded);
+                  if (nextExpanded) await loadSubAgentTrace();
+                }}
+                style={{ padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                {traceExpanded ? 'Hide full trace' : 'Load full trace'}
+              </button>
+              {traceLoading && (
+                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>Loading trace...</div>
+              )}
+              {traceError && (
+                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--red)' }}>{traceError}</div>
+              )}
+              {traceExpanded && loadedTrace && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflow: 'auto' }}>
+                  {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
+                    if (msg.role === 'user') return null;
+                    if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} />;
+                    if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                    return null;
+                  })}
+                  {(loadedTrace.messages || []).length > traceVisibleCount && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setTraceVisibleCount(count => count + 20)}
+                      style={{ alignSelf: 'center', padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                    >
+                      Load more trace messages ({traceVisibleCount}/{loadedTrace.messages.length})
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

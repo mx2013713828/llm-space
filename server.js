@@ -24,6 +24,7 @@ import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js'
 import { createCronApiHandlers } from './server/agent/scheduler/cronApi.js';
 import { buildPersistedSessionState, readSessionState, resolveRunTeamContext } from './server/sessions/sessionState.js';
 import { listExecutionStrategies, resolveSelectedStrategyId } from './server/agent/strategies/strategyRegistry.js';
+import { loadSubAgentTrace } from './server/agent/subagents/subAgentTraceStore.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -817,6 +818,16 @@ app.get('/api/execution-strategies', async (req, res) => {
 /** 获取后端注册的所有工具 Schema */
 app.get('/api/tools', (req, res) => {
   res.json(getToolSchemas());
+});
+
+/** 获取单次 sub-agent 完整运行轨迹 */
+app.get('/api/sub-agent-traces/:harnessId/:traceId', async (req, res) => {
+  try {
+    const trace = await loadSubAgentTrace(req.params.harnessId, req.params.traceId);
+    res.json(trace);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
 });
 
 /** Agent 运行端点 (支持后台运行和多客户端订阅广播) */
