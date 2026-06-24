@@ -17,6 +17,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [selectedTools, setSelectedTools] = useState(harness.tools || []);
   const [availableTools, setAvailableTools] = useState([]);
   const [availableSkills, setAvailableSkills] = useState([]);
+  const [availableStrategies, setAvailableStrategies] = useState([]);
   const [activeTab, setActiveTab] = useState('editor');
   const [features, setFeatures] = useState(() => parseFeatures(harness.features));
   const [models, setModels] = useState([]);
@@ -55,6 +56,15 @@ export function PromptLabPage({ harness, onSave }) {
       .then(data => {
         if (active) {
           setModels(data);
+        }
+      })
+      .catch(console.error);
+
+    fetch('http://localhost:3001/api/execution-strategies')
+      .then(r => r.json())
+      .then(data => {
+        if (active && Array.isArray(data)) {
+          setAvailableStrategies(data);
         }
       })
       .catch(console.error);
@@ -573,7 +583,11 @@ export function PromptLabPage({ harness, onSave }) {
 
                           if (subMeta.type === 'select') {
                             const selectedValue = features[key]?.[subKey] || subMeta.defaultValue;
-                            const hasOptions = !!subMeta.options;
+                            const registryOptions = key === 'task_orchestration' && subKey === 'strategy' && availableStrategies.length > 0
+                              ? availableStrategies.map(strategy => ({ value: strategy.id, label: strategy.name }))
+                              : null;
+                            const selectOptions = registryOptions || subMeta.options;
+                            const hasOptions = !!selectOptions;
                             const isDisabled = hasOptions 
                               ? !isParentEnabled 
                               : (!isParentEnabled || (subKey === 'fallback_model_id' && !features[key]?.fallback_model));
@@ -603,7 +617,7 @@ export function PromptLabPage({ harness, onSave }) {
                                   style={{ width: '100%', fontSize: 11, padding: '4px 8px', height: 28 }}
                                 >
                                   {hasOptions ? (
-                                    subMeta.options.map(opt => (
+                                    selectOptions.map(opt => (
                                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                                     ))
                                   ) : (
