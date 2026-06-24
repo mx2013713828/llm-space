@@ -14,6 +14,31 @@ const TEAM_LEAD_TOOLS = ['spawn_teammate', 'check_team_inbox'];
 const TEAM_COMMUNICATION_TOOLS = ['send_team_message'];
 const TEAM_TOOLS = [...TEAM_LEAD_TOOLS, ...TEAM_COMMUNICATION_TOOLS];
 
+export const EXECUTION_STRATEGY_PRESETS = {
+  custom: {},
+  inline: {
+    mode: 'todo',
+    enable_background_tasks: false,
+    enable_sub_agents: false,
+    enable_agent_teams: false,
+    enable_cron_scheduler: false,
+  },
+  sequential_subagent: {
+    mode: 'task_system',
+    enable_background_tasks: false,
+    enable_sub_agents: true,
+    enable_agent_teams: false,
+    enable_cron_scheduler: false,
+  },
+  async_teams: {
+    mode: 'task_system',
+    enable_background_tasks: false,
+    enable_sub_agents: false,
+    enable_agent_teams: true,
+    enable_cron_scheduler: false,
+  },
+};
+
 export const ORCHESTRATION_MANAGED_TOOL_NAMES = [
   ...TODO_PLANNING_TOOLS,
   ...TASK_SYSTEM_PLANNING_TOOLS,
@@ -45,6 +70,34 @@ export function getNextGroupFeatureState(previousValue, groupMeta, enabled) {
   }
 
   return nextGroup;
+}
+
+export function applyExecutionStrategyPreset(orchestration, strategyId) {
+  const selectedStrategy = Object.hasOwn(EXECUTION_STRATEGY_PRESETS, strategyId)
+    ? strategyId
+    : 'custom';
+  const preset = EXECUTION_STRATEGY_PRESETS[selectedStrategy];
+
+  return {
+    ...(orchestration ?? {}),
+    enabled: selectedStrategy === 'custom' ? (orchestration?.enabled ?? true) : true,
+    strategy: selectedStrategy,
+    ...preset,
+  };
+}
+
+export function getStrategyAfterPrimitiveEdit(orchestration, subKey, nextValue) {
+  const currentStrategy = orchestration?.strategy || 'custom';
+  if (currentStrategy === 'custom' || subKey === 'strategy') {
+    return currentStrategy;
+  }
+
+  const preset = EXECUTION_STRATEGY_PRESETS[currentStrategy];
+  if (!preset || !Object.hasOwn(preset, subKey)) {
+    return currentStrategy;
+  }
+
+  return preset[subKey] === nextValue ? currentStrategy : 'custom';
 }
 
 export function getToolName(tool) {

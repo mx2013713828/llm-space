@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
   TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
+  applyExecutionStrategyPreset,
   getNextGroupFeatureState,
+  getStrategyAfterPrimitiveEdit,
   getToolName,
   isOrchestrationEnabled,
   resolveOrchestrationTools,
@@ -280,4 +282,46 @@ test('preserves task orchestration child values when parent is disabled and re-e
     ...previousValue,
     enabled: true,
   });
+});
+
+test('execution strategy presets write recommended primitive values', () => {
+  const previousValue = {
+    enabled: false,
+    strategy: 'custom',
+    mode: 'todo',
+    enable_background_tasks: true,
+    enable_sub_agents: false,
+    enable_agent_teams: false,
+    enable_cron_scheduler: true,
+  };
+
+  assert.deepEqual(applyExecutionStrategyPreset(previousValue, 'sequential_subagent'), {
+    ...previousValue,
+    enabled: true,
+    strategy: 'sequential_subagent',
+    mode: 'task_system',
+    enable_background_tasks: false,
+    enable_sub_agents: true,
+    enable_agent_teams: false,
+    enable_cron_scheduler: false,
+  });
+
+  assert.deepEqual(applyExecutionStrategyPreset(previousValue, 'async_teams'), {
+    ...previousValue,
+    enabled: true,
+    strategy: 'async_teams',
+    mode: 'task_system',
+    enable_background_tasks: false,
+    enable_sub_agents: false,
+    enable_agent_teams: true,
+    enable_cron_scheduler: false,
+  });
+});
+
+test('manual primitive edits move presets back to custom only when diverging', () => {
+  const sequential = applyExecutionStrategyPreset({}, 'sequential_subagent');
+
+  assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'enable_sub_agents', true), 'sequential_subagent');
+  assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'enable_sub_agents', false), 'custom');
+  assert.equal(getStrategyAfterPrimitiveEdit(sequential, 'todo_prompt', '<custom />'), 'sequential_subagent');
 });

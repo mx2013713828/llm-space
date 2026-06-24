@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { FEATURE_SCHEMA, parseFeatures } from '../lib/FeatureSchema.js';
 import {
   TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
+  applyExecutionStrategyPreset,
   getNextGroupFeatureState,
+  getStrategyAfterPrimitiveEdit,
 } from '../lib/taskOrchestration.js';
 
 /**
@@ -160,10 +162,15 @@ export function PromptLabPage({ harness, onSave }) {
   const handleSubFeatureChange = (parentKey, subKey, val) => {
     setFeatures(prev => ({
       ...prev,
-      [parentKey]: {
-        ...prev[parentKey],
-        [subKey]: val
-      }
+      [parentKey]: parentKey === 'task_orchestration' && subKey === 'strategy'
+        ? applyExecutionStrategyPreset(prev[parentKey], val)
+        : {
+            ...prev[parentKey],
+            [subKey]: val,
+            ...(parentKey === 'task_orchestration'
+              ? { strategy: getStrategyAfterPrimitiveEdit(prev[parentKey], subKey, val) }
+              : {}),
+          }
     }));
     // 联动副作用：enable_global_skills 子开关变更时重新加载 skills 列表
     if (parentKey === 'enable_skills' && subKey === 'enable_global_skills') {
