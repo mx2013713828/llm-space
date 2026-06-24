@@ -371,6 +371,31 @@ function broadcastEvent(harnessId, type, data) {
   }
 }
 
+function prepareSseResponse(res) {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+}
+
+async function attachToActiveJob(res, job) {
+  prepareSseResponse(res);
+  job.clients.add(res);
+
+  if (job.executor) {
+    sendEvent(res, 'messages_update', { messages: job.executor.messages });
+    sendEvent(res, 'todo_update', { todos: job.executor.todos });
+    sendEvent(res, 'background_tasks_update', { tasks: job.executor.backgroundTasks || [] });
+  }
+
+  await new Promise((resolve) => {
+    res.on('close', () => {
+      job.clients.delete(res);
+      resolve();
+    });
+  });
+}
+
 await cronScheduler.loadDurableJobs();
 await cronScheduler.loadRunHistory();
 cronScheduler.start();
@@ -857,49 +882,28 @@ app.post('/api/agent/run', async (req, res) => {
     return res.status(400).json({ error: '非法的 Harness ID' });
   }
 
+  if (activeJobs.has(harnessId)) {
+    await attachToActiveJob(res, activeJobs.get(harnessId));
+    return;
+  }
+
+  const job = { executor: null, clients: new Set() };
+  activeJobs.set(harnessId, job);
+
+  // Branch 2: The job is not running yet - requires API Key
+  if (!model?.key) {
+    activeJobs.delete(harnessId);
+    return res.status(400).json({ error: '缺少 API Key' });
+  }
+
+  // 设置 SSE 响应头 (启动新运行任务)
+  prepareSseResponse(res);
+
   const effectiveTeamContext = await resolveRunTeamContext({
     sessionsDir: SESSIONS_DIR,
     harnessId,
     requestedTeamContext: teamContext,
   });
-
-  // Branch 1: The job is already running
-  if (activeJobs.has(harnessId)) {
-    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
-
-    const job = activeJobs.get(harnessId);
-    job.clients.add(res);
-
-    // Synchronize current state to newly attached client
-    if (job.executor) {
-      sendEvent(res, 'messages_update', { messages: job.executor.messages });
-      sendEvent(res, 'todo_update', { todos: job.executor.todos });
-      sendEvent(res, 'background_tasks_update', { tasks: job.executor.backgroundTasks || [] });
-    }
-
-    // Keep the request handler pending until client disconnects
-    await new Promise((resolve) => {
-      res.on('close', () => {
-        job.clients.delete(res);
-        resolve();
-      });
-    });
-    return;
-  }
-
-  // Branch 2: The job is not running yet - requires API Key
-  if (!model?.key) {
-    return res.status(400).json({ error: '缺少 API Key' });
-  }
-
-  // 设置 SSE 响应头 (启动新运行任务)
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
 
   // Branch 2: The job is not running yet
   const executor = new AgentExecutor({
@@ -922,8 +926,8 @@ app.post('/api/agent/run', async (req, res) => {
     }
   });
 
-  const job = { executor, clients: new Set([res]) };
-  activeJobs.set(harnessId, job);
+  job.executor = executor;
+  job.clients.add(res);
   
   // 初始化发送一次已有后台任务给客户端
   sendEvent(res, 'background_tasks_update', { tasks: executor.backgroundTasks || [] });

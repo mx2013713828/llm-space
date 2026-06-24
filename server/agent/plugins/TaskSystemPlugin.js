@@ -69,6 +69,8 @@ export const TaskSystemPlugin = {
 
   async preToolUse(context) {
     const { executor, tool } = context;
+    if (tool.handled) return;
+
     const harnessId = executor.harnessId || 'default';
     const toolName = tool.toolName;
     const args = tool.toolInput || {};
