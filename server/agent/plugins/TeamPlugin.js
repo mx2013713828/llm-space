@@ -70,6 +70,23 @@ function sanitizeMaxTurns(value) {
 }
 
 async function ensureTeam({ executor, stateStore }) {
+  if (executor._teamEnsurePromise) {
+    return executor._teamEnsurePromise;
+  }
+
+  if (executor.teamContext?.teamId && executor.teamContext?.harnessId) {
+    return executor.teamContext.teamId;
+  }
+
+  executor._teamEnsurePromise = ensureTeamState({ executor, stateStore }).catch(error => {
+    executor._teamEnsurePromise = null;
+    throw error;
+  });
+
+  return executor._teamEnsurePromise;
+}
+
+async function ensureTeamState({ executor, stateStore }) {
   const currentTeamId = executor.teamContext?.teamId;
   const teamId = currentTeamId || createTeamId();
   const harnessId = resolveTeamHarnessId(executor);

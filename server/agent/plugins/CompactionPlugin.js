@@ -1,5 +1,4 @@
-import { compactMessages } from '../messageBuilder.js';
-import { HARD_COMPACT_TOKEN_THRESHOLD } from '../AgentExecutor.js';
+import { buildApiMessages, compactMessages } from '../messageBuilder.js';
 
 export function foldThinkingForDisplay(executor) {
   if (!executor.features?.context_compaction?.thinking_compaction) return false;
@@ -19,6 +18,9 @@ export const CompactionPlugin = {
 
   async preLLM(context) {
     const { executor, turnIndex } = context;
+    const thresholds = executor.compactionThresholds ?? {};
+    const softThreshold = thresholds.soft ?? 120000;
+    const hardThreshold = thresholds.hard ?? 160000;
 
     // 获取可配置的参数入口，提供默认值
     const cooldown = executor.features?.soft_compact_cooldown ?? 10;
@@ -44,7 +46,8 @@ export const CompactionPlugin = {
         executor.tools,
         executor.thinkingEnabled,
         executor.compactionEnabled,
-        minSaving
+        minSaving,
+        softThreshold
       );
 
       if (compactResult.compactedCount > 0) {
@@ -56,6 +59,11 @@ export const CompactionPlugin = {
         if (compactResult.estimatedTokens != null) {
           executor.contextTokens = compactResult.estimatedTokens;
         }
+        context.apiMessages = buildApiMessages(
+          executor.messages,
+          executor.thinkingEnabled,
+          executor.features.context_compaction,
+        );
         executor.onEvent('messages_update', { messages: executor.messages });
         await executor.saveSession();
       }
@@ -63,9 +71,14 @@ export const CompactionPlugin = {
 
     // 2. Hard Compact Stage 2
     const tokensAfterSoft = executor.contextTokens > 0 ? executor.contextTokens : executor.estimateCurrentTokens();
-    if (executor.compactionEnabled && executor.features?.context_compaction?.hard_compact && tokensAfterSoft > HARD_COMPACT_TOKEN_THRESHOLD && !executor.hardCompactTriggered && executor.messages.length > 10) {
+    if (executor.compactionEnabled && executor.features?.context_compaction?.hard_compact && tokensAfterSoft > hardThreshold && !executor.hardCompactTriggered && executor.messages.length > 10) {
       try {
         await executor.performHardCompact(turnIndex);
+        context.apiMessages = buildApiMessages(
+          executor.messages,
+          executor.thinkingEnabled,
+          executor.features.context_compaction,
+        );
       } catch (compactErr) {
         console.error('[CompactionPlugin] Failed to perform Hard-Compact:', compactErr);
       }

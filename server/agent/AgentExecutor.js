@@ -21,6 +21,7 @@ import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
 import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
+import { getModelContextWindow } from '../../src/lib/modelContext.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -32,8 +33,8 @@ export class AuthError extends Error { constructor(msg) { super(msg); this.name 
 // 物理常量配置
 export const OFFLOAD_THRESHOLD_BYTES = 20000;
 export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
-export const SOFT_COMPACT_TOKEN_THRESHOLD = 120000;
-export const HARD_COMPACT_TOKEN_THRESHOLD = 160000;
+export const SOFT_COMPACT_CONTEXT_RATIO = 0.75;
+export const HARD_COMPACT_CONTEXT_RATIO = 0.9;
 
 function inferExecutorModelProvider(model = {}) {
   return inferModelProvider({}, {
@@ -41,6 +42,15 @@ function inferExecutorModelProvider(model = {}) {
     baseUrl: model.url,
     modelId: model.modelId,
   });
+}
+
+export function getCompactionTokenThresholds(model = {}) {
+  const contextWindow = getModelContextWindow(model).value;
+  return {
+    contextWindow,
+    soft: Math.floor(contextWindow * SOFT_COMPACT_CONTEXT_RATIO),
+    hard: Math.floor(contextWindow * HARD_COMPACT_CONTEXT_RATIO),
+  };
 }
 
 /** Helper function: parse Markdown YAML frontmatter */
@@ -103,6 +113,7 @@ export class AgentExecutor {
     }
 
     this.model = model;
+    this.compactionThresholds = getCompactionTokenThresholds(model);
     this.temperature = temperature;
     this.maxTokens = maxTokens;
     this.thinkingEnabled = thinkingEnabled;
@@ -300,7 +311,10 @@ export class AgentExecutor {
 
     console.log('✅ Hard-Compact 语义摘要生成成功，长度为:', summary.length);
 
-    const activeMessages = this.messages.filter(msg => turnIndex - (msg.turn || 1) < 3);
+    const activeMessages = this.messages.filter(msg => (
+      msg.type !== 'system_alert'
+      && turnIndex - (msg.turn || 1) < 3
+    ));
 
     const summaryMsg = {
       role: 'user',
@@ -309,15 +323,8 @@ export class AgentExecutor {
       content: `[System Memory Compacted]\nHere is the summarized history of the project so far:\n\n${summary}\n\nThe complete historical transcript has been persisted to disk.`
     };
 
-    const resumeMsg = {
-      role: 'user',
-      type: 'system_alert',
-      turn: turnIndex,
-      content: `Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.`
-    };
-
     // 更新 messages 并重置状态
-    this.messages.splice(0, this.messages.length, summaryMsg, ...activeMessages, resumeMsg);
+    this.messages.splice(0, this.messages.length, summaryMsg, ...activeMessages);
     this.contextTokens = 0;
     this.hardCompactTriggered = true;
 

@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { AgentExecutor } from './AgentExecutor.js';
+import { AgentExecutor, getCompactionTokenThresholds } from './AgentExecutor.js';
 import { HookManager } from './HookManager.js';
 
 function createExecutor(overrides = {}) {
@@ -33,6 +33,50 @@ test('parent-disabled orchestration strips every managed child tool but keeps cu
 
   assert.deepEqual(executor.tools.sort(), ['bash', 'get_current_time'].sort());
   assert.equal(executor.tools.filter(tool => tool === 'get_current_time').length, 1);
+});
+
+test('compaction thresholds scale with model context window', () => {
+  assert.deepEqual(getCompactionTokenThresholds({ contextWindow: 1000000 }), {
+    contextWindow: 1000000,
+    soft: 750000,
+    hard: 900000,
+  });
+  assert.deepEqual(getCompactionTokenThresholds({}), {
+    contextWindow: 128000,
+    soft: 96000,
+    hard: 115200,
+  });
+});
+
+test('hard compact preserves the current user message as the final message', async (t) => {
+  const originalCwd = process.cwd();
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-hard-compact-'));
+  await mkdir(path.join(rootDir, 'server', 'sessions'), { recursive: true });
+  process.chdir(rootDir);
+
+  t.after(async () => {
+    process.chdir(originalCwd);
+    await rm(rootDir, { recursive: true, force: true });
+  });
+
+  const executor = createExecutor({
+    harnessId: 'hard-compact-current-user',
+    messages: [
+      { role: 'user', type: 'text', turn: 1, content: 'old request' },
+      { role: 'assistant', type: 'text', turn: 1, content: 'old answer' },
+      { role: 'user', type: 'text', turn: 10, content: '你好' },
+    ],
+    onEvent() {},
+  });
+  executor._callLLMNonStream = async () => '<summary>old context summary</summary>';
+
+  await executor.performHardCompact(10);
+
+  assert.equal(executor.messages.at(-1).content, '你好');
+  assert.equal(
+    executor.messages.some(message => String(message.content).includes('Continue with the last task')),
+    false,
+  );
 });
 
 test('task-system mode mounts the task board tools once and preserves current time', () => {

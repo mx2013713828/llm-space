@@ -124,6 +124,43 @@ test('spawn_teammate clamps maxTurns to a finite positive integer with safe defa
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('parallel spawn_teammate calls in one turn share a single team', async () => {
+  const fixture = await createFixture();
+  const runCalls = [];
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn(input) {
+      runCalls.push(input);
+    },
+  });
+  const executor = { harnessId: 'h1', teamContext: null };
+  const tools = [
+    createTool('spawn_teammate', { name: 'backend', prompt: 'Review backend.' }),
+    createTool('spawn_teammate', { name: 'frontend', prompt: 'Review frontend.' }),
+    createTool('spawn_teammate', { name: 'tests', prompt: 'Review tests.' }),
+  ];
+
+  await Promise.all(tools.map(tool => plugin.preToolUse({ executor, tool })));
+
+  const outputs = tools.map(tool => JSON.parse(tool.toolOutput));
+  const teamIds = new Set(outputs.map(output => output.teamId));
+  assert.equal(teamIds.size, 1);
+  assert.equal(runCalls.length, 3);
+  assert.deepEqual(new Set(runCalls.map(call => call.teamId)), teamIds);
+
+  const state = await fixture.stateStore.loadState({
+    harnessId: 'h1',
+    teamId: outputs[0].teamId,
+  });
+  assert.deepEqual(
+    Object.keys(state.teammates).sort(),
+    ['teammate_backend', 'teammate_frontend', 'teammate_tests'].sort(),
+  );
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('send_team_message writes from lead by default and from teammate when team context exists', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({

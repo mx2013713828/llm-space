@@ -169,14 +169,24 @@ export function estimateTokens(messages, thinkingEnabled, systemPrompt, tools, c
  * @param {boolean} thinkingEnabled - 是否启用思维链
  * @returns {{ messages: Array, compactedCount: number, estimatedTokens: number|null }}
  */
-export function compactMessages(messages, turnIndex, currentTokens, systemPrompt, tools, thinkingEnabled, compactionEnabled = true, minSaving = 10000) {
+export function compactMessages(
+  messages,
+  turnIndex,
+  currentTokens,
+  systemPrompt,
+  tools,
+  thinkingEnabled,
+  compactionEnabled = true,
+  minSaving = 10000,
+  softThreshold = 120000,
+) {
   // 如果未启用压缩，直接返回
   if (!compactionEnabled) {
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
 
-  // 触发条件：Token 超过 120000 且至少聊了 5 轮以上
-  if (currentTokens <= 120000 || turnIndex <= 5) {
+  // 触发条件：Token 超过软压缩水位且至少聊了 5 轮以上
+  if (currentTokens <= softThreshold || turnIndex <= 5) {
     return { messages, compactedCount: 0, estimatedTokens: null };
   }
 
@@ -405,4 +415,3 @@ export function alignRequestPayload(systemPrompt, tools, apiMessages, modelConfi
     messages: alignedMessages
   };
 }
-
