@@ -12,6 +12,17 @@ import {
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
 
+export function createTeammateHarnessId(parentHarnessId, teammateId) {
+  const safeParentHarnessId = String(parentHarnessId || 'team')
+    .replace(/[^A-Za-z0-9_-]/g, '_')
+    .slice(0, 80) || 'team';
+  const safeTeammateId = String(teammateId || 'teammate')
+    .replace(/[^A-Za-z0-9_-]/g, '_')
+    .slice(0, 80) || 'teammate';
+
+  return `${safeParentHarnessId}_${safeTeammateId}`;
+}
+
 export async function runTeammate({
   parentExecutor,
   teamId,
@@ -43,9 +54,14 @@ export async function runTeammate({
 
     const teammateExecutor = new ExecutorClass({
       cwd,
-      harnessId: '',
+      harnessId: createTeammateHarnessId(parentExecutor.harnessId, teammateId),
       runtimeRole: 'teammate',
-      teamContext: { teamId, agentId: teammateId, leadId: 'lead' },
+      teamContext: {
+        teamId,
+        agentId: teammateId,
+        leadId: 'lead',
+        harnessId: parentExecutor.harnessId,
+      },
       messages: [{ role: 'user', content: initialPrompt }],
       systemPrompt: createTeammateSystemPrompt({ name, role }),
       tools: selectTeammateTools(parentExecutor.tools),

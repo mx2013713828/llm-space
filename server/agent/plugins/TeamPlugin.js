@@ -56,6 +56,10 @@ function resolveInboxAgentId(executor) {
   return executor.teamContext?.leadId ?? 'lead';
 }
 
+function resolveTeamHarnessId(executor) {
+  return executor.teamContext?.harnessId || executor.harnessId;
+}
+
 function sanitizeMaxTurns(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -68,19 +72,22 @@ function sanitizeMaxTurns(value) {
 async function ensureTeam({ executor, stateStore }) {
   const currentTeamId = executor.teamContext?.teamId;
   const teamId = currentTeamId || createTeamId();
+  const harnessId = resolveTeamHarnessId(executor);
   const existingState = await stateStore.loadState({
-    harnessId: executor.harnessId,
+    harnessId,
     teamId,
   });
 
   if (!existingState) {
-    await stateStore.createTeam({ harnessId: executor.harnessId, teamId });
+    await stateStore.createTeam({ harnessId, teamId });
   }
 
   if (!executor.teamContext) {
-    executor.teamContext = { teamId, agentId: 'lead', leadId: 'lead' };
+    executor.teamContext = { teamId, agentId: 'lead', leadId: 'lead', harnessId };
   } else if (!executor.teamContext.teamId) {
-    executor.teamContext = { ...executor.teamContext, teamId };
+    executor.teamContext = { ...executor.teamContext, teamId, harnessId };
+  } else if (!executor.teamContext.harnessId) {
+    executor.teamContext = { ...executor.teamContext, harnessId };
   }
 
   return teamId;
@@ -106,9 +113,10 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
       if (!teamId) return;
       const agentId = resolveInboxAgentId(executor);
       if (!agentId) return;
+      const harnessId = resolveTeamHarnessId(executor);
 
       const inboxMessages = await bus.readInbox({
-        harnessId: executor.harnessId,
+        harnessId,
         teamId,
         agentId,
       });
@@ -136,9 +144,10 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
 
           const teamId = await ensureTeam({ executor, stateStore });
           const teammateId = createTeammateId(args.name);
+          const harnessId = resolveTeamHarnessId(executor);
 
           await stateStore.upsertTeammate({
-            harnessId: executor.harnessId,
+            harnessId,
             teamId,
             teammate: {
               agentId: teammateId,
@@ -171,7 +180,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
 
           const teamId = resolveTeamId(executor, args.teamId);
           const envelope = await bus.sendMessage({
-            harnessId: executor.harnessId,
+            harnessId: resolveTeamHarnessId(executor),
             teamId,
             from: executor.teamContext?.agentId ?? 'lead',
             to: args.to,
@@ -183,7 +192,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
         } else if (tool.toolName === 'check_team_inbox') {
           const teamId = resolveTeamId(executor, args.teamId);
           const messages = await bus.readInbox({
-            harnessId: executor.harnessId,
+            harnessId: resolveTeamHarnessId(executor),
             teamId,
             agentId: 'lead',
           });

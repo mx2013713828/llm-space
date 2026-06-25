@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runTeammate } from './teammateRunner.js';
+import { createTeammateHarnessId, runTeammate } from './teammateRunner.js';
 
 class FakeExecutor {
   static instances = [];
@@ -87,6 +87,7 @@ test('runTeammate creates a teammate child executor, marks running then complete
     teamId: 'team_1',
     agentId: 'reviewer',
     leadId: 'lead',
+    harnessId: 'h1',
   });
   assert.deepEqual(
     FakeExecutor.lastArgs.tools,
@@ -288,6 +289,16 @@ test('runTeammate isolates child harness state and suppresses raw child messages
     },
   });
 
-  assert.equal(FakeExecutor.lastArgs.harnessId, '');
+  assert.equal(FakeExecutor.lastArgs.harnessId, 'h1_reviewer');
+  assert.notEqual(FakeExecutor.lastArgs.harnessId, 'h1');
+  assert.equal(FakeExecutor.lastArgs.teamContext.harnessId, 'h1');
   assert.deepEqual(forwardedEvents, [{ type: 'tool_call', payload: { tool: 'bash' } }]);
+});
+
+test('createTeammateHarnessId returns a non-empty storage-safe id', () => {
+  assert.equal(
+    createTeammateHarnessId('harness/with spaces', 'teammate:reviewer'),
+    'harness_with_spaces_teammate_reviewer',
+  );
+  assert.equal(createTeammateHarnessId('', ''), 'team_teammate');
 });

@@ -56,6 +56,7 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   assert.equal(output.status, 'running');
   assert.equal(output.teammateId, 'teammate_reviewer');
   assert.equal(runCalls.length, 1);
+  assert.equal(runCalls[0].parentExecutor.teamContext.harnessId, 'h1');
 
   const state = await fixture.stateStore.loadState({
     harnessId: 'h1',
@@ -178,6 +179,59 @@ test('send_team_message writes from lead by default and from teammate when team 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('teammate team tools use the parent team harness even when child harness is isolated', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.stateStore.createTeam({ harnessId: 'parent_harness', teamId: 'team_1' });
+  await fixture.bus.sendMessage({
+    harnessId: 'parent_harness',
+    teamId: 'team_1',
+    from: 'lead',
+    to: 'teammate_reviewer',
+    type: 'message',
+    payload: { message: 'Use the parent inbox.' },
+  });
+
+  const context = {
+    executor: {
+      harnessId: 'parent_harness_teammate_reviewer',
+      runtimeRole: 'teammate',
+      teamContext: {
+        harnessId: 'parent_harness',
+        teamId: 'team_1',
+        agentId: 'teammate_reviewer',
+        leadId: 'lead',
+      },
+    },
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'Continue.' }] }],
+  };
+
+  await plugin.preLLM(context);
+
+  assert.match(context.apiMessages[0].content[0].text, /Use the parent inbox/);
+
+  const replyTool = createTool('send_team_message', {
+    teamId: 'team_1',
+    to: 'lead',
+    message: 'Done.',
+  });
+  await plugin.preToolUse({ executor: context.executor, tool: replyTool });
+
+  const leadInbox = await fixture.bus.readInbox({
+    harnessId: 'parent_harness',
+    teamId: 'team_1',
+    agentId: 'lead',
+  });
+  assert.equal(leadInbox[0].payload.message, 'Done.');
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('check_team_inbox consumes the lead inbox and formats messages', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
@@ -272,9 +326,14 @@ test('preLLM injects teammate inbox using teamContext agentId and consumes it on
 
   const context = {
     executor: {
-      harnessId: 'h1',
+      harnessId: 'h1_teammate_reviewer',
       runtimeRole: 'teammate',
-      teamContext: { teamId: 'team_1', agentId: 'teammate_reviewer', leadId: 'lead' },
+      teamContext: {
+        harnessId: 'h1',
+        teamId: 'team_1',
+        agentId: 'teammate_reviewer',
+        leadId: 'lead',
+      },
     },
     apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'Review the patch.' }] }],
   };
