@@ -113,3 +113,74 @@ test('promotes a folded-thinking response when the provider ends without text', 
   ]);
   assert.equal(emittedEvents.includes('messages_update'), true);
 });
+
+test('non-stream summary calls do not inherit Anthropic thinking mode', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async (_url, options) => {
+    requests.push({
+      headers: options.headers,
+      body: JSON.parse(options.body),
+    });
+    return {
+      ok: true,
+      async json() {
+        return { content: [{ type: 'text', text: '<summary>done</summary>' }] };
+      },
+    };
+  };
+
+  const executor = new AgentExecutor({
+    model: { id: 'anthropic', modelId: 'claude-sonnet-4-5', key: 'test', url: 'https://api.anthropic.com' },
+    thinkingEnabled: true,
+  });
+
+  const summary = await executor._callLLMNonStream(
+    [{ role: 'user', content: [{ type: 'text', text: 'Summarize.' }] }],
+    'summary prompt',
+  );
+
+  assert.equal(summary, '<summary>done</summary>');
+  assert.equal('thinking' in requests[0].body, false);
+  assert.equal('anthropic-beta' in requests[0].headers, false);
+});
+
+test('DeepSeek model hints use DeepSeek request semantics even through a proxy URL', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async (_url, options) => {
+    requests.push({
+      headers: options.headers,
+      body: JSON.parse(options.body),
+    });
+    return sseResponse([
+      { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+    ]);
+  };
+
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://llm-proxy.local/anthropic' },
+    thinkingEnabled: true,
+  });
+
+  await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'hello' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: [],
+  }, { continuation_tokens: [] });
+
+  assert.deepEqual(requests[0].body.thinking, { type: 'enabled', budget_tokens: 4915 });
+  assert.equal('betas' in requests[0].body, false);
+  assert.equal('anthropic-beta' in requests[0].headers, false);
+});

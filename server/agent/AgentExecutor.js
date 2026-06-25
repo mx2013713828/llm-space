@@ -18,7 +18,7 @@ import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
 import { TeamPlugin } from './plugins/TeamPlugin.js';
 import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
-import { normalizeUsageMetrics } from './usageNormalizer.js';
+import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 
@@ -34,6 +34,14 @@ export const OFFLOAD_THRESHOLD_BYTES = 20000;
 export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
 export const SOFT_COMPACT_TOKEN_THRESHOLD = 120000;
 export const HARD_COMPACT_TOKEN_THRESHOLD = 160000;
+
+function inferExecutorModelProvider(model = {}) {
+  return inferModelProvider({}, {
+    providerHint: model.provider || model.id || model.name,
+    baseUrl: model.url,
+    modelId: model.modelId,
+  });
+}
 
 /** Helper function: parse Markdown YAML frontmatter */
 
@@ -210,7 +218,8 @@ export class AgentExecutor {
    */
   async _callLLMNonStream(apiMessages, systemPrompt) {
     const endpoint = `${(this.model.url || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
-    const isDeepSeek = endpoint.includes('deepseek.com');
+    const modelProvider = inferExecutorModelProvider(this.model);
+    const isDeepSeek = modelProvider === 'deepseek';
 
     const requestBody = {
       model: this.model.modelId || 'claude-sonnet-4-5',
@@ -226,13 +235,8 @@ export class AgentExecutor {
       'anthropic-version': '2023-06-01',
     };
 
-    if (this.thinkingEnabled && !isDeepSeek) {
-      requestBody.thinking = { 
-        type: 'enabled', 
-        budget_tokens: 1024
-      };
-      requestBody.temperature = 1;
-      reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
+    if (isDeepSeek) {
+      requestBody.thinking = { type: 'disabled' };
     }
 
     const res = await fetch(endpoint, {
@@ -622,7 +626,8 @@ export class AgentExecutor {
       const baseUrl = this.model.url || 'https://api.anthropic.com';
       const cleanedUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
       const endpoint = `${cleanedUrl}/v1/messages`;
-      const isDeepSeek = endpoint.includes('deepseek.com');
+      const modelProvider = inferExecutorModelProvider(this.model);
+      const isDeepSeek = modelProvider === 'deepseek';
 
       // 提取目前启用的工具清单并生成后端统一定义的 Schema
       const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
