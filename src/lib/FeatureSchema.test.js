@@ -12,7 +12,7 @@ test('exposes canonical task orchestration sections', () => {
   assert.equal(group.children.strategy.section, 'Execution Strategy');
   assert.equal(group.children.strategy.defaultValue, 'custom');
   assert.equal(group.children.inline_strategy_prompt.type, 'text_area');
-  assert.match(group.children.inline_strategy_prompt.defaultValue, /<execution_strategy id="inline">/);
+  assert.match(group.children.inline_strategy_prompt.defaultValue, /<strategy_guidelines>/);
   assert.equal(group.children.custom_strategy_prompt.type, 'text_area');
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
   assert.deepEqual(group.children.enable_agent_teams, {
@@ -33,7 +33,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
     task_orchestration: {
       enabled: false,
       strategy: 'sequential_subagent',
-      sequential_subagent_strategy_prompt: '<execution_strategy id="sequential_subagent">custom</execution_strategy>',
+      sequential_subagent_strategy_prompt: '<strategy_guidelines>custom</strategy_guidelines>',
       mode: 'task_system',
       enable_sub_agents: true,
       enable_agent_teams: true,
@@ -43,7 +43,7 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
 
   assert.equal(disabled.enabled, false);
   assert.equal(disabled.strategy, 'sequential_subagent');
-  assert.equal(disabled.sequential_subagent_strategy_prompt, '<execution_strategy id="sequential_subagent">custom</execution_strategy>');
+  assert.equal(disabled.sequential_subagent_strategy_prompt, '<strategy_guidelines>custom</strategy_guidelines>');
   assert.equal(disabled.mode, 'task_system');
   assert.equal(disabled.enable_sub_agents, true);
   assert.equal(disabled.enable_agent_teams, true);

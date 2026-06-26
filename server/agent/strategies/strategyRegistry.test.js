@@ -24,7 +24,7 @@ test('loads selected strategy body lazily', async () => {
   const strategy = await loadExecutionStrategy('async_teams');
 
   assert.equal(strategy.id, 'async_teams');
-  assert.match(strategy.body, /<execution_strategy id="async_teams">/);
+  assert.match(strategy.body, /<strategy_guidelines>/);
 });
 
 test('rejects unknown strategies', async () => {

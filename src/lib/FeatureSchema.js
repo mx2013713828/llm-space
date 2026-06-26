@@ -84,7 +84,7 @@ export const FEATURE_SCHEMA = {
         section: 'Execution Strategy',
         label: 'Inline Execution Guideline (XML Format)',
         description: 'Editable guideline injected when Inline Execution is selected. Reset restores the built-in preset.',
-        defaultValue: `<execution_strategy id="inline">
+        defaultValue: `<strategy_guidelines>
 Use direct lead-agent execution.
 
 Guidelines:
@@ -92,7 +92,7 @@ Guidelines:
 - Do implementation, verification, and reporting in the lead agent loop.
 - Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.
 - Prefer small, reversible steps and concise progress updates.
-</execution_strategy>`,
+</strategy_guidelines>`,
         failSafeValue: ''
       },
       sequential_subagent_strategy_prompt: {
@@ -100,7 +100,7 @@ Guidelines:
         section: 'Execution Strategy',
         label: 'Sequential Sub-agent Guideline (XML Format)',
         description: 'Editable guideline injected when Sequential Sub-agent Workflow is selected. Reset restores the built-in preset.',
-        defaultValue: `<execution_strategy id="sequential_subagent">
+        defaultValue: `<strategy_guidelines>
 Use a sequential sub-agent workflow.
 
 Guidelines:
@@ -111,7 +111,7 @@ Guidelines:
 - Mark finished tasks with \`complete_task\` so the frontend Task DAG board stays synchronized.
 - Integrate, verify, and report from the lead agent.
 - If \`sub_agent\` is unavailable, continue inline and explain the limitation briefly.
-</execution_strategy>`,
+</strategy_guidelines>`,
         failSafeValue: ''
       },
       async_teams_strategy_prompt: {
@@ -119,7 +119,7 @@ Guidelines:
         section: 'Execution Strategy',
         label: 'Async Agent Teams Guideline (XML Format)',
         description: 'Editable guideline injected when Async Agent Teams is selected. Reset restores the built-in preset.',
-        defaultValue: `<execution_strategy id="async_teams">
+        defaultValue: `<strategy_guidelines>
 Use finite asynchronous teammate coordination.
 
 Guidelines:
@@ -128,7 +128,7 @@ Guidelines:
 - Use team inbox checks to collect results before making final decisions.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
-</execution_strategy>`,
+</strategy_guidelines>`,
         failSafeValue: ''
       },
       custom_strategy_prompt: {
@@ -136,9 +136,9 @@ Guidelines:
         section: 'Execution Strategy',
         label: 'Custom / Manual Guideline (XML Format)',
         description: 'Editable guideline injected when Custom / Manual is selected. Clear this field to run without a full strategy guideline.',
-        defaultValue: `<execution_strategy id="custom">
+        defaultValue: `<strategy_guidelines>
 No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
-</execution_strategy>`,
+</strategy_guidelines>`,
         failSafeValue: ''
       },
       mode: {

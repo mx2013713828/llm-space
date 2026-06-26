@@ -47,7 +47,7 @@ test('preLLM injects custom strategy guideline when configured', async () => {
       features: {
         task_orchestration: {
           enabled: true,
-          custom_strategy_prompt: '<execution_strategy id="custom">Use my workflow.</execution_strategy>',
+          custom_strategy_prompt: '<strategy_guidelines>Use my workflow.</strategy_guidelines>',
         },
       },
     },
@@ -70,7 +70,7 @@ test('preLLM prefers configured strategy guideline over the built-in body', asyn
       features: {
         task_orchestration: {
           enabled: true,
-          inline_strategy_prompt: '<execution_strategy id="inline">Custom inline rule.</execution_strategy>',
+          inline_strategy_prompt: '<strategy_guidelines>Custom inline rule.</strategy_guidelines>',
         },
       },
     },

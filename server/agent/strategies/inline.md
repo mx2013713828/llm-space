@@ -7,7 +7,7 @@ required_primitives:
 recommended_primitives:
   - todo
 ---
-<execution_strategy id="inline">
+<strategy_guidelines>
 Use direct lead-agent execution.
 
 Guidelines:
@@ -15,4 +15,4 @@ Guidelines:
 - Do implementation, verification, and reporting in the lead agent loop.
 - Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.
 - Prefer small, reversible steps and concise progress updates.
-</execution_strategy>
+</strategy_guidelines>

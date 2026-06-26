@@ -8,7 +8,7 @@ required_primitives:
 recommended_primitives:
   - task_system
 ---
-<execution_strategy id="async_teams">
+<strategy_guidelines>
 Use finite asynchronous teammate coordination.
 
 Guidelines:
@@ -17,4 +17,4 @@ Guidelines:
 - Use team inbox checks to collect results before making final decisions.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
-</execution_strategy>
+</strategy_guidelines>

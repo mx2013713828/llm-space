@@ -5,6 +5,6 @@ description: No strategy guideline is injected; user controls primitives directl
 required_primitives: []
 recommended_primitives: []
 ---
-<execution_strategy id="custom">
+<strategy_guidelines>
 No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
-</execution_strategy>
+</strategy_guidelines>

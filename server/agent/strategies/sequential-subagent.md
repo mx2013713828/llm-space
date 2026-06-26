@@ -8,7 +8,7 @@ required_primitives:
 recommended_primitives:
   - task_system
 ---
-<execution_strategy id="sequential_subagent">
+<strategy_guidelines>
 Use a sequential sub-agent workflow.
 
 Guidelines:
@@ -19,4 +19,4 @@ Guidelines:
 - Mark finished tasks with `complete_task` so the frontend Task DAG board stays synchronized.
 - Integrate, verify, and report from the lead agent.
 - If `sub_agent` is unavailable, continue inline and explain the limitation briefly.
-</execution_strategy>
+</strategy_guidelines>
