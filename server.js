@@ -632,7 +632,11 @@ app.post('/api/harnesses/:harnessId/dry-run', async (req, res) => {
     const context = {
       executor,
       messages: executor.messages,
-      apiMessages: buildApiMessages(executor.messages, executor.thinkingEnabled, executor.compactionEnabled),
+      apiMessages: buildApiMessages(
+        executor.messages,
+        executor.thinkingEnabled,
+        executor.features.context_compaction,
+      ),
       systemPrompt: executor.systemPrompt || '',
       tools: executor.tools,
       turnIndex: 1

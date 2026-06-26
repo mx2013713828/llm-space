@@ -155,7 +155,7 @@ export function useAgentLoop({
   const loopCount = Object.keys(turns).length || 0;
   const toolCallCount = messages.filter(m => m.type === 'tool_call').length;
   const thinkingCount = messages.filter(m => m.type === 'thinking').length;
-  const compactionEnabled = harness.features?.context_compaction !== false;
+  const compactionEnabled = harness.features?.context_compaction ?? true;
   const currentTokens = estimateTokens(messages, thinkingEnabled, systemPrompt, harness.tools, contextTokens, compactionEnabled);
 
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
