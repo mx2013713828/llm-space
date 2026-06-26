@@ -23,6 +23,7 @@ test('preLLM injects selected strategy into last user message', async () => {
   assert.equal(context.apiMessages.length, 1);
   assert.match(context.apiMessages[0].content.at(-1).text, /<active_execution_strategy id="inline"/);
   assert.match(context.systemPrompt, /<available_execution_strategies>/);
+  assert.match(context.systemPrompt, /do not replace it with a more direct path/);
 });
 
 test('preLLM leaves custom strategy untouched', async () => {

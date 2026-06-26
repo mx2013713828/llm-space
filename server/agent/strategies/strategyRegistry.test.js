@@ -86,6 +86,8 @@ test('builds a compact strategy index without guideline bodies', async () => {
   const index = buildStrategyIndexBlock(strategies);
 
   assert.match(index, /<available_execution_strategies>/);
+  assert.match(index, /explicitly asks to use a specific available tool/);
+  assert.match(index, /do not replace it with a more direct path/);
   assert.match(index, /sequential_subagent: Sequential Sub-agent Workflow/);
   assert.doesNotMatch(index, /<execution_strategy id=/);
 });

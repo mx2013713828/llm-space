@@ -173,6 +173,7 @@ export function buildStrategyIndexBlock(strategies = []) {
 
   return `<available_execution_strategies>
 These are high-level orchestration strategies. They guide behavior only; mounted tools and runtime policy remain authoritative.
+If the user explicitly asks to use a specific available tool, primitive, or strategy, treat that requested execution path as a constraint; do not replace it with a more direct path unless you first ask for confirmation. If the requested path is unavailable, explain the limitation briefly and continue with the closest safe alternative.
 ${lines}
 </available_execution_strategies>`;
 }
