@@ -79,6 +79,68 @@ export const FEATURE_SCHEMA = {
           { value: 'async_teams', label: 'Async Agent Teams' }
         ]
       },
+      inline_strategy_prompt: {
+        type: 'text_area',
+        section: 'Execution Strategy',
+        label: 'Inline Execution Guideline (XML Format)',
+        description: 'Editable guideline injected when Inline Execution is selected. Reset restores the built-in preset.',
+        defaultValue: `<execution_strategy id="inline">
+Use direct lead-agent execution.
+
+Guidelines:
+- Keep the plan visible with the available planning primitive.
+- Do implementation, verification, and reporting in the lead agent loop.
+- Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.
+- Prefer small, reversible steps and concise progress updates.
+</execution_strategy>`,
+        failSafeValue: ''
+      },
+      sequential_subagent_strategy_prompt: {
+        type: 'text_area',
+        section: 'Execution Strategy',
+        label: 'Sequential Sub-agent Guideline (XML Format)',
+        description: 'Editable guideline injected when Sequential Sub-agent Workflow is selected. Reset restores the built-in preset.',
+        defaultValue: `<execution_strategy id="sequential_subagent">
+Use a sequential sub-agent workflow.
+
+Guidelines:
+- If task-system tools are available, create a small DAG with \`create_task\` before the first delegation.
+- Claim exactly one unblocked task with \`claim_task\` before delegating or implementing it.
+- Delegate at most one implementation, investigation, or review step at a time to \`sub_agent\`.
+- Review each sub-agent result before starting the next delegated step.
+- Mark finished tasks with \`complete_task\` so the frontend Task DAG board stays synchronized.
+- Integrate, verify, and report from the lead agent.
+- If \`sub_agent\` is unavailable, continue inline and explain the limitation briefly.
+</execution_strategy>`,
+        failSafeValue: ''
+      },
+      async_teams_strategy_prompt: {
+        type: 'text_area',
+        section: 'Execution Strategy',
+        label: 'Async Agent Teams Guideline (XML Format)',
+        description: 'Editable guideline injected when Async Agent Teams is selected. Reset restores the built-in preset.',
+        defaultValue: `<execution_strategy id="async_teams">
+Use finite asynchronous teammate coordination.
+
+Guidelines:
+- Split independent work into clear teammate briefs.
+- Spawn teammates only for work that can proceed independently.
+- Use team inbox checks to collect results before making final decisions.
+- Keep ownership clear: the lead integrates, verifies, and communicates final status.
+- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
+</execution_strategy>`,
+        failSafeValue: ''
+      },
+      custom_strategy_prompt: {
+        type: 'text_area',
+        section: 'Execution Strategy',
+        label: 'Custom / Manual Guideline (XML Format)',
+        description: 'Editable guideline injected when Custom / Manual is selected. Clear this field to run without a full strategy guideline.',
+        defaultValue: `<execution_strategy id="custom">
+No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
+</execution_strategy>`,
+        failSafeValue: ''
+      },
       mode: {
         type: 'select',
         section: 'Planning & Tracking',

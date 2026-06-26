@@ -8,6 +8,13 @@ import {
   getStrategyAfterPrimitiveEdit,
 } from '../lib/taskOrchestration.js';
 
+const STRATEGY_PROMPT_VISIBILITY = {
+  inline_strategy_prompt: 'inline',
+  sequential_subagent_strategy_prompt: 'sequential_subagent',
+  async_teams_strategy_prompt: 'async_teams',
+  custom_strategy_prompt: 'custom',
+};
+
 /**
  * Prompt Lab 页面
  * 用于配置当前 agent 的 system prompt 和 tools/skills
@@ -576,6 +583,10 @@ export function PromptLabPage({ harness, onSave }) {
                               return features[key]?.mode === 'task_system';
                             }
 
+                            if (Object.hasOwn(STRATEGY_PROMPT_VISIBILITY, subKey)) {
+                              return features[key]?.strategy === STRATEGY_PROMPT_VISIBILITY[subKey];
+                            }
+
                             return true;
                           })
                           .map(([subKey, subMeta], visibleIndex, visibleChildren) => {
@@ -654,7 +665,7 @@ export function PromptLabPage({ harness, onSave }) {
                                     </div>
                                     <div style={{ fontSize: 10, color: missingPrimitives.length > 0 ? 'var(--orange)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                                       {selectedStrategy.id === 'custom'
-                                        ? 'manual mode: no full strategy guideline is injected'
+                                        ? 'manual mode: editable guideline can be cleared to inject nothing'
                                         : missingPrimitives.length > 0
                                           ? `missing primitives: ${missingPrimitives.join(', ')}`
                                           : 'required primitives satisfied'}
@@ -706,7 +717,7 @@ export function PromptLabPage({ harness, onSave }) {
                                       userSelect: 'none'
                                     }}
                                   >
-                                    <span>⚙️ Custom System Guidelines (XML)</span>
+                                    <span>⚙️ Editable Guidelines (XML)</span>
                                     <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
                                       {isExpanded ? 'Collapse ▲' : 'Edit ▶'}
                                     </span>

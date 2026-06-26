@@ -22,6 +22,20 @@ function appendTextContext(apiMessages, text) {
   apiMessages.push({ role: 'user', content: [payloadBlock] });
 }
 
+const STRATEGY_PROMPT_KEYS = {
+  inline: 'inline_strategy_prompt',
+  sequential_subagent: 'sequential_subagent_strategy_prompt',
+  async_teams: 'async_teams_strategy_prompt',
+  custom: 'custom_strategy_prompt',
+};
+
+function getStrategyGuidelineOverride(features, strategyId) {
+  const promptKey = STRATEGY_PROMPT_KEYS[strategyId];
+  if (!promptKey) return null;
+  const value = features?.task_orchestration?.[promptKey];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 export const ExecutionStrategyPlugin = {
   name: 'ExecutionStrategyPlugin',
 
@@ -38,7 +52,7 @@ export const ExecutionStrategyPlugin = {
       context.systemPrompt += `\n\n${buildStrategyIndexBlock(strategies)}`;
     }
 
-    if (!selectedStrategyId || selectedStrategyId === 'custom') {
+    if (!selectedStrategyId) {
       return;
     }
 
@@ -53,7 +67,19 @@ export const ExecutionStrategyPlugin = {
       return;
     }
 
-    const strategyContext = buildStrategyContextBlock(strategy, executor.features);
+    const guidelineOverride = getStrategyGuidelineOverride(executor.features, strategy.id);
+    if (strategy.id === 'custom' && !guidelineOverride) {
+      return;
+    }
+
+    const strategyContext = strategy.id === 'custom'
+      ? `<active_execution_strategy id="${strategy.id}" name="${strategy.name}">
+${guidelineOverride}
+</active_execution_strategy>`
+      : buildStrategyContextBlock({
+          ...strategy,
+          body: guidelineOverride || strategy.body,
+        }, executor.features);
     appendTextContext(apiMessages, strategyContext);
   },
 };

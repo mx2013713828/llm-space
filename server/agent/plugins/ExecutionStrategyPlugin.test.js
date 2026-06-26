@@ -40,6 +40,53 @@ test('preLLM leaves custom strategy untouched', async () => {
   assert.match(context.systemPrompt, /<available_execution_strategies>/);
 });
 
+test('preLLM injects custom strategy guideline when configured', async () => {
+  const context = {
+    executor: {
+      selectedStrategyId: 'custom',
+      features: {
+        task_orchestration: {
+          enabled: true,
+          custom_strategy_prompt: '<execution_strategy id="custom">Use my workflow.</execution_strategy>',
+        },
+      },
+    },
+    apiMessages: [
+      { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
+    ],
+    systemPrompt: '',
+  };
+
+  await ExecutionStrategyPlugin.preLLM(context);
+
+  assert.match(context.apiMessages[0].content.at(-1).text, /<active_execution_strategy id="custom"/);
+  assert.match(context.apiMessages[0].content.at(-1).text, /Use my workflow/);
+});
+
+test('preLLM prefers configured strategy guideline over the built-in body', async () => {
+  const context = {
+    executor: {
+      selectedStrategyId: 'inline',
+      features: {
+        task_orchestration: {
+          enabled: true,
+          inline_strategy_prompt: '<execution_strategy id="inline">Custom inline rule.</execution_strategy>',
+        },
+      },
+    },
+    apiMessages: [
+      { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
+    ],
+    systemPrompt: '',
+  };
+
+  await ExecutionStrategyPlugin.preLLM(context);
+
+  const injected = context.apiMessages[0].content.at(-1).text;
+  assert.match(injected, /Custom inline rule/);
+  assert.doesNotMatch(injected, /Use direct lead-agent execution/);
+});
+
 test('preLLM appends separate user message after tool_result messages', async () => {
   const context = {
     executor: {

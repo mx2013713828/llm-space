@@ -263,6 +263,10 @@ test('preserves task orchestration child values when parent is disabled and re-e
   const previousValue = {
     enabled: true,
     strategy: 'sequential_subagent',
+    inline_strategy_prompt: '<execution_strategy id="inline">inline</execution_strategy>',
+    sequential_subagent_strategy_prompt: '<execution_strategy id="sequential_subagent">sequential</execution_strategy>',
+    async_teams_strategy_prompt: '<execution_strategy id="async_teams">teams</execution_strategy>',
+    custom_strategy_prompt: '<execution_strategy id="custom">custom</execution_strategy>',
     mode: 'task_system',
     todo_prompt: '<todo>custom</todo>',
     task_system_prompt: '<task>custom</task>',
