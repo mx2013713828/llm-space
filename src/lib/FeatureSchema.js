@@ -162,10 +162,14 @@ No strategy guideline is active. Follow the currently enabled primitives and the
         label: 'Todo Mode System Guidelines (XML Format)',
         description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Todo mode.',
         defaultValue: `<todo_mode_guidelines>
-You must use the \`write_todos\` tool to manage your development board to keep your progress synchronized with the user:
-1. Upon receiving a complex request, immediately call \`write_todos\` to break down the task into 4-8 pending sub-tasks.
+Use the \`write_todos\` board for complex, multi-step work where visible progress tracking helps the user.
+
+For simple one-shot requests, direct tool calls, direct sub-agent delegation, or quick factual lookups, do not create or update a todo board unless the user explicitly asks for task tracking.
+
+When a todo board is warranted:
+1. Break down the task into 3-8 pending sub-tasks with \`write_todos\`.
 2. Each time you complete a sub-task, call \`write_todos\` to mark its status as "completed".
-3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.
+3. Keep the board aligned with actual implementation progress; do not work for multiple turns on a tracked task without updating the board.
 </todo_mode_guidelines>`,
         failSafeValue: ''
       },
@@ -175,13 +179,18 @@ You must use the \`write_todos\` tool to manage your development board to keep y
         label: 'Task System Guidelines (XML Format)',
         description: 'Behavioral guidelines injected into the System Prompt in real-time when the model operates in Task System mode.',
         defaultValue: `<task_system_guidelines>
-When facing complex development tasks, you must use the task dependency system to organize your workflow:
+Use the task dependency system for complex, multi-step development work with meaningful dependencies.
+
+For simple one-shot requests, direct tool calls, direct sub-agent delegation, quick factual lookups, or small tasks without dependencies, do not create task-system tasks unless the user explicitly asks for task tracking.
+
+When task-system tracking is warranted:
 1. First, analyze the requirements and create a dependency tree of Tasks using \`create_task\`. Declare upstream dependencies using \`blockedBy\` (comma-separated IDs).
 2. Call \`list_tasks\` to inspect the status of all current tasks.
 3. Before writing any code, call \`claim_task\` to claim a pending task that is not blocked by any uncompleted upstream dependencies.
 4. Once claimed successfully, use \`bash\`, \`read_file\`, and \`write_file\` to implement, debug, and verify the task.
 5. Upon completion, call \`complete_task\` to mark it as "completed", which will automatically unlock downstream dependent tasks.
-6. Do not write code for multiple consecutive turns without updating the task board status.
+6. Only call \`complete_task\` for tasks that were actually created and claimed.
+7. Do not work for multiple turns on a tracked task without updating the task board status.
 </task_system_guidelines>`,
         failSafeValue: ''
       },

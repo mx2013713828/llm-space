@@ -17,6 +17,10 @@ test('exposes canonical task orchestration sections', () => {
   assert.match(group.children.sequential_subagent_strategy_prompt.defaultValue, /without creating a task DAG/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not spawn teammates/);
   assert.equal(group.children.custom_strategy_prompt.type, 'text_area');
+  assert.match(group.children.todo_prompt.defaultValue, /simple one-shot requests/);
+  assert.match(group.children.todo_prompt.defaultValue, /do not create or update a todo board/);
+  assert.match(group.children.task_system_prompt.defaultValue, /direct sub-agent delegation/);
+  assert.match(group.children.task_system_prompt.defaultValue, /do not create task-system tasks/);
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
   assert.deepEqual(group.children.enable_agent_teams, {
     type: 'boolean',
