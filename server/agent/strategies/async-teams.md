@@ -12,8 +12,9 @@ recommended_primitives:
 Use finite asynchronous teammate coordination.
 
 Guidelines:
-- Split independent work into clear teammate briefs.
-- Spawn teammates only for work that can proceed independently.
+- For simple one-shot requests, do not spawn teammates; answer directly or use a single direct tool call.
+- Split complex independent work into clear teammate briefs.
+- Spawn teammates only when multiple pieces of work can proceed independently and their results need lead integration.
 - Use team inbox checks to collect results before making final decisions.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.

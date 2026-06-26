@@ -88,7 +88,8 @@ export const FEATURE_SCHEMA = {
 Use direct lead-agent execution.
 
 Guidelines:
-- Keep the plan visible with the available planning primitive.
+- For simple one-shot requests, answer or act directly without creating a visible plan.
+- For multi-step or risky work, keep the plan visible with the available planning primitive.
 - Do implementation, verification, and reporting in the lead agent loop.
 - Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.
 - Prefer small, reversible steps and concise progress updates.
@@ -104,11 +105,12 @@ Guidelines:
 Use a sequential sub-agent workflow.
 
 Guidelines:
-- If task-system tools are available, create a small DAG with \`create_task\` before the first delegation.
-- Claim exactly one unblocked task with \`claim_task\` before delegating or implementing it.
-- Delegate at most one implementation, investigation, or review step at a time to \`sub_agent\`.
+- For simple one-shot delegation explicitly requested by the user, call \`sub_agent\` directly and return the result without creating a task DAG.
+- For complex development, investigation, or review work, create a small DAG with \`create_task\` if task-system tools are available.
+- Claim exactly one unblocked task with \`claim_task\` before delegating or implementing task-system work.
+- Delegate at most one scoped implementation, investigation, or review step at a time to \`sub_agent\`.
 - Review each sub-agent result before starting the next delegated step.
-- Mark finished tasks with \`complete_task\` so the frontend Task DAG board stays synchronized.
+- Mark task-system tasks with \`complete_task\` only when a task was actually created and claimed.
 - Integrate, verify, and report from the lead agent.
 - If \`sub_agent\` is unavailable, continue inline and explain the limitation briefly.
 </strategy_guidelines>`,
@@ -123,8 +125,9 @@ Guidelines:
 Use finite asynchronous teammate coordination.
 
 Guidelines:
-- Split independent work into clear teammate briefs.
-- Spawn teammates only for work that can proceed independently.
+- For simple one-shot requests, do not spawn teammates; answer directly or use a single direct tool call.
+- Split complex independent work into clear teammate briefs.
+- Spawn teammates only when multiple pieces of work can proceed independently and their results need lead integration.
 - Use team inbox checks to collect results before making final decisions.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.

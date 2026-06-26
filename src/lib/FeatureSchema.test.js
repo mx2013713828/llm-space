@@ -13,6 +13,9 @@ test('exposes canonical task orchestration sections', () => {
   assert.equal(group.children.strategy.defaultValue, 'custom');
   assert.equal(group.children.inline_strategy_prompt.type, 'text_area');
   assert.match(group.children.inline_strategy_prompt.defaultValue, /<strategy_guidelines>/);
+  assert.match(group.children.inline_strategy_prompt.defaultValue, /simple one-shot requests/);
+  assert.match(group.children.sequential_subagent_strategy_prompt.defaultValue, /without creating a task DAG/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not spawn teammates/);
   assert.equal(group.children.custom_strategy_prompt.type, 'text_area');
   assert.equal(group.children.enable_sub_agents.section, 'Delegation');
   assert.deepEqual(group.children.enable_agent_teams, {

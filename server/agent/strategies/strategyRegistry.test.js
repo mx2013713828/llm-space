@@ -25,6 +25,14 @@ test('loads selected strategy body lazily', async () => {
 
   assert.equal(strategy.id, 'async_teams');
   assert.match(strategy.body, /<strategy_guidelines>/);
+  assert.match(strategy.body, /simple one-shot requests/);
+});
+
+test('sequential strategy allows simple direct sub-agent delegation', async () => {
+  const strategy = await loadExecutionStrategy('sequential_subagent');
+
+  assert.match(strategy.body, /call `sub_agent` directly/);
+  assert.match(strategy.body, /without creating a task DAG/);
 });
 
 test('rejects unknown strategies', async () => {
