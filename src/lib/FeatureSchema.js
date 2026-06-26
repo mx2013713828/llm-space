@@ -337,6 +337,83 @@ When task-system tracking is warranted:
   },
 };
 
+const LEGACY_TEXT_AREA_DEFAULTS = {
+  task_orchestration: {
+    inline_strategy_prompt: [
+      `<execution_strategy id="inline">
+Use direct lead-agent execution.
+
+Guidelines:
+- Keep the plan visible with the available planning primitive.
+- Do implementation, verification, and reporting in the lead agent loop.
+- Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.
+- Prefer small, reversible steps and concise progress updates.
+</execution_strategy>`
+    ],
+    sequential_subagent_strategy_prompt: [
+      `<execution_strategy id="sequential_subagent">
+Use a sequential sub-agent workflow.
+
+Guidelines:
+- If task-system tools are available, create a small DAG with \`create_task\` before the first delegation.
+- Claim exactly one unblocked task with \`claim_task\` before delegating or implementing it.
+- Delegate at most one implementation, investigation, or review step at a time to \`sub_agent\`.
+- Review each sub-agent result before starting the next delegated step.
+- Mark finished tasks with \`complete_task\` so the frontend Task DAG board stays synchronized.
+- Integrate, verify, and report from the lead agent.
+- If \`sub_agent\` is unavailable, continue inline and explain the limitation briefly.
+</execution_strategy>`
+    ],
+    async_teams_strategy_prompt: [
+      `<execution_strategy id="async_teams">
+Use finite asynchronous teammate coordination.
+
+Guidelines:
+- Split independent work into clear teammate briefs.
+- Spawn teammates only for work that can proceed independently.
+- Use team inbox checks to collect results before making final decisions.
+- Keep ownership clear: the lead integrates, verifies, and communicates final status.
+- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
+</execution_strategy>`
+    ],
+    custom_strategy_prompt: [
+      `<execution_strategy id="custom">
+No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
+</execution_strategy>`
+    ],
+    todo_prompt: [
+      `<todo_mode_guidelines>
+You must use the \`write_todos\` tool to manage your development board to keep your progress synchronized with the user:
+1. Upon receiving a complex request, immediately call \`write_todos\` to break down the task into 4-8 pending sub-tasks.
+2. Each time you complete a sub-task, call \`write_todos\` to mark its status as "completed".
+3. Ensure your task board status aligns with your actual implementation progress. Never write code for multiple turns without updating the task board.
+</todo_mode_guidelines>`
+    ],
+    task_system_prompt: [
+      `<task_system_guidelines>
+When facing complex development tasks, you must use the task dependency system to organize your workflow:
+1. First, analyze the requirements and create a dependency tree of Tasks using \`create_task\`. Declare upstream dependencies using \`blockedBy\` (comma-separated IDs).
+2. Call \`list_tasks\` to inspect the status of all current tasks.
+3. Before writing any code, call \`claim_task\` to claim a pending task that is not blocked by any uncompleted upstream dependencies.
+4. Once claimed successfully, use \`bash\`, \`read_file\`, and \`write_file\` to implement, debug, and verify the task.
+5. Upon completion, call \`complete_task\` to mark it as "completed", which will automatically unlock downstream dependent tasks.
+6. Do not write code for multiple consecutive turns without updating the task board status.
+</task_system_guidelines>`
+    ],
+  },
+};
+
+function normalizeTextAreaValue(groupKey, subKey, value, defaultValue) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const legacyValues = LEGACY_TEXT_AREA_DEFAULTS[groupKey]?.[subKey] ?? [];
+  return legacyValues.some(legacyValue => legacyValue.trim() === value.trim())
+    ? defaultValue
+    : value;
+}
+
 /**
  * parseFeatures - 依据 FEATURE_SCHEMA 解析、补全、翻译并做 Fail-Safe 熔断降级
  * @param {Object} inputFeatures 用户传入的 features 配置对象
@@ -386,8 +463,9 @@ export function parseFeatures(inputFeatures) {
               ? normalizedValue
               : subMeta.defaultValue;
           } else if (subMeta.type === 'text_area') {
+            const rawValue = subVal !== undefined ? subVal : subMeta.defaultValue;
             parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
-              ? (subVal !== undefined ? subVal : subMeta.defaultValue)
+              ? normalizeTextAreaValue(key, subKey, rawValue, subMeta.defaultValue)
               : subMeta.defaultValue;
           } else {
             parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
