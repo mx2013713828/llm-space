@@ -2,6 +2,7 @@ import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
 import { createTeamId, createTeammateId, validateAgentName } from '../teams/teamEnvelope.js';
 import { runTeammate } from '../teams/teammateRunner.js';
+import { emitTeamUpdate } from '../teams/teamUpdates.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'check_team_inbox']);
 const DEFAULT_TEAMMATE_MAX_TURNS = 6;
@@ -171,6 +172,21 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
               name: args.name,
               role: args.role ?? null,
               state: 'running',
+              prompt: args.prompt,
+              startedAt: new Date().toISOString(),
+            },
+          });
+          await emitTeamUpdate({
+            executor,
+            stateStore,
+            harnessId,
+            teamId,
+            fallbackTeammate: {
+              agentId: teammateId,
+              name: args.name,
+              role: args.role ?? null,
+              state: 'running',
+              prompt: args.prompt,
             },
           });
 

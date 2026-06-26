@@ -58,9 +58,12 @@ test('runTeammate creates a teammate child executor, marks running then complete
 
   const updates = [];
   const sentMessages = [];
+  const events = [];
+  const parentExecutor = createParentExecutor();
+  parentExecutor.onEvent = (type, payload) => events.push({ type, payload });
 
   await runTeammate({
-    parentExecutor: createParentExecutor(),
+    parentExecutor,
     teamId: 'team_1',
     teammateId: 'reviewer',
     name: 'Reviewer',
@@ -97,20 +100,19 @@ test('runTeammate creates a teammate child executor, marks running then complete
   assert.equal(FakeExecutor.lastArgs.features.enable_memory.enabled, false);
   assert.equal(FakeExecutor.lastRunMaxTurns, 4);
 
-  assert.deepEqual(updates, [
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'running' },
-    },
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'completed' },
-    },
-  ]);
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].harnessId, 'h1');
+  assert.equal(updates[0].teamId, 'team_1');
+  assert.equal(updates[0].agentId, 'reviewer');
+  assert.equal(updates[0].updates.state, 'running');
+  assert.match(updates[0].updates.startedAt, /^\d{4}-/);
+  assert.equal(updates[1].updates.state, 'completed');
+  assert.equal(updates[1].updates.lastResult, 'done');
+  assert.match(updates[1].updates.completedAt, /^\d{4}-/);
+  assert.deepEqual(events.map(event => event.type), ['team_update', 'team_update']);
+  assert.equal(events[0].payload.teammates[0].state, 'running');
+  assert.equal(events[1].payload.teammates[0].state, 'completed');
+  assert.equal(events[1].payload.teammates[0].lastResult, 'done');
 
   assert.deepEqual(sentMessages, [
     {
@@ -138,10 +140,13 @@ test('runTeammate marks failed and sends an error message when execution throws'
 
   const updates = [];
   const sentMessages = [];
+  const events = [];
+  const parentExecutor = createParentExecutor();
+  parentExecutor.onEvent = (type, payload) => events.push({ type, payload });
 
   await assert.rejects(
     runTeammate({
-      parentExecutor: createParentExecutor(),
+      parentExecutor,
       teamId: 'team_1',
       teammateId: 'reviewer',
       name: 'Reviewer',
@@ -162,20 +167,16 @@ test('runTeammate marks failed and sends an error message when execution throws'
     /boom/,
   );
 
-  assert.deepEqual(updates, [
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'running' },
-    },
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'failed', error: 'boom' },
-    },
-  ]);
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].updates.state, 'running');
+  assert.match(updates[0].updates.startedAt, /^\d{4}-/);
+  assert.equal(updates[1].updates.state, 'failed');
+  assert.equal(updates[1].updates.error, 'boom');
+  assert.match(updates[1].updates.completedAt, /^\d{4}-/);
+  assert.deepEqual(events.map(event => event.type), ['team_update', 'team_update']);
+  assert.equal(events[0].payload.teammates[0].state, 'running');
+  assert.equal(events[1].payload.teammates[0].state, 'failed');
+  assert.equal(events[1].payload.teammates[0].error, 'boom');
 
   assert.deepEqual(sentMessages, [
     {
@@ -240,20 +241,12 @@ test('runTeammate still reports failure to lead when initial running-state updat
     },
   ]);
 
-  assert.deepEqual(updates, [
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'running' },
-    },
-    {
-      harnessId: 'h1',
-      teamId: 'team_1',
-      agentId: 'reviewer',
-      updates: { state: 'failed', error: 'state write failed' },
-    },
-  ]);
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].updates.state, 'running');
+  assert.match(updates[0].updates.startedAt, /^\d{4}-/);
+  assert.equal(updates[1].updates.state, 'failed');
+  assert.equal(updates[1].updates.error, 'state write failed');
+  assert.match(updates[1].updates.completedAt, /^\d{4}-/);
 });
 
 test('runTeammate isolates child harness state and suppresses raw child messages_update events', async () => {
@@ -292,7 +285,15 @@ test('runTeammate isolates child harness state and suppresses raw child messages
   assert.equal(FakeExecutor.lastArgs.harnessId, 'h1_reviewer');
   assert.notEqual(FakeExecutor.lastArgs.harnessId, 'h1');
   assert.equal(FakeExecutor.lastArgs.teamContext.harnessId, 'h1');
-  assert.deepEqual(forwardedEvents, [{ type: 'tool_call', payload: { tool: 'bash' } }]);
+  assert.deepEqual(
+    forwardedEvents.filter(event => event.type === 'tool_call'),
+    [{ type: 'tool_call', payload: { tool: 'bash' } }],
+  );
+  assert.deepEqual(forwardedEvents.filter(event => event.type === 'messages_update'), []);
+  assert.deepEqual(forwardedEvents.filter(event => event.type === 'team_update').map(event => event.payload.teammates[0].state), [
+    'running',
+    'completed',
+  ]);
 });
 
 test('createTeammateHarnessId returns a non-empty storage-safe id', () => {

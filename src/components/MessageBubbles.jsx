@@ -64,7 +64,7 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
  * 工具调用卡片
  * 展示工具名称、输入参数、输出结果，支持折叠
  */
-export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, subAgentStatus, subAgentTrace }) {
+export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, subAgentStatus, subAgentTrace, teamStatus }) {
   const [expanded, setExpanded] = useState(false);
   const [traceExpanded, setTraceExpanded] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
@@ -79,6 +79,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
   };
   const icon = TOOL_ICONS[toolName] || '🔧';
   const isSubAgent = toolName === 'sub_agent';
+  const isSpawnTeammate = toolName === 'spawn_teammate';
 
   const formatJson = (obj) => {
     try {
@@ -169,6 +170,42 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
     );
   };
 
+  const renderTeamStatus = () => {
+    if (!isSpawnTeammate || !teamStatus?.teammates?.length) return null;
+
+    const counts = teamStatus.teammates.reduce((acc, teammate) => {
+      const state = teammate.state || 'unknown';
+      acc[state] = (acc[state] || 0) + 1;
+      return acc;
+    }, {});
+    const hasFailed = Boolean(counts.failed);
+    const allCompleted = teamStatus.teammates.every(teammate => teammate.state === 'completed');
+    const color = hasFailed ? 'var(--red)' : allCompleted ? 'var(--green)' : 'var(--blue)';
+    const summary = teamStatus.teammates
+      .map(teammate => `${teammate.name || teammate.agentId}: ${teammate.state || 'unknown'}`)
+      .join(' · ');
+
+    return (
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 6,
+        marginLeft: 'auto',
+        minWidth: 0,
+        color,
+        fontSize: 11,
+      }}>
+        <span className="badge" style={{ color, border: `1px solid ${color}`, background: 'transparent', fontSize: 10 }}>
+          team {counts.completed || 0}/{teamStatus.teammates.length}
+        </span>
+        <span style={{ color: 'var(--text-muted)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {summary}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="message-bubble msg-tool animate-fade-in" style={{ padding: 0 }}>
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
@@ -176,6 +213,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
         <span className="tool-call-name">{toolName}</span>
         <span className="badge badge-cyan" style={{ fontSize: 10 }}>Tool Call</span>
         {renderSubAgentStatus()}
+        {renderTeamStatus()}
         <svg
           className={`chevron ${expanded ? 'open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -215,7 +253,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                 {subMessages.map((msg, idx) => {
                   if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
                   if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} />;
+                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                   if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
                   return null;
                 })}
@@ -255,7 +293,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                   {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
                     if (msg.role === 'user') return null;
                     if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                     if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
                     return null;
                   })}

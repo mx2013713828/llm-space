@@ -25,6 +25,7 @@ function createTool(toolName, toolInput) {
 test('spawn_teammate validates name, persists teammate state, and starts runTeammate without blocking', async () => {
   const fixture = await createFixture();
   const runCalls = [];
+  const events = [];
   let resolveRun;
   const runStarted = new Promise(resolve => {
     resolveRun = resolve;
@@ -47,7 +48,7 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   });
 
   await plugin.preToolUse({
-    executor: { harnessId: 'h1', teamContext: null },
+    executor: { harnessId: 'h1', teamContext: null, onEvent: (type, payload) => events.push({ type, payload }) },
     tool,
   });
 
@@ -65,6 +66,26 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   assert.equal(state.teamId, output.teamId);
   assert.equal(state.teammates.teammate_reviewer.agentId, 'teammate_reviewer');
   assert.equal(state.teammates.teammate_reviewer.role, 'Critic');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'team_update');
+  assert.equal(events[0].payload.teamId, output.teamId);
+  assert.deepEqual(
+    {
+      agentId: events[0].payload.teammates[0].agentId,
+      name: events[0].payload.teammates[0].name,
+      role: events[0].payload.teammates[0].role,
+      state: events[0].payload.teammates[0].state,
+      prompt: events[0].payload.teammates[0].prompt,
+    },
+    {
+      agentId: 'teammate_reviewer',
+      name: 'reviewer',
+      role: 'Critic',
+      state: 'running',
+      prompt: 'Review the patch.',
+    },
+  );
+  assert.match(events[0].payload.teammates[0].startedAt, /^\d{4}-/);
 
   const invalidTool = createTool('spawn_teammate', {
     name: 'bad name',

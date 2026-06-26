@@ -333,6 +333,41 @@ export function useAgentLoop({
               });
               break;
 
+            case 'team_update':
+              updateMessages(null, (list) => {
+                return list.map(m => {
+                  if (m.type !== 'tool_call' || m.toolName !== 'spawn_teammate') {
+                    return m;
+                  }
+
+                  let outputTeamId = null;
+                  try {
+                    outputTeamId = m.toolOutput ? JSON.parse(m.toolOutput).teamId : null;
+                  } catch {
+                    outputTeamId = null;
+                  }
+
+                  const inputName = m.toolInput?.name;
+                  const matchesTeam = outputTeamId && outputTeamId === evt.teamId;
+                  const matchesPendingSpawn = !outputTeamId
+                    && inputName
+                    && (evt.teammates || []).some(teammate => teammate.name === inputName || teammate.agentId === `teammate_${inputName}`);
+
+                  if (!matchesTeam && !matchesPendingSpawn) {
+                    return m;
+                  }
+
+                  return {
+                    ...m,
+                    teamStatus: {
+                      teamId: evt.teamId,
+                      teammates: evt.teammates || [],
+                    },
+                  };
+                });
+              });
+              break;
+
             case 'message_start':
               lastInputTokens = evt.inputTokens || 0;
               setContextTokens(evt.totalInputTokens ?? (

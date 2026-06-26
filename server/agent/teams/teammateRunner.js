@@ -2,6 +2,7 @@ import { AgentExecutor } from '../AgentExecutor.js';
 import { getLastAssistantText } from '../subAgentProfile.js';
 import { createTeamBus } from './teamBus.js';
 import { createTeamStateStore } from './teamStateStore.js';
+import { emitTeamUpdate } from './teamUpdates.js';
 import {
   EMPTY_TEAMMATE_RESULT,
   createTeammateFeatures,
@@ -37,11 +38,25 @@ export async function runTeammate({
   stateStore = defaultTeamStateStore,
 }) {
   try {
+    const startedAt = new Date().toISOString();
     await stateStore.updateTeammate({
       harnessId: parentExecutor.harnessId,
       teamId,
       agentId: teammateId,
-      updates: { state: 'running' },
+      updates: { state: 'running', startedAt },
+    });
+    await emitTeamUpdate({
+      executor: parentExecutor,
+      stateStore,
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      fallbackTeammate: {
+        agentId: teammateId,
+        name,
+        role: role ?? null,
+        state: 'running',
+        startedAt,
+      },
     });
 
     const forwardChildEvent = (type, payload) => {
@@ -96,7 +111,20 @@ export async function runTeammate({
       harnessId: parentExecutor.harnessId,
       teamId,
       agentId: teammateId,
-      updates: { state: 'completed' },
+      updates: { state: 'completed', completedAt: new Date().toISOString(), lastResult: content },
+    });
+    await emitTeamUpdate({
+      executor: parentExecutor,
+      stateStore,
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      fallbackTeammate: {
+        agentId: teammateId,
+        name,
+        role: role ?? null,
+        state: 'completed',
+        lastResult: content,
+      },
     });
   } catch (error) {
     try {
@@ -122,7 +150,20 @@ export async function runTeammate({
         harnessId: parentExecutor.harnessId,
         teamId,
         agentId: teammateId,
-        updates: { state: 'failed', error: error.message },
+        updates: { state: 'failed', completedAt: new Date().toISOString(), error: error.message },
+      });
+      await emitTeamUpdate({
+        executor: parentExecutor,
+        stateStore,
+        harnessId: parentExecutor.harnessId,
+        teamId,
+        fallbackTeammate: {
+          agentId: teammateId,
+          name,
+          role: role ?? null,
+          state: 'failed',
+          error: error.message,
+        },
       });
     } catch (updateError) {
       console.error('[runTeammate] Failed to mark teammate as failed:', updateError);
