@@ -176,6 +176,37 @@ function injectInboxBlock(apiMessages, block) {
   });
 }
 
+function hasInjectedTeamBlock(apiMessages, tagName) {
+  const openTag = `<${tagName}>`;
+  return apiMessages.some(message => {
+    if (!Array.isArray(message?.content)) return false;
+    return message.content.some(entry => entry?.type === 'text' && String(entry.text || '').includes(openTag));
+  });
+}
+
+function isAsyncTeamsLead(executor) {
+  return executor?.runtimeRole !== 'teammate' && executor?.selectedStrategyId === 'async_teams';
+}
+
+function buildTeamProtocolGuard({ teamId, unreadCount }) {
+  return `<team_protocol_guard>
+Team inbox has ${unreadCount} unread message(s) for team ${teamId}.
+Before producing the final answer, you must call check_team_inbox to read teammate results.
+Do not summarize teammate findings from implicit context alone.
+</team_protocol_guard>`;
+}
+
+function emitAutoInjectedEvent({ executor, teamId, agentId, inboxMessages }) {
+  executor?.onEvent?.('team_inbox_auto_injected', {
+    teamId,
+    agentId,
+    runtimeRole: executor.runtimeRole || 'lead',
+    source: 'preLLM',
+    messageCount: inboxMessages.length,
+    preview: formatInboxEntriesPreview(inboxMessages),
+  });
+}
+
 function resolveInboxAgentId(executor) {
   if (executor.runtimeRole === 'teammate') {
     return executor.teamContext?.agentId;
@@ -308,6 +339,23 @@ export function createTeamPlugin({
       if (!agentId) return;
       const harnessId = resolveTeamHarnessId(executor);
 
+      if (isAsyncTeamsLead(executor)) {
+        const inboxMessages = await bus.peekInbox({
+          harnessId,
+          teamId,
+          agentId,
+        });
+
+        if (inboxMessages.length === 0) return;
+        if (hasInjectedTeamBlock(apiMessages, 'team_protocol_guard')) return;
+
+        injectInboxBlock(
+          apiMessages,
+          buildTeamProtocolGuard({ teamId, unreadCount: inboxMessages.length }),
+        );
+        return;
+      }
+
       const inboxMessages = await bus.readInbox({
         harnessId,
         teamId,
@@ -320,6 +368,7 @@ export function createTeamPlugin({
         apiMessages,
         `<team_inbox>\n${formatInboxEntries(inboxMessages)}\n</team_inbox>`,
       );
+      emitAutoInjectedEvent({ executor, teamId, agentId, inboxMessages });
     },
 
     async preToolUse(context) {

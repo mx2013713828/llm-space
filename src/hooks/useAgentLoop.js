@@ -407,6 +407,18 @@ export function useAgentLoop({
               ]);
               break;
 
+            case 'team_inbox_auto_injected':
+              updateMessages(null, (list) => [
+                ...list,
+                {
+                  role: 'system',
+                  type: 'system_alert',
+                  turn: currentTurn,
+                  content: `Team inbox auto-injected ${evt.messageCount || 0} message(s) for ${evt.agentId || 'lead'} via ${evt.source || 'preLLM'}.`
+                }
+              ]);
+              break;
+
             case 'permission_request':
               setPendingPermission({
                 toolCallId: evt.toolCallId,

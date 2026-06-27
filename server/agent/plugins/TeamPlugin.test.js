@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 
 import { AgentExecutor } from '../AgentExecutor.js';
 import { createTeamBus } from '../teams/teamBus.js';
@@ -563,7 +564,7 @@ test('wait_for_teammates times out with unresolved status', async () => {
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
-test('preLLM injects unread lead inbox into context once and consumes it', async () => {
+test('preLLM asks async team leads to call check_team_inbox without consuming inbox', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
     bus: fixture.bus,
@@ -581,7 +582,12 @@ test('preLLM injects unread lead inbox into context once and consumes it', async
   });
 
   const context = {
-    executor: { harnessId: 'h1', runtimeRole: 'lead', teamContext: { teamId: 'team_1' } },
+    executor: {
+      harnessId: 'h1',
+      runtimeRole: 'lead',
+      selectedStrategyId: 'async_teams',
+      teamContext: { teamId: 'team_1' },
+    },
     apiMessages: [
       {
         role: 'user',
@@ -593,13 +599,64 @@ test('preLLM injects unread lead inbox into context once and consumes it', async
   await plugin.preLLM(context);
 
   const firstText = context.apiMessages[0].content[0].text;
-  assert.match(firstText, /<team_inbox>/);
-  assert.match(firstText, /Need a decision/);
+  assert.match(firstText, /<team_protocol_guard>/);
+  assert.match(firstText, /must call check_team_inbox/);
+  assert.doesNotMatch(firstText, /Need a decision/);
+  assert.equal(
+    (await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' })).length,
+    1,
+  );
 
   await plugin.preLLM(context);
 
   const secondText = context.apiMessages[0].content[0].text;
-  assert.equal((secondText.match(/<team_inbox>/g) || []).length, 1);
+  assert.equal((secondText.match(/<team_protocol_guard>/g) || []).length, 1);
+  assert.equal(
+    (await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' })).length,
+    1,
+  );
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
+test('preLLM auto-injects lead inbox outside async teams and emits an observable event', async () => {
+  const fixture = await createFixture();
+  const events = [];
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'teammate_reviewer',
+    to: 'lead',
+    type: 'message',
+    payload: { message: 'Need a decision.' },
+  });
+
+  const context = {
+    executor: {
+      harnessId: 'h1',
+      runtimeRole: 'lead',
+      selectedStrategyId: 'custom',
+      teamContext: { teamId: 'team_1' },
+      onEvent: (type, payload) => events.push({ type, payload }),
+    },
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'Continue.' }] }],
+  };
+
+  await plugin.preLLM(context);
+
+  const firstText = context.apiMessages[0].content[0].text;
+  assert.match(firstText, /<team_inbox>/);
+  assert.match(firstText, /Need a decision/);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'team_inbox_auto_injected');
+  assert.equal(events[0].payload.messageCount, 1);
+  assert.equal(events[0].payload.agentId, 'lead');
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
