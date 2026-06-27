@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { AgentExecutor } from './AgentExecutor.js';
 
 function sseResponse(events) {
@@ -183,4 +186,44 @@ test('DeepSeek model hints use DeepSeek request semantics even through a proxy U
   assert.deepEqual(requests[0].body.thinking, { type: 'enabled', budget_tokens: 4915 });
   assert.equal('betas' in requests[0].body, false);
   assert.equal('anthropic-beta' in requests[0].headers, false);
+});
+
+test('run still emits done when final cleanup hook fails', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalCwd = process.cwd();
+  const originalConsoleError = console.error;
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-final-cleanup-'));
+  await mkdir(path.join(rootDir, 'server', 'sessions'), { recursive: true });
+  process.chdir(rootDir);
+
+  t.after(async () => {
+    globalThis.fetch = originalFetch;
+    console.error = originalConsoleError;
+    process.chdir(originalCwd);
+    await rm(rootDir, { recursive: true, force: true });
+  });
+  console.error = () => {};
+
+  globalThis.fetch = async () => sseResponse([
+    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'done' } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+  ]);
+
+  const emittedEvents = [];
+  const executor = new AgentExecutor({
+    harnessId: 'cleanup-failure',
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    onEvent: (type) => emittedEvents.push(type),
+  });
+  executor.hooks.register({
+    async onLoopEnd() {
+      throw new Error('cleanup failed');
+    },
+  });
+
+  await assert.doesNotReject(() => executor.run(1));
+  assert.equal(emittedEvents.includes('done'), true);
 });

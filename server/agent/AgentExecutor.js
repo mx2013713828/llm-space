@@ -614,10 +614,29 @@ export class AgentExecutor {
       }
     } finally {
       // 触发最终清理和保存
-      await this.hooks.dispatch('onLoopEnd', { executor: this });
-      await this.saveSession();
-      SecurityPlugin.clearExecutorPending(this);
-      this.onEvent('done', {});
+      try {
+        await this.hooks.dispatch('onLoopEnd', { executor: this });
+      } catch (err) {
+        console.error('[AgentExecutor] final onLoopEnd cleanup failed:', err);
+      }
+
+      try {
+        await this.saveSession();
+      } catch (err) {
+        console.error('[AgentExecutor] final session save failed:', err);
+      }
+
+      try {
+        SecurityPlugin.clearExecutorPending(this);
+      } catch (err) {
+        console.error('[AgentExecutor] final security cleanup failed:', err);
+      }
+
+      try {
+        this.onEvent('done', {});
+      } catch (err) {
+        console.error('[AgentExecutor] final done event failed:', err);
+      }
     }
   }
 
