@@ -145,6 +145,53 @@ test('spawn_teammate clamps maxTurns to a finite positive integer with safe defa
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('spawn_teammate accepts structured brief fields and builds a standard teammate prompt', async () => {
+  const fixture = await createFixture();
+  const runCalls = [];
+  const events = [];
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn(input) {
+      runCalls.push(input);
+    },
+  });
+
+  const tool = createTool('spawn_teammate', {
+    name: 'backend',
+    role: 'Backend reviewer',
+    objective: 'Review the team orchestration backend changes.',
+    constraints: 'Do not modify files. Focus on correctness risks.',
+    expected_output: 'Return critical findings with file references.',
+    success_criteria: 'Mention if no blocking issues are found.',
+    maxTurns: 5,
+  });
+
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null, onEvent: (type, payload) => events.push({ type, payload }) },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.equal(runCalls.length, 1);
+  assert.match(runCalls[0].initialPrompt, /<teammate_brief>/);
+  assert.match(runCalls[0].initialPrompt, /Objective:\nReview the team orchestration backend changes\./);
+  assert.match(runCalls[0].initialPrompt, /Constraints:\nDo not modify files\. Focus on correctness risks\./);
+  assert.match(runCalls[0].initialPrompt, /Expected output:\nReturn critical findings with file references\./);
+  assert.match(runCalls[0].initialPrompt, /Success criteria:\nMention if no blocking issues are found\./);
+
+  const output = JSON.parse(tool.toolOutput);
+  const state = await fixture.stateStore.loadState({
+    harnessId: 'h1',
+    teamId: output.teamId,
+  });
+  assert.equal(state.teammates.teammate_backend.brief.objective, 'Review the team orchestration backend changes.');
+  assert.equal(state.teammates.teammate_backend.prompt, runCalls[0].initialPrompt);
+  assert.equal(events[0].payload.teammates[0].brief.objective, 'Review the team orchestration backend changes.');
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('parallel spawn_teammate calls in one turn share a single team', async () => {
   const fixture = await createFixture();
   const runCalls = [];

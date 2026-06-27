@@ -182,7 +182,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
     const allCompleted = teamStatus.teammates.every(teammate => teammate.state === 'completed');
     const color = hasFailed ? 'var(--red)' : allCompleted ? 'var(--green)' : 'var(--blue)';
     const summary = teamStatus.teammates
-      .map(teammate => `${teammate.name || teammate.agentId}: ${teammate.state || 'unknown'}`)
+      .map(teammate => {
+        const briefSummary = teammate.brief?.objective || teammate.prompt || '';
+        const trimmedBrief = briefSummary.length > 64 ? `${briefSummary.slice(0, 61)}...` : briefSummary;
+        return `${teammate.name || teammate.agentId}: ${teammate.state || 'unknown'}${trimmedBrief ? ` · ${trimmedBrief}` : ''}`;
+      })
       .join(' · ');
 
     return (

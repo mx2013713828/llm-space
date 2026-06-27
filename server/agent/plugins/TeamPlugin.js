@@ -70,6 +70,50 @@ function sanitizeMaxTurns(value) {
   return Math.min(MAX_TEAMMATE_MAX_TURNS, Math.floor(parsed));
 }
 
+function normalizeBriefText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function buildStructuredBrief(args) {
+  const brief = {
+    objective: normalizeBriefText(args.objective),
+    constraints: normalizeBriefText(args.constraints),
+    expectedOutput: normalizeBriefText(args.expected_output ?? args.expectedOutput),
+    successCriteria: normalizeBriefText(args.success_criteria ?? args.successCriteria),
+  };
+  const hasStructuredBrief = Object.values(brief).some(Boolean);
+  const prompt = normalizeBriefText(args.prompt);
+
+  if (!hasStructuredBrief) {
+    if (!prompt) {
+      throw new Error('spawn_teammate requires a prompt or objective.');
+    }
+    return {
+      prompt,
+      brief: null,
+    };
+  }
+
+  if (!brief.objective) {
+    throw new Error('spawn_teammate structured brief requires objective.');
+  }
+
+  const lines = [
+    '<teammate_brief>',
+    `Objective:\n${brief.objective}`,
+    brief.constraints ? `Constraints:\n${brief.constraints}` : '',
+    brief.expectedOutput ? `Expected output:\n${brief.expectedOutput}` : '',
+    brief.successCriteria ? `Success criteria:\n${brief.successCriteria}` : '',
+    prompt ? `Additional context:\n${prompt}` : '',
+    '</teammate_brief>',
+  ].filter(Boolean);
+
+  return {
+    prompt: lines.join('\n\n'),
+    brief,
+  };
+}
+
 async function ensureTeam({ executor, stateStore }) {
   if (executor._teamEnsurePromise) {
     return executor._teamEnsurePromise;
@@ -156,9 +200,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
 
         if (tool.toolName === 'spawn_teammate') {
           validateAgentName(args.name);
-          if (typeof args.prompt !== 'string' || !args.prompt.trim()) {
-            throw new Error('spawn_teammate requires a prompt.');
-          }
+          const teammateBrief = buildStructuredBrief(args);
 
           const teamId = await ensureTeam({ executor, stateStore });
           const teammateId = createTeammateId(args.name);
@@ -172,7 +214,8 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
               name: args.name,
               role: args.role ?? null,
               state: 'running',
-              prompt: args.prompt,
+              prompt: teammateBrief.prompt,
+              brief: teammateBrief.brief ?? undefined,
               startedAt: new Date().toISOString(),
             },
           });
@@ -186,7 +229,8 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
               name: args.name,
               role: args.role ?? null,
               state: 'running',
-              prompt: args.prompt,
+              prompt: teammateBrief.prompt,
+              brief: teammateBrief.brief ?? undefined,
             },
           });
 
@@ -196,7 +240,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
             teammateId,
             name: args.name,
             role: args.role ?? null,
-            initialPrompt: args.prompt,
+            initialPrompt: teammateBrief.prompt,
             maxTurns: sanitizeMaxTurns(args.maxTurns),
           })).catch(error => {
             console.error('[TeamPlugin] Teammate runner failed:', error);

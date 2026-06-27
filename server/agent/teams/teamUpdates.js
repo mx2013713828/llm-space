@@ -7,6 +7,7 @@ export function summarizeTeamState(state) {
         role: teammate.role ?? null,
         state: teammate.state ?? 'unknown',
         prompt: teammate.prompt,
+        brief: teammate.brief,
         startedAt: teammate.startedAt,
         completedAt: teammate.completedAt,
         lastResult: teammate.lastResult,
