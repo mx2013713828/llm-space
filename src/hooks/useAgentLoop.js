@@ -5,6 +5,7 @@ import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 import { shouldSubmitMessage } from '../lib/chatInput.js';
 import { fetchHarnessSession } from '../lib/sessionApi.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
+import { isAgentDoneEvent, normalizeSessionSnapshot } from '../lib/agentRunCompletion.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -247,6 +248,22 @@ export function useAgentLoop({
           const raw = line.slice(6).trim();
           let evt;
           try { evt = JSON.parse(raw); } catch { continue; }
+
+          if (isAgentDoneEvent(evt)) {
+            if (harness?.id) {
+              try {
+                const finalSession = await fetchHarnessSession(harness.id);
+                const snapshot = normalizeSessionSnapshot(finalSession);
+                setMessages(snapshot.messages);
+                setTodos(snapshot.todos);
+                setBackgroundTasks(snapshot.backgroundTasks);
+              } catch (err) {
+                console.warn('Failed to refresh final session after done:', err);
+              }
+            }
+            await reader.cancel().catch(() => {});
+            return;
+          }
 
           switch (evt.type) {
             case 'background_tasks_update':
