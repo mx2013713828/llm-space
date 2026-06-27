@@ -10,6 +10,10 @@ import {
   normalizeSessionSnapshot,
   shouldApplyActiveSessionSnapshot,
 } from '../lib/agentRunCompletion.js';
+import {
+  applyStreamMessageEvent,
+  createStreamMessageState,
+} from '../lib/streamMessageUpdates.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -82,6 +86,7 @@ export function useAgentLoop({
   const lastSavedSessionRef = useRef(null);
   const liveStateRef = useRef({ messages: [], todos: [], backgroundTasks: [] });
   const lastStreamEventAtRef = useRef(0);
+  const streamMessageStatesRef = useRef(new Map());
   useEffect(() => {
     liveStateRef.current = { messages, todos, backgroundTasks };
   }, [messages, todos, backgroundTasks]);
@@ -215,6 +220,8 @@ export function useAgentLoop({
 
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
   const runAgentLoop = async (currentMessages, currentTodos = todos) => {
+    streamMessageStatesRef.current = new Map();
+
     // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
     let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
 
@@ -286,6 +293,17 @@ export function useAgentLoop({
             }
             return m;
           });
+        });
+      };
+
+      const applyStreamEvent = (evt, options = {}) => {
+        const parentToolCallId = evt.parentToolCallId;
+        const stateKey = parentToolCallId || '__root__';
+        updateMessages(parentToolCallId, (list) => {
+          const currentState = streamMessageStatesRef.current.get(stateKey) || createStreamMessageState();
+          const result = applyStreamMessageEvent(list, currentState, evt, options);
+          streamMessageStatesRef.current.set(stateKey, result.state);
+          return result.messages;
         });
       };
 
@@ -450,125 +468,31 @@ export function useAgentLoop({
             case 'thinking_start':
               // 更新轮次追踪器，确保后续错误消息归属到正确的 Step
               if (evt.turn) currentTurn = evt.turn;
-              updateMessages(evt.parentToolCallId, (list) => [
-                ...list,
-                {
-                  role: 'assistant',
-                  type: 'thinking',
-                  turn: evt.turn,
-                  content: '',
-                  tokens: { input: lastInputTokens, output: 0 },
-                  signature: evt.signature
-                }
-              ]);
+              applyStreamEvent(evt, { lastInputTokens });
               break;
 
             case 'thinking_delta':
-              updateMessages(evt.parentToolCallId, (list) => {
-                let targetIdx = -1;
-                for (let i = list.length - 1; i >= 0; i--) {
-                  if (list[i].role === 'assistant' && list[i].type === 'thinking') {
-                    targetIdx = i;
-                    break;
-                  }
-                }
-                if (targetIdx === -1) return list;
-                return list.map((item, idx) =>
-                  idx === targetIdx
-                    ? { ...item, content: item.content + (evt.text || '') }
-                    : item
-                );
-              });
+              applyStreamEvent(evt);
               break;
 
             case 'text_start':
-              if (evt.isContinuation) {
-                break; // 续写模式：直接在原本助手消息气泡末尾追加文本流，不新增新消息气泡
-              }
-              updateMessages(evt.parentToolCallId, (list) => [
-                ...list,
-                {
-                  role: 'assistant',
-                  type: 'text',
-                  turn: evt.turn,
-                  content: '',
-                  tokens: { input: lastInputTokens, output: 0 }
-                }
-              ]);
+              applyStreamEvent(evt, { lastInputTokens });
               break;
 
             case 'text_delta':
-              updateMessages(evt.parentToolCallId, (list) => {
-                let targetIdx = -1;
-                for (let i = list.length - 1; i >= 0; i--) {
-                  if (list[i].role === 'assistant' && list[i].type === 'text') {
-                    targetIdx = i;
-                    break;
-                  }
-                }
-                if (targetIdx === -1) return list;
-                return list.map((item, idx) =>
-                  idx === targetIdx
-                    ? { ...item, content: item.content + (evt.text || '') }
-                    : item
-                );
-              });
+              applyStreamEvent(evt);
               break;
 
             case 'tool_start':
-              updateMessages(evt.parentToolCallId, (list) => [
-                ...list,
-                {
-                  role: 'assistant',
-                  type: 'tool_call',
-                  turn: evt.turn,
-                  id: evt.id,
-                  toolName: evt.name,
-                  toolInputRaw: '',
-                  toolInput: {}
-                }
-              ]);
+              applyStreamEvent(evt);
               break;
 
             case 'tool_input_delta':
-              updateMessages(evt.parentToolCallId, (list) => {
-                let targetIdx = -1;
-                for (let i = list.length - 1; i >= 0; i--) {
-                  if (list[i].role === 'assistant' && list[i].type === 'tool_call') {
-                    targetIdx = i;
-                    break;
-                  }
-                }
-                if (targetIdx === -1) return list;
-                return list.map((item, idx) => {
-                  if (idx === targetIdx) {
-                    const newRaw = item.toolInputRaw + evt.partial;
-                    let parsed = { ...item.toolInput };
-                    try { parsed = JSON.parse(newRaw); } catch { /* ignore */ }
-                    return { ...item, toolInputRaw: newRaw, toolInput: parsed };
-                  }
-                  return item;
-                });
-              });
+              applyStreamEvent(evt);
               break;
 
             case 'tool_end':
-              updateMessages(evt.parentToolCallId, (list) => {
-                let targetIdx = -1;
-                for (let i = list.length - 1; i >= 0; i--) {
-                  if (list[i].role === 'assistant' && list[i].type === 'tool_call') {
-                    targetIdx = i;
-                    break;
-                  }
-                }
-                if (targetIdx === -1) return list;
-                return list.map((item, idx) => {
-                  if (idx === targetIdx) {
-                    return { ...item, toolInput: evt.input || item.toolInput };
-                  }
-                  return item;
-                });
-              });
+              applyStreamEvent(evt);
               break;
 
             case 'tool_exec_chunk':
@@ -594,19 +518,7 @@ export function useAgentLoop({
               break;
 
             case 'message_delta':
-              updateMessages(evt.parentToolCallId, (list) => {
-                if (list.length === 0) return list;
-                const targetIdx = list.length - 1;
-                return list.map((item, idx) => {
-                  if (idx === targetIdx && item.role === 'assistant' && evt.outputTokens) {
-                    return {
-                      ...item,
-                      tokens: { ...item.tokens, output: evt.outputTokens }
-                    };
-                  }
-                  return item;
-                });
-              });
+              applyStreamEvent(evt);
               break;
 
             case 'error':

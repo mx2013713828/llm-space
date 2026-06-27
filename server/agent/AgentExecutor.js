@@ -908,9 +908,11 @@ export class AgentExecutor {
           case 'content_block_start': {
             const blk = evt.content_block;
             currentBlockType = blk.type;
+            const streamMessageId = `msg_${turnIndex}_${evt.index}_${blk.type}`;
 
             if (blk.type === 'thinking') {
               currentMsg = {
+                id: streamMessageId,
                 role: 'assistant',
                 type: 'thinking',
                 turn: turnIndex,
@@ -919,12 +921,13 @@ export class AgentExecutor {
                 signature: blk.signature
               };
               this.messages.push(currentMsg);
-              this.onEvent('thinking_start', { index: evt.index, signature: blk.signature, turn: turnIndex });
+              this.onEvent('thinking_start', { id: currentMsg.id, index: evt.index, signature: blk.signature, turn: turnIndex });
             } else if (blk.type === 'text') {
               if (isContinuation) {
                 currentMsg = this.messages.findLast(m => m.role === 'assistant' && m.type === 'text');
               } else {
                 currentMsg = {
+                  id: streamMessageId,
                   role: 'assistant',
                   type: 'text',
                   turn: turnIndex,
@@ -933,7 +936,7 @@ export class AgentExecutor {
                 };
                 this.messages.push(currentMsg);
               }
-              this.onEvent('text_start', { index: evt.index, turn: turnIndex, isContinuation });
+              this.onEvent('text_start', { id: currentMsg?.id, index: evt.index, turn: turnIndex, isContinuation });
             } else if (blk.type === 'tool_use') {
               currentMsg = {
                 role: 'assistant',
@@ -955,6 +958,7 @@ export class AgentExecutor {
             if (delta.type === 'thinking_delta') {
               if (currentMsg?.type !== 'thinking') {
                 currentMsg = {
+                  id: `msg_${turnIndex}_${evt.index}_thinking`,
                   role: 'assistant',
                   type: 'thinking',
                   turn: turnIndex,
@@ -964,20 +968,21 @@ export class AgentExecutor {
                 };
                 currentBlockType = 'thinking';
                 this.messages.push(currentMsg);
-                this.onEvent('thinking_start', { index: evt.index, signature: '', turn: turnIndex });
+                this.onEvent('thinking_start', { id: currentMsg.id, index: evt.index, signature: '', turn: turnIndex });
               }
               if (currentMsg) currentMsg.content += delta.thinking;
-              this.onEvent('thinking_delta', { text: delta.thinking });
+              this.onEvent('thinking_delta', { id: currentMsg?.id, text: delta.thinking });
             } else if (delta.type === 'text_delta') {
               if (currentMsg?.type !== 'text') {
                 if (currentMsg?.type === 'thinking') {
-                  this.onEvent('thinking_end', { text: currentMsg.content || '' });
+                  this.onEvent('thinking_end', { id: currentMsg.id, text: currentMsg.content || '' });
                 }
                 currentMsg = isContinuation
                   ? this.messages.findLast(m => m.role === 'assistant' && m.type === 'text')
                   : null;
                 if (!currentMsg) {
                   currentMsg = {
+                    id: `msg_${turnIndex}_${evt.index}_text`,
                     role: 'assistant',
                     type: 'text',
                     turn: turnIndex,
@@ -987,30 +992,30 @@ export class AgentExecutor {
                   this.messages.push(currentMsg);
                 }
                 currentBlockType = 'text';
-                this.onEvent('text_start', { index: evt.index, turn: turnIndex, isContinuation });
+                this.onEvent('text_start', { id: currentMsg?.id, index: evt.index, turn: turnIndex, isContinuation });
               }
               if (currentMsg) currentMsg.content += delta.text;
               if (isContinuation) {
                 newCharsGenerated += delta.text.length;
               }
-              this.onEvent('text_delta', { text: delta.text });
+              this.onEvent('text_delta', { id: currentMsg?.id, text: delta.text });
             } else if (delta.type === 'input_json_delta') {
               if (currentMsg && currentMsg.type === 'tool_call') {
                 currentMsg.toolInputRaw += delta.partial_json;
                 try { currentMsg.toolInput = JSON.parse(currentMsg.toolInputRaw); } catch { }
               }
-              this.onEvent('tool_input_delta', { partial: delta.partial_json });
+              this.onEvent('tool_input_delta', { id: currentMsg?.id, partial: delta.partial_json });
             }
             break;
           }
 
           case 'content_block_stop':
             if (currentBlockType === 'thinking') {
-              this.onEvent('thinking_end', { text: currentMsg?.content || '' });
+              this.onEvent('thinking_end', { id: currentMsg?.id, text: currentMsg?.content || '' });
             } else if (currentBlockType === 'text') {
-              this.onEvent('text_end', { text: currentMsg?.content || '' });
+              this.onEvent('text_end', { id: currentMsg?.id, text: currentMsg?.content || '' });
             } else if (currentBlockType === 'tool_use') {
-              this.onEvent('tool_end', { name: currentMsg?.toolName || '', input: currentMsg?.toolInput || {} });
+              this.onEvent('tool_end', { id: currentMsg?.id, name: currentMsg?.toolName || '', input: currentMsg?.toolInput || {} });
             }
             currentBlockType = null;
             break;
@@ -1022,6 +1027,7 @@ export class AgentExecutor {
               if (answer) {
                 currentMsg.content = '[Thinking folded]';
                 currentMsg = {
+                  id: `msg_${turnIndex}_folded_text`,
                   role: 'assistant',
                   type: 'text',
                   turn: turnIndex,

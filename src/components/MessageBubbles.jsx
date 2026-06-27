@@ -255,10 +255,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {subMessages.map((msg, idx) => {
+                  const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                   if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
-                  if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                  if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                  if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                  if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+                  if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                  if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} />;
                   return null;
                 })}
               </div>
@@ -295,10 +296,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
               {traceExpanded && loadedTrace && (
                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflow: 'auto' }}>
                   {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
+                    const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                     if (msg.role === 'user') return null;
-                    if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                    if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                    if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} />;
                     return null;
                   })}
                   {(loadedTrace.messages || []).length > traceVisibleCount && (

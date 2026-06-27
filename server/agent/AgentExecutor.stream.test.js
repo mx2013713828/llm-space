@@ -50,6 +50,47 @@ test('stores a text block separately after a thinking block', async (t) => {
   ]);
 });
 
+test('emits stable ids for streamed assistant content blocks', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => sseResponse([
+    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'thinking', signature: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Plan.' } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'content_block_start', index: 1, content_block: { type: 'text' } },
+    { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: 'Answer.' } },
+    { type: 'content_block_stop', index: 1 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 6 } }
+  ]);
+  const emittedEvents = [];
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    thinkingEnabled: true,
+    onEvent: (type, payload) => emittedEvents.push({ type, payload }),
+  });
+
+  await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'review' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: []
+  }, { continuation_tokens: [] });
+
+  const thinkingStart = emittedEvents.find(event => event.type === 'thinking_start');
+  const thinkingDelta = emittedEvents.find(event => event.type === 'thinking_delta');
+  const textStart = emittedEvents.find(event => event.type === 'text_start');
+  const textDelta = emittedEvents.find(event => event.type === 'text_delta');
+
+  assert.equal(thinkingStart.payload.id, 'msg_1_0_thinking');
+  assert.equal(thinkingDelta.payload.id, thinkingStart.payload.id);
+  assert.equal(textStart.payload.id, 'msg_1_1_text');
+  assert.equal(textDelta.payload.id, textStart.payload.id);
+  assert.deepEqual(executor.messages.map(({ id }) => id), ['msg_1_0_thinking', 'msg_1_1_text']);
+});
+
 test('recovers when a provider sends text_delta without starting a text block', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

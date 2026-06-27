@@ -158,6 +158,7 @@ export function TrajectoryView({
                 <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div className="turn-divider"><span className="turn-label">🔄 Step {turn}</span></div>
                   {msgs.map((msg, idx) => {
+                    const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                     // 后台任务完成通知：渲染为紧凑的 inline 状态标签，而非原始 XML 用户气泡
                     if (msg.type === 'bg_notification') {
                       const notifications = [];
@@ -168,7 +169,7 @@ export function TrajectoryView({
                       }
                       if (notifications.length === 0) return null;
                       return (
-                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '4px 0' }}>
+                        <div key={messageKey} style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '4px 0' }}>
                           {notifications.map((n, nIdx) => {
                             const ok = n.status === 'completed';
                             return (
@@ -196,7 +197,7 @@ export function TrajectoryView({
                       const presentation = getUserMessagePresentation(msg);
                       return (
                         <UserMessage
-                          key={idx}
+                          key={messageKey}
                           content={presentation.content}
                           variant={presentation.variant}
                           onRetry={isRunning || presentation.variant === 'scheduled'
@@ -206,7 +207,7 @@ export function TrajectoryView({
                       );
                     }
                     if (msg.type === 'system_alert') return (
-                      <div key={idx} className="system-alert-bubble" style={{
+                      <div key={messageKey} className="system-alert-bubble" style={{
                         margin: '8px 0',
                         padding: '10px 14px',
                         background: 'rgba(59, 130, 246, 0.08)',
@@ -223,11 +224,11 @@ export function TrajectoryView({
                         <div style={{ lineHeight: 1.4 }}>{msg.content}</div>
                       </div>
                     );
-                    if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                     if (msg.type === 'text') return (
                       <AssistantMessage
-                        key={idx}
+                        key={messageKey}
                         content={msg.content}
                         isFinalAnswer={isAssistantTextFinalAnswer(msgs, idx)}
                       />
