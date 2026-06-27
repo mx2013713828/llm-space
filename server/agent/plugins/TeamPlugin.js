@@ -1,4 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
@@ -13,8 +15,11 @@ const DEFAULT_WAIT_TIMEOUT_MS = 15000;
 const MAX_WAIT_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;
 const TERMINAL_TEAMMATE_STATES = new Set(['completed', 'failed', 'turn_limit', 'no_result']);
+const TEAM_OUTPUT_INLINE_LIMIT = 4000;
+const TEAM_MESSAGE_PREVIEW_LIMIT = 800;
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
+const defaultTeamOutputRootDir = path.join(globalThis.process?.cwd?.() || '.', 'server', 'sessions');
 
 function getInboxText(payload) {
   if (payload?.message) return payload.message;
@@ -33,6 +38,41 @@ function formatInboxEntries(messages) {
     const text = getInboxText(message.payload);
     return `- from=${message.from} type=${message.type}${text ? ` text=${text}` : ''}`;
   }).join('\n');
+}
+
+function truncateText(text, limit = TEAM_MESSAGE_PREVIEW_LIMIT) {
+  const value = String(text ?? '');
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}\n...[truncated ${value.length - limit} chars]`;
+}
+
+function formatInboxEntriesPreview(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return 'No team messages.';
+  }
+
+  return messages.map(message => {
+    const text = truncateText(getInboxText(message.payload));
+    return `- from=${message.from} type=${message.type}${text ? ` text=${text}` : ''}`;
+  }).join('\n');
+}
+
+async function offloadTeamOutput({ rootDir, harnessId, teamId, label, content }) {
+  const dirName = `${harnessId}_team_outputs`;
+  const fileName = `${teamId}-${label}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}.txt`;
+  const dirPath = path.join(rootDir, dirName);
+  await fs.mkdir(dirPath, { recursive: true });
+  await fs.writeFile(path.join(dirPath, fileName), content, 'utf-8');
+  return `server/sessions/${dirName}/${fileName}`;
+}
+
+async function boundTeamOutput({ rootDir, harnessId, teamId, label, fullOutput, previewOutput }) {
+  if (fullOutput.length <= TEAM_OUTPUT_INLINE_LIMIT) {
+    return fullOutput;
+  }
+
+  const offloadPath = await offloadTeamOutput({ rootDir, harnessId, teamId, label, content: fullOutput });
+  return `${previewOutput}\n\nFull team inbox offloaded: ${offloadPath}\nUse read_file to inspect the complete teammate report if needed.`;
 }
 
 function formatTeamStatus(state) {
@@ -90,7 +130,7 @@ async function waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, poll
   return state;
 }
 
-async function buildWaitForTeammatesOutput({ bus, stateStore, harnessId, teamId, timeoutMs, pollIntervalMs }) {
+async function buildWaitForTeammatesOutput({ bus, stateStore, outputRootDir, harnessId, teamId, timeoutMs, pollIntervalMs }) {
   const state = await waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, pollIntervalMs });
 
   if (!state) {
@@ -107,7 +147,10 @@ async function buildWaitForTeammatesOutput({ bus, stateStore, harnessId, teamId,
     ? 'All teammates reached terminal states.'
     : `Timed out waiting for teammates; ${unresolved.length} teammate(s) still unresolved.`;
 
-  return `${heading}\n\nLead inbox:\n${formatInboxEntries(messages)}${formatTeamStatus(state)}`;
+  const status = formatTeamStatus(state);
+  const fullOutput = `${heading}\n\nLead inbox:\n${formatInboxEntries(messages)}${status}`;
+  const previewOutput = `${heading}\n\nLead inbox preview:\n${formatInboxEntriesPreview(messages)}${status}`;
+  return await boundTeamOutput({ rootDir: outputRootDir, harnessId, teamId, label: 'wait', fullOutput, previewOutput });
 }
 
 function injectInboxBlock(apiMessages, block) {
@@ -244,7 +287,12 @@ function resolveTeamId(executor, requestedTeamId) {
   return teamId;
 }
 
-export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTeamStateStore, runTeammateFn = runTeammate } = {}) {
+export function createTeamPlugin({
+  bus = defaultTeamBus,
+  stateStore = defaultTeamStateStore,
+  runTeammateFn = runTeammate,
+  outputRootDir = defaultTeamOutputRootDir,
+} = {}) {
   return {
     name: 'TeamPlugin',
 
@@ -353,6 +401,7 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
           tool.toolOutput = await buildWaitForTeammatesOutput({
             bus,
             stateStore,
+            outputRootDir,
             harnessId,
             teamId,
             timeoutMs: sanitizeWaitTimeoutMs(args.timeoutMs),
@@ -370,7 +419,17 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
           const state = typeof stateStore.loadState === 'function'
             ? await stateStore.loadState({ harnessId, teamId })
             : null;
-          tool.toolOutput = `${formatInboxEntries(messages)}${formatTeamStatus(state)}`;
+          const status = formatTeamStatus(state);
+          const fullOutput = `${formatInboxEntries(messages)}${status}`;
+          const previewOutput = `${formatInboxEntriesPreview(messages)}${status}`;
+          tool.toolOutput = await boundTeamOutput({
+            rootDir: outputRootDir,
+            harnessId,
+            teamId,
+            label: 'inbox',
+            fullOutput,
+            previewOutput,
+          });
         }
       } catch (error) {
         tool.toolOutput = `[TeamPlugin error]\n${error.message}`;

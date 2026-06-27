@@ -384,6 +384,46 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('check_team_inbox bounds large inbox output', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    outputRootDir: fixture.rootDir,
+    async runTeammateFn() {},
+  });
+  const largeReport = `INBOX_START\n${'large inbox line\n'.repeat(500)}INBOX_END`;
+
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'teammate_reviewer',
+    to: 'lead',
+    type: 'result',
+    payload: { content: largeReport },
+  });
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_reviewer', name: 'reviewer', state: 'completed' },
+    ],
+  });
+
+  const tool = createTool('check_team_inbox', { teamId: 'team_1' });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.equal(tool.toolOutput.includes('INBOX_END'), false);
+  assert.match(tool.toolOutput, /Full team inbox offloaded/);
+  assert.ok(tool.toolOutput.length < 5000);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('wait_for_teammates waits for terminal states and returns inbox results', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
@@ -435,6 +475,55 @@ test('wait_for_teammates waits for terminal states and returns inbox results', a
     await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' }),
     [],
   );
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
+test('wait_for_teammates bounds large inbox output and writes a readable offload file', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    outputRootDir: fixture.rootDir,
+    async runTeammateFn() {},
+  });
+  const largeReport = `REPORT_START\n${'large teammate finding\n'.repeat(500)}REPORT_END`;
+
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_reviewer', name: 'reviewer', state: 'completed', lastResult: largeReport },
+    ],
+  });
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'teammate_reviewer',
+    to: 'lead',
+    type: 'result',
+    payload: { content: largeReport },
+  });
+
+  const tool = createTool('wait_for_teammates', {
+    teamId: 'team_1',
+    timeoutMs: 10,
+    pollIntervalMs: 5,
+  });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.equal(tool.toolOutput.includes('REPORT_END'), false);
+  assert.match(tool.toolOutput, /Full team inbox offloaded/);
+  assert.ok(tool.toolOutput.length < 5000);
+
+  const offloadPath = tool.toolOutput.match(/server\/sessions\/h1_team_outputs\/[^\s]+\.txt/)?.[0];
+  assert.ok(offloadPath);
+  const offloaded = await readFile(path.join(fixture.rootDir, offloadPath.replace(/^server\/sessions\//, '')), 'utf-8');
+  assert.match(offloaded, /REPORT_END/);
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
