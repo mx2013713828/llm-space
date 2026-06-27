@@ -23,7 +23,7 @@ function valueLength(value) {
 function messageProgressScore(message) {
   if (!message || typeof message !== 'object') return 0;
 
-  let score = 0;
+  let score = 1;
   score += valueLength(message.content);
   score += valueLength(message.toolOutput);
   score += valueLength(message.toolInputRaw);
@@ -56,7 +56,6 @@ export function shouldApplyActiveSessionSnapshot(current, incoming, options = {}
   const incomingSnapshot = normalizeSessionSnapshot(incoming);
 
   if (incomingSnapshot.messages.length < currentSnapshot.messages.length) return false;
-  if (incomingSnapshot.messages.length > currentSnapshot.messages.length) return true;
 
   return snapshotProgressScore(incomingSnapshot) > snapshotProgressScore(currentSnapshot);
 }
