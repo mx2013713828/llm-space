@@ -278,6 +278,46 @@ test('runTeammate marks no_result when child finishes without final assistant te
   assert.equal(sentMessages[0].payload.content, EMPTY_TEAMMATE_RESULT);
 });
 
+test('runTeammate does not treat pre-tool progress text as the final report', async () => {
+  class ProgressThenToolExecutor extends FakeExecutor {
+    constructor(args) {
+      super(args);
+      this.messages = [
+        { role: 'assistant', type: 'text', content: 'I will inspect the files first.' },
+        { role: 'assistant', type: 'tool_call', toolName: 'read_file', toolOutput: 'source code' },
+      ];
+    }
+  }
+
+  const updates = [];
+  const sentMessages = [];
+
+  await runTeammate({
+    parentExecutor: createParentExecutor(),
+    teamId: 'team_1',
+    teammateId: 'reviewer',
+    name: 'Reviewer',
+    role: 'Critic',
+    initialPrompt: 'Review the patch.',
+    ExecutorClass: ProgressThenToolExecutor,
+    stateStore: {
+      async updateTeammate(input) {
+        updates.push(input);
+      },
+    },
+    bus: {
+      async sendMessage(input) {
+        sentMessages.push(input);
+      },
+    },
+  });
+
+  assert.equal(updates[1].updates.state, 'no_result');
+  assert.equal(updates[1].updates.lastResult, EMPTY_TEAMMATE_RESULT);
+  assert.equal(sentMessages[0].type, 'result');
+  assert.equal(sentMessages[0].payload.content, EMPTY_TEAMMATE_RESULT);
+});
+
 test('runTeammate still reports failure to lead when initial running-state update fails', async () => {
   const updates = [];
   const sentMessages = [];

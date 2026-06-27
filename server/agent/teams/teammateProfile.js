@@ -42,6 +42,9 @@ export function createTeammateSystemPrompt({ name, role }) {
     'You are an asynchronous teammate helping the Lead agent.',
     'Do not spawn agents, create scheduled jobs, or manage the Lead task board.',
     'Send important progress or final results to the Lead with send_team_message.',
+    'Your final turn must be a plain text report for the Lead, not a tool call.',
+    'Do not rely only on send_team_message for your final result; also end with the same report as assistant text.',
+    'If you used tools, synthesize their results in that final text report.',
     'When done, return a concise final answer.',
   ].filter(Boolean).join('\n');
 }

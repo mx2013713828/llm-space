@@ -14,6 +14,30 @@ import {
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
 
+function getFinalAssistantTextAfterLastTool(messages) {
+  const entries = Array.isArray(messages) ? messages : [];
+  let lastToolIndex = -1;
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i]?.role === 'assistant' && entries[i]?.type === 'tool_call') {
+      lastToolIndex = i;
+      break;
+    }
+  }
+
+  const finalText = getLastAssistantText(entries);
+  if (!finalText) return null;
+  if (lastToolIndex === -1) return finalText;
+
+  const finalTextIndex = entries.findLastIndex(message =>
+    message?.role === 'assistant'
+    && message?.type === 'text'
+    && typeof message?.content === 'string'
+    && message.content.trim()
+  );
+
+  return finalTextIndex > lastToolIndex ? finalText : null;
+}
+
 export function createTeammateHarnessId(parentHarnessId, teammateId) {
   const safeParentHarnessId = String(parentHarnessId || 'team')
     .replace(/[^A-Za-z0-9_-]/g, '_')
@@ -92,7 +116,7 @@ export async function runTeammate({
 
     await teammateExecutor.run(maxTurns);
 
-    const finalText = getLastAssistantText(teammateExecutor.messages);
+    const finalText = getFinalAssistantTextAfterLastTool(teammateExecutor.messages);
     const content = finalText ?? EMPTY_TEAMMATE_RESULT;
     const finalState = teammateExecutor.lastRunStopReason === 'turn_limit'
       ? 'turn_limit'
