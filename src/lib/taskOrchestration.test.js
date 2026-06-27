@@ -55,7 +55,7 @@ test('lead gets team tools only when agent teams is enabled', () => {
       mode: 'todo',
       enable_agent_teams: true,
     }),
-    ['bash', 'write_todos', 'spawn_teammate', 'send_team_message', 'check_team_inbox']
+    ['bash', 'write_todos', 'spawn_teammate', 'send_team_message', 'wait_for_teammates', 'check_team_inbox']
   );
 });
 
@@ -65,6 +65,7 @@ test('teammate only keeps team communication from orchestration tools', () => {
       'bash',
       'write_todos',
       'spawn_teammate',
+      'wait_for_teammates',
       'send_team_message',
       'check_team_inbox',
       'sub_agent',
@@ -253,6 +254,7 @@ test('hidden orchestration tools include teams tools for UI-managed filtering', 
     'list_crons',
     'cancel_cron',
     'spawn_teammate',
+    'wait_for_teammates',
     'check_team_inbox',
     'send_team_message',
   ]);

@@ -19,6 +19,7 @@ import getCurrentTime from './get_current_time.js';
 import spawnTeammate from './spawn_teammate.js';
 import sendTeamMessage from './send_team_message.js';
 import checkTeamInbox from './check_team_inbox.js';
+import waitForTeammates from './wait_for_teammates.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -48,6 +49,7 @@ class ToolRegistry {
       spawn_teammate: spawnTeammate,
       send_team_message: sendTeamMessage,
       check_team_inbox: checkTeamInbox,
+      wait_for_teammates: waitForTeammates,
     };
   }
 

@@ -384,6 +384,95 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('wait_for_teammates waits for terminal states and returns inbox results', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_reviewer', name: 'reviewer', state: 'running' },
+    ],
+  });
+
+  setTimeout(async () => {
+    await fixture.stateStore.updateTeammate({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      agentId: 'teammate_reviewer',
+      updates: { state: 'completed', lastResult: 'Looks good.' },
+    });
+    await fixture.bus.sendMessage({
+      harnessId: 'h1',
+      teamId: 'team_1',
+      from: 'teammate_reviewer',
+      to: 'lead',
+      type: 'result',
+      payload: { content: 'Looks good.' },
+    });
+  }, 20);
+
+  const tool = createTool('wait_for_teammates', {
+    teamId: 'team_1',
+    timeoutMs: 500,
+    pollIntervalMs: 10,
+  });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.match(tool.toolOutput, /All teammates reached terminal states/);
+  assert.match(tool.toolOutput, /reviewer: completed/);
+  assert.match(tool.toolOutput, /Looks good/);
+  assert.deepEqual(
+    await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' }),
+    [],
+  );
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
+test('wait_for_teammates times out with unresolved status', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_backend', name: 'backend', state: 'running' },
+    ],
+  });
+
+  const tool = createTool('wait_for_teammates', {
+    teamId: 'team_1',
+    timeoutMs: 25,
+    pollIntervalMs: 5,
+  });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.match(tool.toolOutput, /Timed out waiting for teammates/);
+  assert.match(tool.toolOutput, /backend: running/);
+  assert.match(tool.toolOutput, /Do not give a final answer as if all teammates completed/);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('preLLM injects unread lead inbox into context once and consumes it', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({

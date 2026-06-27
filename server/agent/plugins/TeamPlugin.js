@@ -1,12 +1,18 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
 import { createTeamId, createTeammateId, validateAgentName } from '../teams/teamEnvelope.js';
 import { runTeammate } from '../teams/teammateRunner.js';
 import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
 
-const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'check_team_inbox']);
+const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'wait_for_teammates', 'check_team_inbox']);
 const DEFAULT_TEAMMATE_MAX_TURNS = 6;
 const MAX_TEAMMATE_MAX_TURNS = 12;
+const DEFAULT_WAIT_TIMEOUT_MS = 15000;
+const MAX_WAIT_TIMEOUT_MS = 30000;
+const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;
+const TERMINAL_TEAMMATE_STATES = new Set(['completed', 'failed', 'turn_limit', 'no_result']);
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
 
@@ -47,6 +53,61 @@ function formatTeamStatus(state) {
     : '';
 
   return `\n\nTeam status:\n${statusLines.join('\n')}${reminder}`;
+}
+
+function getUnresolvedTeammates(state) {
+  const teammates = Object.values(state?.teammates ?? {});
+  return teammates.filter(teammate => !TERMINAL_TEAMMATE_STATES.has(teammate.state));
+}
+
+function sanitizeWaitTimeoutMs(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_WAIT_TIMEOUT_MS;
+  }
+
+  return Math.min(MAX_WAIT_TIMEOUT_MS, Math.floor(parsed));
+}
+
+function sanitizeWaitPollIntervalMs(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_WAIT_POLL_INTERVAL_MS;
+  }
+
+  return Math.min(2000, Math.max(50, Math.floor(parsed)));
+}
+
+async function waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, pollIntervalMs }) {
+  const deadline = Date.now() + timeoutMs;
+  let state = await stateStore.loadState({ harnessId, teamId });
+
+  while (state && getUnresolvedTeammates(state).length > 0 && Date.now() < deadline) {
+    await delay(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
+    state = await stateStore.loadState({ harnessId, teamId });
+  }
+
+  return state;
+}
+
+async function buildWaitForTeammatesOutput({ bus, stateStore, harnessId, teamId, timeoutMs, pollIntervalMs }) {
+  const state = await waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, pollIntervalMs });
+
+  if (!state) {
+    return `No team state found for ${teamId}.`;
+  }
+
+  const messages = await bus.readInbox({
+    harnessId,
+    teamId,
+    agentId: 'lead',
+  });
+  const unresolved = getUnresolvedTeammates(state);
+  const heading = unresolved.length === 0
+    ? 'All teammates reached terminal states.'
+    : `Timed out waiting for teammates; ${unresolved.length} teammate(s) still unresolved.`;
+
+  return `${heading}\n\nLead inbox:\n${formatInboxEntries(messages)}${formatTeamStatus(state)}`;
 }
 
 function injectInboxBlock(apiMessages, block) {
@@ -286,6 +347,17 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
           });
 
           tool.toolOutput = `Sent team message to ${envelope.to}.`;
+        } else if (tool.toolName === 'wait_for_teammates') {
+          const teamId = resolveTeamId(executor, args.teamId);
+          const harnessId = resolveTeamHarnessId(executor);
+          tool.toolOutput = await buildWaitForTeammatesOutput({
+            bus,
+            stateStore,
+            harnessId,
+            teamId,
+            timeoutMs: sanitizeWaitTimeoutMs(args.timeoutMs),
+            pollIntervalMs: sanitizeWaitPollIntervalMs(args.pollIntervalMs),
+          });
         } else if (tool.toolName === 'check_team_inbox') {
           const teamId = resolveTeamId(executor, args.teamId);
           const harnessId = resolveTeamHarnessId(executor);

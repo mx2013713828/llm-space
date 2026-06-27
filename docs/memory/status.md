@@ -46,6 +46,10 @@
 | `web_search` | `web_search.js` | Tavily `/search` — 关键词搜索，返回 AI 摘要 + 结构化结果 |
 | `web_fetch` | `web_fetch.js` | Tavily `/extract` — 传入 URL，返回清洗后 Markdown 正文 |
 | `sub_agent` | `sub_agent.js` | 派发子代理任务（后端系统级拦截并实例化子 Executor 循环） |
+| `spawn_teammate` | `spawn_teammate.js` | 启动有限异步 teammate，支持结构化 brief（由 Task Orchestration / Agent Teams 隐式注入） |
+| `send_team_message` | `send_team_message.js` | 在 Lead 与 teammate 之间发送 TeamBus 消息（由 Task Orchestration / Agent Teams 隐式注入） |
+| `wait_for_teammates` | `wait_for_teammates.js` | 等待 teammate 收敛到终态并返回 team status 与 Lead inbox（由 Task Orchestration / Agent Teams 隐式注入） |
+| `check_team_inbox` | `check_team_inbox.js` | 读取并消费 Lead team inbox，附带当前 team status（由 Task Orchestration / Agent Teams 隐式注入） |
 | `create_task` | `create_task.js` | 创建新任务（附带 Kahn DAG 环检测）（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
 | `list_tasks` | `list_tasks.js` | 检索任务看板状态（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
 | `get_task` | `get_task.js` | 查询单个任务详情（由 task_manager 特性隐式注入并装配，不显示在前端 Tools 挂载面板中） |
@@ -102,8 +106,19 @@
 19. **Hook-Based 生命周期架构重构**：将原本臃肿的后端 AgentExecutor 主循环彻底解耦。引入微内核 `HookManager`，将上下文清洗、大文本物理卸载、子代理拦截、技能按需扫描加载、Todo 看板同步及催促等特性，完全剥离为独立的可插拔插件（Plugins）。框架现已演进为严格遵循 `PreLLM -> PreToolUse -> PostToolUse -> OnLoopEnd` 的标准化流水线，具备了类似 Claude Code 等工业级 Agent 引擎的极致扩展能力与代码纯洁度。
 20. **长期记忆系统（Memory System）**：实现跨会话、跨压缩的知识积累层（阶段十，commit d5128f9）。包含 memoryStore（写锁+路径校验+UTF-8安全截断）、memorySelect（LLM side-query+关键词降级）、memoryExtract（对话结束后自动提取）、memoryConsolidate（三层门控定期整理）、MemoryPlugin（preLLM 注入 + onLoopEnd fire-and-forget）。索引注入 system prompt 保护 Prompt Cache，具体内容注入 user turn 不破坏缓存前缀。FeatureSchema 新增 enable_memory group，含子级联动约束。
 21. **可恢复的任务依赖系统 (DAG Task System) 与一键式合并重构**：实现类似 Claude Code 的持久化任务图系统，内置 Kahn 算法环检测、Claim 排他文件锁、Release Path 中断回滚事务，以及静前动后前缀缓存友好拆分。更进一步，进行了任务系统一键一类合并重构，在前端 Tools 面板中彻底隐藏 6 个物理原子工具，在 FeatureSchema 中引入统一的 `task_manager` 实验特性组，支持 `todo`/`task_system` 双模式动态净化与自动搭载。
+22. **Task Orchestration 与 Agent Teams MVP 闭环**：将任务看板、DAG Task System、Sub-agent、Cron、Background Tasks、Agent Teams 统一到 Task Orchestration 下，新增可实时切换的执行策略层。Agent Teams 已实现有限异步 teammate、TeamBus、结构化 brief、前端 teammate live status、`turn_limit`/`no_result` 终态语义，以及 `wait_for_teammates` join 工具，使 lead 能等待团队收敛后再汇总，完成 MVP 最小闭环。
 
-## 6. CC 级记忆系统增强（待完成）
+## 6. Task Orchestration / Agent Teams 后续计划
+
+| 优先级 | 改进项 | 说明 | 文件 |
+|--------|--------|------|------|
+| 高 | Team Dashboard 轻量增强 | 展示 team 列表、teammate 状态、未读 inbox、失败/超时/无结果标识，并按需展开 teammate 轨迹 | `src/components/MessageBubbles.jsx` / 新增团队面板 |
+| 高 | Teammate 生命周期管理 | 增加 cancel、retry、ignore/adopt result 等控制能力 | `TeamPlugin.js` / `teamStateStore.js` |
+| 中 | 组合策略预设 | 提供 `Todo + Teams`、`DAG + Teams`、`Sequential Review` 等一键策略，同时保留 primitive 自定义 | `src/lib/taskOrchestration.js` / `FeatureSchema.js` |
+| 中 | TeamBus 协议增强 | 增加 `partial_result`、`question`、`blocker`、`review` 等消息类型 | `server/agent/teams/*` |
+| 低 | Autonomous Team Pool | 长时 teammate、idle loop、worktree isolation 和自主团队池 | 后续设计 |
+
+## 7. CC 级记忆系统增强（待完成）
 
 基于对 Claude Code 源码（memdir/、services/、query/ 等）的深度分析，提取出以下高价值改进项，后续完成：
 

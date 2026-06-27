@@ -16,6 +16,7 @@ test('exposes canonical task orchestration sections', () => {
   assert.match(group.children.inline_strategy_prompt.defaultValue, /simple one-shot requests/);
   assert.match(group.children.sequential_subagent_strategy_prompt.defaultValue, /without creating a task DAG/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not spawn teammates/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /wait_for_teammates/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /check_team_inbox/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /hit turn limits/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /are still running/);
@@ -86,7 +87,7 @@ Use finite asynchronous teammate coordination.
 Guidelines:
 - Split independent work into clear teammate briefs.
 - Spawn teammates only for work that can proceed independently.
-- Use team inbox checks to collect results before making final decisions.
+- Use \`wait_for_teammates\` as the join point before making final decisions.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
 </execution_strategy>`,

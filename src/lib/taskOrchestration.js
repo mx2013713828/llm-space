@@ -10,7 +10,7 @@ const TODO_PLANNING_TOOLS = ['write_todos'];
 const DELEGATION_TOOLS = ['sub_agent'];
 const BACKGROUND_TASK_TOOLS = ['query_background_tasks'];
 const CRON_TOOLS = ['schedule_cron', 'list_crons', 'cancel_cron'];
-const TEAM_LEAD_TOOLS = ['spawn_teammate', 'check_team_inbox'];
+const TEAM_LEAD_TOOLS = ['spawn_teammate', 'wait_for_teammates', 'check_team_inbox'];
 const TEAM_COMMUNICATION_TOOLS = ['send_team_message'];
 const TEAM_TOOLS = [...TEAM_LEAD_TOOLS, ...TEAM_COMMUNICATION_TOOLS];
 

@@ -160,3 +160,22 @@
 - [ ] **用户/大模型干预交互 (Task Intervention / stdin Passthrough)**：
   - 允许大模型或用户通过专属指令（或前端 UI 的 Terminal 输入框）向后台挂起的进程发送 `stdin` 键盘输入（如发送 `y\n`）。
   - 彻底解决交互式对话框导致的死锁问题，使后台任务真正具备完全互动的能力。
+
+## 阶段十四：任务编排与 Agent Teams MVP 闭环（进行中） 🤝
+
+**目标**：将任务相关能力统一收敛到 Task Orchestration 下，支持可拆卸实验与一键策略预设，并完成 Agent Teams 的最小可用闭环。
+
+**已完成**：
+- [x] **Task Orchestration 统一入口**：将 TODO、DAG Task System、Sub-agent、Cron、Background Tasks、Agent Teams 归入统一任务编排配置边界。
+- [x] **执行策略层**：新增 `Inline Execution`、`Sequential Sub-agent Workflow`、`Async Agent Teams`、`Custom` 策略，并支持策略 guideline 预览和自定义。
+- [x] **Sub-agent 优化**：修复递归/工具挂载边界，优化简单任务不过度 DAG 化，并将子代理轨迹从主消息树中拆出，支持懒加载详情与卡片状态摘要。
+- [x] **Agent Teams MVP**：实现 `spawn_teammate`、`send_team_message`、`check_team_inbox`，通过 TeamBus 和 TeamStateStore 支持有限异步 teammate、结构化 brief、状态持久化、lead inbox 汇总。
+- [x] **Teams 可观测性**：前端 `spawn_teammate` 卡片显示 teammate 当前状态、任务摘要和完成数，减少异步执行时的黑箱感。
+- [x] **Teams 最小闭环收尾**：新增 `wait_for_teammates` 作为 join 点，等待 teammate 进入 `completed`、`failed`、`turn_limit`、`no_result` 等终态后返回 team status 和 Lead inbox，降低 lead 过早总结的概率。
+
+**后续计划**：
+- [ ] **Team Dashboard 轻量增强**：展示 team 列表、teammate 状态、未读 inbox、失败/超时/无结果标识，并支持按需展开 teammate 轨迹。
+- [ ] **Teammate 生命周期管理**：增加 cancel、retry、ignore/adopt result 等控制能力，避免 teammate 失败或跑偏后只能靠自然终止。
+- [ ] **组合策略预设**：提供 `Todo + Teams`、`DAG + Teams`、`Sequential Review` 等实验预设，同时保留底层 primitives 的可拆卸自定义能力。
+- [ ] **协议层增强**：在 TeamBus 消息类型中逐步加入 `partial_result`、`question`、`blocker`、`review` 等类型，为未来 autonomous team pool 留接口。
+- [ ] **Worktree Isolation / Autonomous Teams**：在 MVP 稳定后，再探索独立工作区、多 teammate 长时运行和自主团队池。
