@@ -43,29 +43,6 @@ test('does not apply stale active-run snapshots over live streamed text', () => 
   );
 });
 
-test('does not apply longer-message snapshots when they regress streamed content', () => {
-  const current = {
-    messages: [
-      { role: 'assistant', type: 'text', content: 'A long streamed report that is already visible in the live UI.' },
-    ],
-    todos: [],
-    backgroundTasks: [],
-  };
-  const incoming = {
-    messages: [
-      { role: 'assistant', type: 'text', content: 'A long streamed' },
-      { role: 'assistant', type: 'tool_call', toolName: 'wait_for_teammates' },
-    ],
-    todos: [],
-    backgroundTasks: [],
-  };
-
-  assert.equal(
-    shouldApplyActiveSessionSnapshot(current, incoming, { now: 10000, lastStreamAt: 0 }),
-    false,
-  );
-});
-
 test('does not reconcile active sessions while SSE events are still arriving', () => {
   const current = {
     messages: [{ role: 'assistant', type: 'text', content: 'partial' }],

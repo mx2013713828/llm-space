@@ -89,7 +89,6 @@ export function useAgentLoop({
   const lastStreamEventAtRef = useRef(0);
   const streamMessageStatesRef = useRef(new Map());
   const streamBatcherRef = useRef(null);
-  const runConnectionActiveRef = useRef(false);
   useEffect(() => {
     liveStateRef.current = { messages, todos, backgroundTasks };
   }, [messages, todos, backgroundTasks]);
@@ -223,8 +222,6 @@ export function useAgentLoop({
 
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
   const runAgentLoop = async (currentMessages, currentTodos = todos) => {
-    if (runConnectionActiveRef.current) return;
-    runConnectionActiveRef.current = true;
     streamMessageStatesRef.current = new Map();
     streamBatcherRef.current?.dispose?.();
     streamBatcherRef.current = null;
@@ -293,14 +290,13 @@ export function useAgentLoop({
       // 辅助更新消息轨：支持 parentToolCallId 的多层嵌套更新
       const updateMessages = (parentToolCallId, updater) => {
         setMessages(prev => {
-          const nextMessages = !parentToolCallId ? updater(prev) : prev.map(m => {
+          if (!parentToolCallId) return updater(prev);
+          return prev.map(m => {
             if (m.id === parentToolCallId) {
               return { ...m, subMessages: updater(m.subMessages || []) };
             }
             return m;
           });
-          liveStateRef.current = { ...liveStateRef.current, messages: nextMessages };
-          return nextMessages;
         });
       };
 
@@ -395,7 +391,6 @@ export function useAgentLoop({
 
           switch (evt.type) {
             case 'background_tasks_update':
-              liveStateRef.current = { ...liveStateRef.current, backgroundTasks: evt.tasks || [] };
               setBackgroundTasks(evt.tasks || []);
               break;
 
@@ -424,29 +419,12 @@ export function useAgentLoop({
             case 'messages_update':
               // 接收后端触发的上下文压缩或历史变更
               flushStreamEvents();
-              if (shouldApplyActiveSessionSnapshot(liveStateRef.current, {
-                messages: evt.messages || [],
-                todos: liveStateRef.current.todos,
-                backgroundTasks: liveStateRef.current.backgroundTasks,
-              }, {
-                now: Date.now(),
-                lastStreamAt: 0,
-                minIdleMs: 0,
-              })) {
-                const nextSnapshot = {
-                  messages: evt.messages || [],
-                  todos: liveStateRef.current.todos,
-                  backgroundTasks: liveStateRef.current.backgroundTasks,
-                };
-                liveStateRef.current = nextSnapshot;
-                setMessages(nextSnapshot.messages);
-              }
+              setMessages(evt.messages);
               break;
 
             case 'todo_update':
               // 看板状态变更同步
-              liveStateRef.current = { ...liveStateRef.current, todos: evt.todos || [] };
-              setTodos(evt.todos || []);
+              setTodos(evt.todos);
               break;
 
             case 'sub_agent_status':
@@ -626,14 +604,13 @@ export function useAgentLoop({
       streamBatcherRef.current?.flushNow?.();
       streamBatcherRef.current?.dispose?.();
       streamBatcherRef.current = null;
-      runConnectionActiveRef.current = false;
       setIsRunning(false);
     }
   };
 
   // Detect background agent state and auto-attach to scheduled executions.
   useEffect(() => {
-    if (!harness?.id || isRunning || runConnectionActiveRef.current) return undefined;
+    if (!harness?.id || isRunning) return undefined;
     let cancelled = false;
 
     const attachIfRunning = async () => {
@@ -649,7 +626,7 @@ export function useAgentLoop({
         if (data.backgroundTasks) {
           setBackgroundTasks(data.backgroundTasks);
         }
-        if (data.isRunning && !runConnectionActiveRef.current) {
+        if (data.isRunning) {
           console.log(`🔌 Background task found for ${harness.id}, auto attaching...`);
           setIsRunning(true);
           const latestMessages = savedSession?.messages || harness?.trajectory || [];

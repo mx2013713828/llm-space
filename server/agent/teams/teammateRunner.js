@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { AgentExecutor } from '../AgentExecutor.js';
 import { getLastAssistantText } from '../subAgentProfile.js';
 import { createTeamBus } from './teamBus.js';
@@ -60,7 +61,7 @@ export async function runTeammate({
     });
 
     const forwardChildEvent = (type, payload) => {
-      if (type === 'messages_update') {
+      if (type !== 'team_update') {
         return;
       }
 

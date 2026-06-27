@@ -332,7 +332,7 @@ test('runTeammate still reports failure to lead when initial running-state updat
   assert.match(updates[1].updates.completedAt, /^\d{4}-/);
 });
 
-test('runTeammate isolates child harness state and suppresses raw child messages_update events', async () => {
+test('runTeammate isolates child harness state and suppresses raw child stream events', async () => {
   const forwardedEvents = [];
 
   class EventingExecutor extends FakeExecutor {
@@ -340,7 +340,10 @@ test('runTeammate isolates child harness state and suppresses raw child messages
       FakeExecutor.lastArgs.onEvent('messages_update', {
         messages: [{ role: 'assistant', content: 'child transcript' }],
       });
-      FakeExecutor.lastArgs.onEvent('tool_call', { tool: 'bash' });
+      FakeExecutor.lastArgs.onEvent('text_start', { id: 'child_text' });
+      FakeExecutor.lastArgs.onEvent('text_delta', { id: 'child_text', text: 'child streamed text' });
+      FakeExecutor.lastArgs.onEvent('tool_start', { id: 'child_tool', name: 'bash' });
+      FakeExecutor.lastArgs.onEvent('tool_exec_done', { id: 'child_tool', output: 'child output' });
     }
   }
 
@@ -369,10 +372,11 @@ test('runTeammate isolates child harness state and suppresses raw child messages
   assert.notEqual(FakeExecutor.lastArgs.harnessId, 'h1');
   assert.equal(FakeExecutor.lastArgs.teamContext.harnessId, 'h1');
   assert.deepEqual(
-    forwardedEvents.filter(event => event.type === 'tool_call'),
-    [{ type: 'tool_call', payload: { tool: 'bash' } }],
+    forwardedEvents
+      .filter(event => event.type !== 'team_update')
+      .map(event => event.type),
+    [],
   );
-  assert.deepEqual(forwardedEvents.filter(event => event.type === 'messages_update'), []);
   assert.deepEqual(forwardedEvents.filter(event => event.type === 'team_update').map(event => event.payload.teammates[0].state), [
     'running',
     'completed',
