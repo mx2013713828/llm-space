@@ -19,6 +19,8 @@ test('exposes canonical task orchestration sections', () => {
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /spawn the teammate before doing the substantive investigation/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /wait_for_teammates/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /Do not repeatedly poll indefinitely/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /wait timeout means teammates are still running/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not fallback to inline synthesis/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /check_team_inbox/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /hit turn limits/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /are still running/);
