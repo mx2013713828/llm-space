@@ -7,8 +7,8 @@ import { fetchHarnessSession } from '../lib/sessionApi.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 import {
   isAgentDoneEvent,
-  isDifferentSessionSnapshot,
   normalizeSessionSnapshot,
+  shouldApplyActiveSessionSnapshot,
 } from '../lib/agentRunCompletion.js';
 
 /**
@@ -58,6 +58,7 @@ export function useAgentLoop({
   // Sync local state up to parent — only when content actually changes
   useEffect(() => {
     if (!onSessionUpdate) return;
+    if (isRunning) return;
     const newMsgStr = JSON.stringify(messages);
     const newTodoStr = JSON.stringify(todos);
     const newBgStr = JSON.stringify(backgroundTasks);
@@ -71,7 +72,7 @@ export function useAgentLoop({
     lastReportedRef.current.todos = newTodoStr;
     lastReportedRef.current.backgroundTasks = newBgStr;
     onSessionUpdate(messages, todos, backgroundTasks);
-  }, [messages, todos, backgroundTasks]);
+  }, [messages, todos, backgroundTasks, isRunning]);
 
   // Synchronize local messages and todos state when external savedSession changes.
   // After updating local state, pre-populate lastReportedRef so that the A effect
@@ -80,17 +81,24 @@ export function useAgentLoop({
   //   B sets messages → A fires → onSessionUpdate → setSessions → savedSession ref changes → B fires...
   const lastSavedSessionRef = useRef(null);
   const liveStateRef = useRef({ messages: [], todos: [], backgroundTasks: [] });
+  const lastStreamEventAtRef = useRef(0);
   useEffect(() => {
     liveStateRef.current = { messages, todos, backgroundTasks };
   }, [messages, todos, backgroundTasks]);
 
-  const applySessionSnapshot = (session) => {
+  const applySessionSnapshot = (session, { markReported = true } = {}) => {
     const snapshot = normalizeSessionSnapshot(session);
     liveStateRef.current = snapshot;
     lastSavedSessionRef.current = JSON.stringify(snapshot);
-    lastReportedRef.current.messages = JSON.stringify(snapshot.messages);
-    lastReportedRef.current.todos = JSON.stringify(snapshot.todos);
-    lastReportedRef.current.backgroundTasks = JSON.stringify(snapshot.backgroundTasks);
+    if (markReported) {
+      lastReportedRef.current.messages = JSON.stringify(snapshot.messages);
+      lastReportedRef.current.todos = JSON.stringify(snapshot.todos);
+      lastReportedRef.current.backgroundTasks = JSON.stringify(snapshot.backgroundTasks);
+    } else {
+      lastReportedRef.current.messages = null;
+      lastReportedRef.current.todos = null;
+      lastReportedRef.current.backgroundTasks = null;
+    }
     setMessages(snapshot.messages);
     setTodos(snapshot.todos);
     setBackgroundTasks(snapshot.backgroundTasks);
@@ -137,7 +145,10 @@ export function useAgentLoop({
       try {
         const session = await fetchHarnessSession(harness.id);
         if (cancelled || !session) return;
-        if (!isDifferentSessionSnapshot(liveStateRef.current, session)) return;
+        if (!shouldApplyActiveSessionSnapshot(liveStateRef.current, session, {
+          now: Date.now(),
+          lastStreamAt: lastStreamEventAtRef.current,
+        })) return;
         applySessionSnapshot(session);
       } catch (err) {
         if (!cancelled) console.warn('Failed to reconcile active agent session:', err);
@@ -291,15 +302,13 @@ export function useAgentLoop({
           const raw = line.slice(6).trim();
           let evt;
           try { evt = JSON.parse(raw); } catch { continue; }
+          lastStreamEventAtRef.current = Date.now();
 
           if (isAgentDoneEvent(evt)) {
             if (harness?.id) {
               try {
                 const finalSession = await fetchHarnessSession(harness.id);
-                const snapshot = normalizeSessionSnapshot(finalSession);
-                setMessages(snapshot.messages);
-                setTodos(snapshot.todos);
-                setBackgroundTasks(snapshot.backgroundTasks);
+                applySessionSnapshot(finalSession, { markReported: false });
               } catch (err) {
                 console.warn('Failed to refresh final session after done:', err);
               }
