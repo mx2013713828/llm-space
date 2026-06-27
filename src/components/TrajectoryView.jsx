@@ -229,7 +229,7 @@ export function TrajectoryView({
                       <AssistantMessage
                         key={idx}
                         content={msg.content}
-                        isFinalAnswer={isAssistantTextFinalAnswer(turnMessages, idx)}
+                        isFinalAnswer={isAssistantTextFinalAnswer(msgs, idx)}
                       />
                     );
                     return null;
