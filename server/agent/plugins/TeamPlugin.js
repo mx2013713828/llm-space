@@ -130,14 +130,14 @@ async function waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, poll
   return state;
 }
 
-async function buildWaitForTeammatesOutput({ bus, stateStore, outputRootDir, harnessId, teamId, timeoutMs, pollIntervalMs }) {
+async function buildWaitForTeammatesOutput({ bus, stateStore, harnessId, teamId, timeoutMs, pollIntervalMs }) {
   const state = await waitForTeamState({ stateStore, harnessId, teamId, timeoutMs, pollIntervalMs });
 
   if (!state) {
     return `No team state found for ${teamId}.`;
   }
 
-  const messages = await bus.readInbox({
+  const unreadMessages = await bus.peekInbox({
     harnessId,
     teamId,
     agentId: 'lead',
@@ -148,9 +148,11 @@ async function buildWaitForTeammatesOutput({ bus, stateStore, outputRootDir, har
     : `Timed out waiting for teammates; ${unresolved.length} teammate(s) still unresolved.`;
 
   const status = formatTeamStatus(state);
-  const fullOutput = `${heading}\n\nLead inbox:\n${formatInboxEntries(messages)}${status}`;
-  const previewOutput = `${heading}\n\nLead inbox preview:\n${formatInboxEntriesPreview(messages)}${status}`;
-  return await boundTeamOutput({ rootDir: outputRootDir, harnessId, teamId, label: 'wait', fullOutput, previewOutput });
+  const inboxHint = `\n\nUnread lead inbox messages: ${unreadMessages.length}`;
+  const nextStep = unreadMessages.length > 0
+    ? '\nCall check_team_inbox to read teammate results before making final decisions.'
+    : '';
+  return `${heading}${status}${inboxHint}${nextStep}`;
 }
 
 function injectInboxBlock(apiMessages, block) {
@@ -401,7 +403,6 @@ export function createTeamPlugin({
           tool.toolOutput = await buildWaitForTeammatesOutput({
             bus,
             stateStore,
-            outputRootDir,
             harnessId,
             teamId,
             timeoutMs: sanitizeWaitTimeoutMs(args.timeoutMs),

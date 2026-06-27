@@ -424,7 +424,7 @@ test('check_team_inbox bounds large inbox output', async () => {
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
-test('wait_for_teammates waits for terminal states and returns inbox results', async () => {
+test('wait_for_teammates waits for terminal states without consuming inbox results', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
     bus: fixture.bus,
@@ -470,16 +470,17 @@ test('wait_for_teammates waits for terminal states and returns inbox results', a
   assert.equal(tool.handled, true);
   assert.match(tool.toolOutput, /All teammates reached terminal states/);
   assert.match(tool.toolOutput, /reviewer: completed/);
-  assert.match(tool.toolOutput, /Looks good/);
-  assert.deepEqual(
-    await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' }),
-    [],
-  );
+  assert.match(tool.toolOutput, /Unread lead inbox messages: 1/);
+  assert.match(tool.toolOutput, /Call check_team_inbox to read teammate results/);
+  assert.doesNotMatch(tool.toolOutput, /Looks good/);
+  const unreadAfterWait = await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' });
+  assert.equal(unreadAfterWait.length, 1);
+  assert.equal(unreadAfterWait[0].from, 'teammate_reviewer');
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
-test('wait_for_teammates bounds large inbox output and writes a readable offload file', async () => {
+test('wait_for_teammates only reports unread count for large inbox output', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({
     bus: fixture.bus,
@@ -517,13 +518,13 @@ test('wait_for_teammates bounds large inbox output and writes a readable offload
 
   assert.equal(tool.handled, true);
   assert.equal(tool.toolOutput.includes('REPORT_END'), false);
-  assert.match(tool.toolOutput, /Full team inbox offloaded/);
+  assert.match(tool.toolOutput, /Unread lead inbox messages: 1/);
+  assert.doesNotMatch(tool.toolOutput, /Full team inbox offloaded/);
   assert.ok(tool.toolOutput.length < 5000);
-
-  const offloadPath = tool.toolOutput.match(/server\/sessions\/h1_team_outputs\/[^\s]+\.txt/)?.[0];
-  assert.ok(offloadPath);
-  const offloaded = await readFile(path.join(fixture.rootDir, offloadPath.replace(/^server\/sessions\//, '')), 'utf-8');
-  assert.match(offloaded, /REPORT_END/);
+  assert.equal(
+    (await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' })).length,
+    1,
+  );
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
