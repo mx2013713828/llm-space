@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { parseMarkdownBlocks } from '../lib/markdown.js';
 
 function renderInline(text) {
@@ -36,8 +37,8 @@ function renderInline(text) {
   return parts;
 }
 
-export function MarkdownRenderer({ content }) {
-  const blocks = parseMarkdownBlocks(content);
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content }) {
+  const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
 
   return (
     <div className="markdown-content">
@@ -92,4 +93,4 @@ export function MarkdownRenderer({ content }) {
       })}
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
 import { getThinkingDisplayContent } from '../lib/messagePresentation.js';
 
@@ -259,7 +259,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                   if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
                   if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
                   if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                  if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} />;
+                  if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
                   return null;
                 })}
               </div>
@@ -300,7 +300,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                     if (msg.role === 'user') return null;
                     if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
                     if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                    if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} />;
+                    if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
                     return null;
                   })}
                   {(loadedTrace.messages || []).length > traceVisibleCount && (
@@ -359,7 +359,7 @@ export function UserMessage({ content, onRetry, variant = 'user' }) {
 /**
  * 助手文本回复
  */
-export function AssistantMessage({ content, isFinalAnswer = true }) {
+export const AssistantMessage = memo(function AssistantMessage({ content, isFinalAnswer = true, streaming = false }) {
   return (
     <div className="message-bubble msg-text animate-fade-in">
       <div className="msg-text-header">
@@ -369,7 +369,13 @@ export function AssistantMessage({ content, isFinalAnswer = true }) {
           {isFinalAnswer ? 'Final Answer' : 'Progress'}
         </span>
       </div>
-      <MarkdownRenderer content={content} />
+      {streaming ? (
+        <div className="markdown-content">
+          <p style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
+        </div>
+      ) : (
+        <MarkdownRenderer content={content} />
+      )}
     </div>
   );
-}
+});

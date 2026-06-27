@@ -46,6 +46,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           content: '',
           tokens: { input: lastInputTokens, output: 0 },
           signature: event.signature,
+          streaming: true,
         },
       ],
     };
@@ -90,6 +91,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           turn: event.turn,
           content: '',
           tokens: { input: lastInputTokens, output: 0 },
+          streaming: true,
         },
       ],
     };
@@ -106,6 +108,26 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
       messages: updateMessageByIndex(messages, targetIdx, message => ({
         ...message,
         content: (message.content || '') + (event.text || ''),
+      })),
+    };
+  }
+
+  if (event.type === 'thinking_end' || event.type === 'text_end') {
+    const expectedType = event.type === 'thinking_end' ? 'thinking' : 'text';
+    const stateKey = expectedType === 'thinking' ? 'activeThinkingId' : 'activeTextId';
+    const targetIdx = findStreamTargetIndex(
+      messages,
+      event.id || currentState[stateKey],
+      message => message.role === 'assistant' && message.type === expectedType,
+    );
+    return {
+      state: {
+        ...currentState,
+        [stateKey]: null,
+      },
+      messages: updateMessageByIndex(messages, targetIdx, message => ({
+        ...message,
+        streaming: false,
       })),
     };
   }
@@ -157,6 +179,23 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
       messages: updateMessageByIndex(messages, targetIdx, message => ({
         ...message,
         toolInput: event.input || message.toolInput,
+      })),
+    };
+  }
+
+  if (event.type === 'tool_exec_chunk' || event.type === 'tool_exec_done') {
+    const targetIdx = findStreamTargetIndex(
+      messages,
+      event.id,
+      message => message.role === 'assistant' && message.type === 'tool_call',
+    );
+    return {
+      state: currentState,
+      messages: updateMessageByIndex(messages, targetIdx, message => ({
+        ...message,
+        toolOutput: event.type === 'tool_exec_done'
+          ? String(event.output)
+          : `${message.toolOutput || ''}${event.content || ''}`,
       })),
     };
   }

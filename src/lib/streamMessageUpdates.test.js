@@ -41,6 +41,24 @@ test('routes text deltas to the active stream block instead of the previous text
   assert.equal(afterDelta.messages[2].content, 'Final summary.');
 });
 
+test('marks text blocks as streaming until the matching text_end event', () => {
+  const state = createStreamMessageState();
+  const afterStart = applyStreamMessageEvent([], state, {
+    type: 'text_start',
+    id: 'streaming_text',
+    turn: 1,
+  });
+
+  assert.equal(afterStart.messages[0].streaming, true);
+
+  const afterEnd = applyStreamMessageEvent(afterStart.messages, afterStart.state, {
+    type: 'text_end',
+    id: 'streaming_text',
+  });
+
+  assert.equal(afterEnd.messages[0].streaming, false);
+});
+
 test('keeps thinking deltas attached to their stream block after messages_update restores a snapshot', () => {
   const state = createStreamMessageState();
   const afterStart = applyStreamMessageEvent([], state, {

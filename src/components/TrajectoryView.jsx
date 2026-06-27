@@ -231,6 +231,7 @@ export function TrajectoryView({
                         key={messageKey}
                         content={msg.content}
                         isFinalAnswer={isAssistantTextFinalAnswer(msgs, idx)}
+                        streaming={msg.streaming}
                       />
                     );
                     return null;

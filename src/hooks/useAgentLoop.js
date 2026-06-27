@@ -14,6 +14,7 @@ import {
   applyStreamMessageEvent,
   createStreamMessageState,
 } from '../lib/streamMessageUpdates.js';
+import { createStreamEventBatcher } from '../lib/streamEventBatcher.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -87,6 +88,7 @@ export function useAgentLoop({
   const liveStateRef = useRef({ messages: [], todos: [], backgroundTasks: [] });
   const lastStreamEventAtRef = useRef(0);
   const streamMessageStatesRef = useRef(new Map());
+  const streamBatcherRef = useRef(null);
   useEffect(() => {
     liveStateRef.current = { messages, todos, backgroundTasks };
   }, [messages, todos, backgroundTasks]);
@@ -221,6 +223,8 @@ export function useAgentLoop({
   // ── 核心 Agent 运行引擎 (单路 SSE 事件消费) ──
   const runAgentLoop = async (currentMessages, currentTodos = todos) => {
     streamMessageStatesRef.current = new Map();
+    streamBatcherRef.current?.dispose?.();
+    streamBatcherRef.current = null;
 
     // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
     let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
@@ -296,15 +300,64 @@ export function useAgentLoop({
         });
       };
 
-      const applyStreamEvent = (evt, options = {}) => {
-        const parentToolCallId = evt.parentToolCallId;
-        const stateKey = parentToolCallId || '__root__';
-        updateMessages(parentToolCallId, (list) => {
-          const currentState = streamMessageStatesRef.current.get(stateKey) || createStreamMessageState();
-          const result = applyStreamMessageEvent(list, currentState, evt, options);
-          streamMessageStatesRef.current.set(stateKey, result.state);
-          return result.messages;
+      const applyStreamBatch = (events) => {
+        const groups = new Map();
+        for (const event of events) {
+          const stateKey = event.parentToolCallId || '__root__';
+          if (!groups.has(stateKey)) groups.set(stateKey, []);
+          groups.get(stateKey).push(event);
+        }
+
+        for (const [stateKey, group] of groups.entries()) {
+          const parentToolCallId = stateKey === '__root__' ? null : stateKey;
+          updateMessages(parentToolCallId, (list) => {
+            let nextList = list;
+            let nextState = streamMessageStatesRef.current.get(stateKey) || createStreamMessageState();
+            for (const event of group) {
+              const result = applyStreamMessageEvent(nextList, nextState, event, {
+                lastInputTokens: event._lastInputTokens || 0,
+              });
+              nextList = result.messages;
+              nextState = result.state;
+            }
+            streamMessageStatesRef.current.set(stateKey, nextState);
+            return nextList;
+          });
+        }
+      };
+
+      const scheduleStreamFlush = (callback) => {
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+          return { type: 'raf', id: window.requestAnimationFrame(callback) };
+        }
+        return { type: 'timeout', id: setTimeout(callback, 32) };
+      };
+
+      const cancelStreamFlush = (handle) => {
+        if (!handle) return;
+        if (handle.type === 'raf' && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+          window.cancelAnimationFrame(handle.id);
+          return;
+        }
+        clearTimeout(handle.id);
+      };
+
+      const streamBatcher = createStreamEventBatcher({
+        schedule: scheduleStreamFlush,
+        cancel: cancelStreamFlush,
+        applyBatch: applyStreamBatch,
+      });
+      streamBatcherRef.current = streamBatcher;
+
+      const enqueueStreamEvent = (evt, options = {}) => {
+        streamBatcher.enqueue({
+          ...evt,
+          _lastInputTokens: options.lastInputTokens || 0,
         });
+      };
+
+      const flushStreamEvents = () => {
+        streamBatcher.flushNow();
       };
 
       while (true) {
@@ -323,6 +376,7 @@ export function useAgentLoop({
           lastStreamEventAtRef.current = Date.now();
 
           if (isAgentDoneEvent(evt)) {
+            flushStreamEvents();
             if (harness?.id) {
               try {
                 const finalSession = await fetchHarnessSession(harness.id);
@@ -364,6 +418,7 @@ export function useAgentLoop({
 
             case 'messages_update':
               // 接收后端触发的上下文压缩或历史变更
+              flushStreamEvents();
               setMessages(evt.messages);
               break;
 
@@ -431,7 +486,7 @@ export function useAgentLoop({
                   try {
                     outputTeamId = m.toolOutput ? JSON.parse(m.toolOutput).teamId : null;
                   } catch {
-                    outputTeamId = null;
+                    // Keep null when the tool output is still streaming or not JSON yet.
                   }
 
                   const inputName = m.toolInput?.name;
@@ -468,61 +523,56 @@ export function useAgentLoop({
             case 'thinking_start':
               // 更新轮次追踪器，确保后续错误消息归属到正确的 Step
               if (evt.turn) currentTurn = evt.turn;
-              applyStreamEvent(evt, { lastInputTokens });
+              enqueueStreamEvent(evt, { lastInputTokens });
               break;
 
             case 'thinking_delta':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
+              break;
+
+            case 'thinking_end':
+              enqueueStreamEvent(evt);
               break;
 
             case 'text_start':
-              applyStreamEvent(evt, { lastInputTokens });
+              enqueueStreamEvent(evt, { lastInputTokens });
               break;
 
             case 'text_delta':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
+              break;
+
+            case 'text_end':
+              enqueueStreamEvent(evt);
               break;
 
             case 'tool_start':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
               break;
 
             case 'tool_input_delta':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
               break;
 
             case 'tool_end':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
               break;
 
             case 'tool_exec_chunk':
-              updateMessages(evt.parentToolCallId, (list) => {
-                return list.map(m => {
-                  if (m.id === evt.id) {
-                    return { ...m, toolOutput: (m.toolOutput || '') + evt.content };
-                  }
-                  return m;
-                });
-              });
+              enqueueStreamEvent(evt);
               break;
 
             case 'tool_exec_done':
-              updateMessages(evt.parentToolCallId, (list) => {
-                return list.map(m => {
-                  if (m.id === evt.id) {
-                    return { ...m, toolOutput: String(evt.output) };
-                  }
-                  return m;
-                });
-              });
+              enqueueStreamEvent(evt);
               break;
 
             case 'message_delta':
-              applyStreamEvent(evt);
+              enqueueStreamEvent(evt);
               break;
 
             case 'error':
               // 处理流式传输中后端的 error 事件
+              flushStreamEvents();
               setMessages(prev => [
                 ...prev,
                 {
@@ -540,6 +590,7 @@ export function useAgentLoop({
       }
     } catch (err) {
       console.error(err);
+      streamBatcherRef.current?.flushNow?.();
       setMessages(prev => [
         ...prev,
         {
@@ -550,6 +601,9 @@ export function useAgentLoop({
         }
       ]);
     } finally {
+      streamBatcherRef.current?.flushNow?.();
+      streamBatcherRef.current?.dispose?.();
+      streamBatcherRef.current = null;
       setIsRunning(false);
     }
   };
