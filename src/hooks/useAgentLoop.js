@@ -5,7 +5,11 @@ import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 import { shouldSubmitMessage } from '../lib/chatInput.js';
 import { fetchHarnessSession } from '../lib/sessionApi.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
-import { isAgentDoneEvent, normalizeSessionSnapshot } from '../lib/agentRunCompletion.js';
+import {
+  isAgentDoneEvent,
+  isDifferentSessionSnapshot,
+  normalizeSessionSnapshot,
+} from '../lib/agentRunCompletion.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -75,6 +79,23 @@ export function useAgentLoop({
   // onSessionUpdate call — this breaks the cycle:
   //   B sets messages → A fires → onSessionUpdate → setSessions → savedSession ref changes → B fires...
   const lastSavedSessionRef = useRef(null);
+  const liveStateRef = useRef({ messages: [], todos: [], backgroundTasks: [] });
+  useEffect(() => {
+    liveStateRef.current = { messages, todos, backgroundTasks };
+  }, [messages, todos, backgroundTasks]);
+
+  const applySessionSnapshot = (session) => {
+    const snapshot = normalizeSessionSnapshot(session);
+    liveStateRef.current = snapshot;
+    lastSavedSessionRef.current = JSON.stringify(snapshot);
+    lastReportedRef.current.messages = JSON.stringify(snapshot.messages);
+    lastReportedRef.current.todos = JSON.stringify(snapshot.todos);
+    lastReportedRef.current.backgroundTasks = JSON.stringify(snapshot.backgroundTasks);
+    setMessages(snapshot.messages);
+    setTodos(snapshot.todos);
+    setBackgroundTasks(snapshot.backgroundTasks);
+  };
+
   useEffect(() => {
     if (isRunning) return; // Skip updating during active run to avoid race condition with stream delta
 
@@ -107,6 +128,28 @@ export function useAgentLoop({
     setTodos(incoming.todos);
     setBackgroundTasks(incoming.backgroundTasks);
   }, [savedSession, harness, isRunning]);
+
+  useEffect(() => {
+    if (!isRunning || !harness?.id) return undefined;
+    let cancelled = false;
+
+    const reconcileActiveRunSession = async () => {
+      try {
+        const session = await fetchHarnessSession(harness.id);
+        if (cancelled || !session) return;
+        if (!isDifferentSessionSnapshot(liveStateRef.current, session)) return;
+        applySessionSnapshot(session);
+      } catch (err) {
+        if (!cancelled) console.warn('Failed to reconcile active agent session:', err);
+      }
+    };
+
+    const timer = setInterval(reconcileActiveRunSession, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isRunning, harness?.id]);
 
   const cronSchedulerEnabled = isOrchestrationEnabled(parsedFeatures.task_orchestration, 'enable_cron_scheduler');
   useEffect(() => {

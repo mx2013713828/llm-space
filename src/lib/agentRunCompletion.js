@@ -9,3 +9,7 @@ export function normalizeSessionSnapshot(session) {
     backgroundTasks: Array.isArray(session?.backgroundTasks) ? session.backgroundTasks : [],
   };
 }
+
+export function isDifferentSessionSnapshot(current, incoming) {
+  return JSON.stringify(normalizeSessionSnapshot(current)) !== JSON.stringify(normalizeSessionSnapshot(incoming));
+}
