@@ -2,7 +2,7 @@ import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
 import { createTeamId, createTeammateId, validateAgentName } from '../teams/teamEnvelope.js';
 import { runTeammate } from '../teams/teammateRunner.js';
-import { emitTeamUpdate } from '../teams/teamUpdates.js';
+import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'check_team_inbox']);
 const DEFAULT_TEAMMATE_MAX_TURNS = 6;
@@ -27,6 +27,26 @@ function formatInboxEntries(messages) {
     const text = getInboxText(message.payload);
     return `- from=${message.from} type=${message.type}${text ? ` text=${text}` : ''}`;
   }).join('\n');
+}
+
+function formatTeamStatus(state) {
+  if (!state) return '';
+
+  const summary = summarizeTeamState(state);
+  if (!summary.teammates.length) return '';
+
+  const statusLines = summary.teammates.map(teammate => {
+    const issue = teammate.error ? ` (${teammate.error})` : '';
+    return `- ${teammate.name || teammate.agentId}: ${teammate.state}${issue}`;
+  });
+  const unresolved = summary.teammates.filter(teammate =>
+    ['running', 'turn_limit', 'no_result', 'failed'].includes(teammate.state)
+  );
+  const reminder = unresolved.length > 0
+    ? '\nDo not give a final answer as if all teammates completed; explicitly account for unresolved teammate states.'
+    : '';
+
+  return `\n\nTeam status:\n${statusLines.join('\n')}${reminder}`;
 }
 
 function injectInboxBlock(apiMessages, block) {
@@ -268,13 +288,17 @@ export function createTeamPlugin({ bus = defaultTeamBus, stateStore = defaultTea
           tool.toolOutput = `Sent team message to ${envelope.to}.`;
         } else if (tool.toolName === 'check_team_inbox') {
           const teamId = resolveTeamId(executor, args.teamId);
+          const harnessId = resolveTeamHarnessId(executor);
           const messages = await bus.readInbox({
-            harnessId: resolveTeamHarnessId(executor),
+            harnessId,
             teamId,
             agentId: 'lead',
           });
 
-          tool.toolOutput = formatInboxEntries(messages);
+          const state = typeof stateStore.loadState === 'function'
+            ? await stateStore.loadState({ harnessId, teamId })
+            : null;
+          tool.toolOutput = `${formatInboxEntries(messages)}${formatTeamStatus(state)}`;
         }
       } catch (error) {
         tool.toolOutput = `[TeamPlugin error]\n${error.message}`;

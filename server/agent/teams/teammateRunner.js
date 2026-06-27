@@ -91,15 +91,28 @@ export async function runTeammate({
 
     await teammateExecutor.run(maxTurns);
 
-    const content = getLastAssistantText(teammateExecutor.messages) ?? EMPTY_TEAMMATE_RESULT;
+    const finalText = getLastAssistantText(teammateExecutor.messages);
+    const content = finalText ?? EMPTY_TEAMMATE_RESULT;
+    const finalState = teammateExecutor.lastRunStopReason === 'turn_limit'
+      ? 'turn_limit'
+      : (finalText ? 'completed' : 'no_result');
+    const finalError = finalState === 'turn_limit'
+      ? `Teammate exhausted max turns (${maxTurns}) before producing a final answer.`
+      : null;
+    const messageType = finalState === 'turn_limit' ? 'error' : 'result';
 
     await bus.sendMessage({
       harnessId: parentExecutor.harnessId,
       teamId,
       from: teammateId,
       to: 'lead',
-      type: 'result',
-      payload: {
+      type: messageType,
+      payload: finalState === 'turn_limit' ? {
+        teammateId,
+        name,
+        role: role ?? null,
+        error: finalError,
+      } : {
         teammateId,
         name,
         role: role ?? null,
@@ -111,7 +124,12 @@ export async function runTeammate({
       harnessId: parentExecutor.harnessId,
       teamId,
       agentId: teammateId,
-      updates: { state: 'completed', completedAt: new Date().toISOString(), lastResult: content },
+      updates: {
+        state: finalState,
+        completedAt: new Date().toISOString(),
+        lastResult: content,
+        ...(finalError ? { error: finalError } : {}),
+      },
     });
     await emitTeamUpdate({
       executor: parentExecutor,
@@ -122,8 +140,9 @@ export async function runTeammate({
         agentId: teammateId,
         name,
         role: role ?? null,
-        state: 'completed',
+        state: finalState,
         lastResult: content,
+        ...(finalError ? { error: finalError } : {}),
       },
     });
   } catch (error) {

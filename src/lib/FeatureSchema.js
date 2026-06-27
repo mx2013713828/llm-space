@@ -130,7 +130,7 @@ Guidelines:
 - Spawn teammates only when multiple pieces of work can proceed independently and their results need lead integration.
 - When spawning a teammate, prefer structured brief fields: \`objective\`, \`constraints\`, \`expected_output\`, and \`success_criteria\`; use \`prompt\` only for legacy free-form context.
 - Before giving a final answer after spawning teammates, call \`check_team_inbox\` to collect available results and avoid leaving teammate reports unread.
-- In the final answer, summarize which teammates completed, failed, or were not used, and identify which results informed the lead's decision.
+- In the final answer, summarize which teammates completed, failed, hit turn limits, produced no result, are still running, or were not used, and identify which results informed the lead's decision.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
 </strategy_guidelines>`,

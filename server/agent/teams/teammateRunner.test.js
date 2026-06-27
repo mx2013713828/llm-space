@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createTeammateHarnessId, runTeammate } from './teammateRunner.js';
+import { EMPTY_TEAMMATE_RESULT } from './teammateProfile.js';
 
 class FakeExecutor {
   static instances = [];
@@ -193,6 +194,88 @@ test('runTeammate marks failed and sends an error message when execution throws'
       },
     },
   ]);
+});
+
+test('runTeammate marks turn_limit when child exhausts max turns', async () => {
+  class TurnLimitedExecutor extends FakeExecutor {
+    async run() {
+      this.lastRunStopReason = 'turn_limit';
+    }
+  }
+
+  const updates = [];
+  const sentMessages = [];
+  const events = [];
+  const parentExecutor = createParentExecutor();
+  parentExecutor.onEvent = (type, payload) => events.push({ type, payload });
+
+  await runTeammate({
+    parentExecutor,
+    teamId: 'team_1',
+    teammateId: 'reviewer',
+    name: 'Reviewer',
+    role: 'Critic',
+    initialPrompt: 'Review the patch.',
+    maxTurns: 1,
+    ExecutorClass: TurnLimitedExecutor,
+    stateStore: {
+      async updateTeammate(input) {
+        updates.push(input);
+      },
+    },
+    bus: {
+      async sendMessage(input) {
+        sentMessages.push(input);
+      },
+    },
+  });
+
+  assert.equal(updates[1].updates.state, 'turn_limit');
+  assert.match(updates[1].updates.error, /max turns/i);
+  assert.equal(events[1].payload.teammates[0].state, 'turn_limit');
+  assert.equal(sentMessages[0].type, 'error');
+  assert.match(sentMessages[0].payload.error, /max turns/i);
+});
+
+test('runTeammate marks no_result when child finishes without final assistant text', async () => {
+  class NoResultExecutor extends FakeExecutor {
+    constructor(args) {
+      super(args);
+      this.messages = [{ role: 'assistant', type: 'thinking', content: 'working' }];
+    }
+  }
+
+  const updates = [];
+  const sentMessages = [];
+  const events = [];
+  const parentExecutor = createParentExecutor();
+  parentExecutor.onEvent = (type, payload) => events.push({ type, payload });
+
+  await runTeammate({
+    parentExecutor,
+    teamId: 'team_1',
+    teammateId: 'reviewer',
+    name: 'Reviewer',
+    role: 'Critic',
+    initialPrompt: 'Review the patch.',
+    ExecutorClass: NoResultExecutor,
+    stateStore: {
+      async updateTeammate(input) {
+        updates.push(input);
+      },
+    },
+    bus: {
+      async sendMessage(input) {
+        sentMessages.push(input);
+      },
+    },
+  });
+
+  assert.equal(updates[1].updates.state, 'no_result');
+  assert.equal(updates[1].updates.lastResult, EMPTY_TEAMMATE_RESULT);
+  assert.equal(events[1].payload.teammates[0].state, 'no_result');
+  assert.equal(sentMessages[0].type, 'result');
+  assert.equal(sentMessages[0].payload.content, EMPTY_TEAMMATE_RESULT);
 });
 
 test('runTeammate still reports failure to lead when initial running-state update fails', async () => {

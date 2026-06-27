@@ -335,7 +335,7 @@ export class AgentExecutor {
   /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
-    async run(maxTurns = 15) {
+  async run(maxTurns = 15) {
     // 2.2 优化：单次 Turn 级自愈状态隔离，防止跨轮次/实例并发污染
     const recoveryState = {
       consecutive_529: 0,
@@ -357,6 +357,8 @@ export class AgentExecutor {
 
       await this.saveSession();
 
+      this.lastRunStopReason = null;
+      let exhaustedTurns = true;
       for (let cycle = 0; cycle < maxTurns; cycle++) {
         // 构建流水线 Context
         const context = {
@@ -417,6 +419,7 @@ export class AgentExecutor {
           const isContinuation = recoveryState.recovery_count > 0;
           stopReason = await this._callLLM(context, recoveryState, isContinuation);
           context.stopReason = stopReason;
+          this.lastRunStopReason = stopReason;
           this.maxTokens = originalMaxTokens; // 恢复 tokens 限制
         } catch (err) {
           this.maxTokens = originalMaxTokens; // 异常时也恢复
@@ -602,8 +605,12 @@ export class AgentExecutor {
           await this.saveSession();
         } else {
           // 完成文字回复，主动退出 ReAct 循环
+          exhaustedTurns = false;
           break;
         }
+      }
+      if (exhaustedTurns && this.lastRunStopReason === 'tool_use') {
+        this.lastRunStopReason = 'turn_limit';
       }
     } finally {
       // 触发最终清理和保存

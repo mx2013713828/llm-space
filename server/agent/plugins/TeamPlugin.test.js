@@ -353,6 +353,15 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
     type: 'result',
     payload: { content: 'Review complete.' },
   });
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_reviewer', name: 'reviewer', state: 'completed' },
+      { agentId: 'teammate_backend', name: 'backend', state: 'running' },
+      { agentId: 'teammate_tests', name: 'tests', state: 'turn_limit', error: 'max turns exhausted' },
+    ],
+  });
 
   const tool = createTool('check_team_inbox', { teamId: 'team_1' });
   await plugin.preToolUse({
@@ -363,6 +372,10 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
   assert.equal(tool.handled, true);
   assert.match(tool.toolOutput, /teammate_reviewer/);
   assert.match(tool.toolOutput, /Review complete/);
+  assert.match(tool.toolOutput, /Team status/);
+  assert.match(tool.toolOutput, /backend: running/);
+  assert.match(tool.toolOutput, /tests: turn_limit/);
+  assert.match(tool.toolOutput, /Do not give a final answer as if all teammates completed/);
   assert.deepEqual(
     await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' }),
     [],
