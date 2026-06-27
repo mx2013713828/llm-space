@@ -16,7 +16,9 @@ test('exposes canonical task orchestration sections', () => {
   assert.match(group.children.inline_strategy_prompt.defaultValue, /simple one-shot requests/);
   assert.match(group.children.sequential_subagent_strategy_prompt.defaultValue, /without creating a task DAG/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not spawn teammates/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /spawn the teammate before doing the substantive investigation/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /wait_for_teammates/);
+  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /Do not repeatedly poll indefinitely/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /check_team_inbox/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /hit turn limits/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /are still running/);

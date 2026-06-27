@@ -357,13 +357,15 @@ export function UserMessage({ content, onRetry, variant = 'user' }) {
 /**
  * 助手文本回复
  */
-export function AssistantMessage({ content }) {
+export function AssistantMessage({ content, isFinalAnswer = true }) {
   return (
     <div className="message-bubble msg-text animate-fade-in">
       <div className="msg-text-header">
         <span>🤖</span>
         <span>Assistant</span>
-        <span className="badge badge-green" style={{ fontSize: 10 }}>Final Answer</span>
+        <span className={`badge ${isFinalAnswer ? 'badge-green' : 'badge-cyan'}`} style={{ fontSize: 10 }}>
+          {isFinalAnswer ? 'Final Answer' : 'Progress'}
+        </span>
       </div>
       <MarkdownRenderer content={content} />
     </div>

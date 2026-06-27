@@ -3,7 +3,7 @@ import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './M
 import { TodoList } from './TodoList';
 import { ScheduledTasksPanel } from './ScheduledTasksPanel';
 import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js';
-import { getUserMessagePresentation } from '../lib/messagePresentation.js';
+import { getUserMessagePresentation, isAssistantTextFinalAnswer } from '../lib/messagePresentation.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 
@@ -225,7 +225,13 @@ export function TrajectoryView({
                     );
                     if (msg.type === 'thinking') return <ThinkingBubble key={idx} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} />;
                     if (msg.type === 'tool_call') return <ToolCallCard key={idx} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                    if (msg.type === 'text') return <AssistantMessage key={idx} content={msg.content} />;
+                    if (msg.type === 'text') return (
+                      <AssistantMessage
+                        key={idx}
+                        content={msg.content}
+                        isFinalAnswer={isAssistantTextFinalAnswer(turnMessages, idx)}
+                      />
+                    );
                     return null;
                   })}
                 </div>
