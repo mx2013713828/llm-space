@@ -227,3 +227,52 @@ test('run still emits done when final cleanup hook fails', async (t) => {
   await assert.doesNotReject(() => executor.run(1));
   assert.equal(emittedEvents.includes('done'), true);
 });
+
+test('run gives one final synthesis turn after tool use exhausts max turns', async (t) => {
+  const originalCwd = process.cwd();
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-tool-limit-final-'));
+  await mkdir(path.join(rootDir, 'server', 'sessions'), { recursive: true });
+  process.chdir(rootDir);
+
+  t.after(async () => {
+    process.chdir(originalCwd);
+    await rm(rootDir, { recursive: true, force: true });
+  });
+
+  const executor = new AgentExecutor({
+    harnessId: 'tool-limit-final',
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    tools: ['get_current_time'],
+  });
+  let calls = 0;
+  executor._callLLM = async (context) => {
+    calls++;
+    if (calls === 1) {
+      executor.messages.push({
+        role: 'assistant',
+        type: 'tool_call',
+        turn: context.turnIndex,
+        id: 'toolu_time',
+        toolName: 'get_current_time',
+        toolInput: {},
+      });
+      return 'tool_use';
+    }
+
+    assert.deepEqual(context.tools, []);
+    assert.match(context.systemPrompt, /final answer from the available tool results/i);
+    executor.messages.push({
+      role: 'assistant',
+      type: 'text',
+      turn: context.turnIndex,
+      content: 'Final answer after tool result.',
+    });
+    return 'end_turn';
+  };
+
+  await executor.run(1);
+
+  assert.equal(calls, 2);
+  assert.equal(executor.lastRunStopReason, 'end_turn');
+  assert.equal(executor.messages.at(-1).content, 'Final answer after tool result.');
+});

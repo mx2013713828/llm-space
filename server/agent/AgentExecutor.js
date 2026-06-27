@@ -332,6 +332,25 @@ export class AgentExecutor {
     await this.saveSession();
   }
 
+  async synthesizeFinalAfterToolTurnLimit(turnIndex, recoveryState) {
+    const context = {
+      executor: this,
+      messages: this.messages,
+      apiMessages: buildApiMessages(this.messages, this.thinkingEnabled, this.features.context_compaction),
+      systemPrompt: `${this.systemPrompt || ''}\n\n<system_reminder>\nThe tool-use turn limit has been reached. Provide a final answer from the available tool results. Do not call tools.\n</system_reminder>`,
+      tools: [],
+      turnIndex,
+      stopReason: null,
+      hasUpdatedTodoThisTurn: false,
+    };
+
+    await this.hooks.dispatch('preLLM', context);
+    const stopReason = await this._callLLM(context, recoveryState, false);
+    context.stopReason = stopReason;
+    this.lastRunStopReason = stopReason;
+    return stopReason;
+  }
+
   /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
@@ -610,7 +629,10 @@ export class AgentExecutor {
         }
       }
       if (exhaustedTurns && this.lastRunStopReason === 'tool_use') {
-        this.lastRunStopReason = 'turn_limit';
+        const finalStopReason = await this.synthesizeFinalAfterToolTurnLimit(turnIndex, recoveryState);
+        if (finalStopReason === 'tool_use') {
+          this.lastRunStopReason = 'turn_limit';
+        }
       }
     } finally {
       // 触发最终清理和保存
