@@ -20,6 +20,7 @@ import { TeamPlugin } from './plugins/TeamPlugin.js';
 import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
 import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
+import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 
@@ -89,6 +90,7 @@ export class AgentExecutor {
     maxTokens = 8192,
     thinkingEnabled = false,
     selectedStrategyId = '',
+    interactionMode = null,
     skills = [],
     onEvent = () => {}
   }) {
@@ -118,6 +120,7 @@ export class AgentExecutor {
     this.maxTokens = maxTokens;
     this.thinkingEnabled = thinkingEnabled;
     this.selectedStrategyId = String(selectedStrategyId || '').trim();
+    this.interactionMode = interactionMode || resolveInteractionMode({ messages: this.messages });
     this.skills = [...skills];
     this.onEvent = onEvent;
 
@@ -393,6 +396,8 @@ export class AgentExecutor {
 
         // 生命周期：onLoopStart
         await this.hooks.dispatch('onLoopStart', context);
+
+        applyToolPolicyToContext(context, this.interactionMode);
 
         // 生命周期：preLLM (在这里会发生：软硬清洗压缩、Todo 看板注入、Skills 组装等)
         await this.hooks.dispatch('preLLM', context);

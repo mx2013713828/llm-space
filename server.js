@@ -886,6 +886,7 @@ app.post('/api/agent/run', async (req, res) => {
     maxTokens,
     thinkingEnabled,
     selectedStrategyId,
+    interactionMode,
     skills
   } = req.body;
 
@@ -935,6 +936,7 @@ app.post('/api/agent/run', async (req, res) => {
     maxTokens,
     thinkingEnabled,
     selectedStrategyId: resolveSelectedStrategyId({ explicitStrategyId: selectedStrategyId, features }),
+    interactionMode,
     skills,
     onEvent: (type, data) => {
       broadcastEvent(harnessId, type, data);
