@@ -2,6 +2,11 @@ import { memo, useState } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
 import { getThinkingDisplayContent } from '../lib/messagePresentation.js';
 import { getSpawnCardTeammate } from '../lib/teamStatusPresentation.js';
+import {
+  getBadgeClassForTone,
+  getTeammateStatusPresentation,
+  getToolStatusPresentation,
+} from '../lib/runtimeStatusPresentation.js';
 
 /**
  * Thinking 气泡组件
@@ -82,16 +87,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   const isSubAgent = toolName === 'sub_agent';
   const isSpawnTeammate = toolName === 'spawn_teammate';
   const cardTeammate = isSpawnTeammate ? getSpawnCardTeammate(teamStatus, toolInput) : null;
-  const statusTone = toolStatus === 'invalid_args' || toolStatus === 'failed'
-    ? 'badge-red'
-    : toolStatus === 'completed'
-      ? 'badge-green'
-      : 'badge-cyan';
-  const statusLabel = toolStatus === 'invalid_args'
-    ? 'Invalid Args'
-    : toolStatus
-      ? toolStatus.replace(/_/g, ' ')
-      : '';
+  const toolPresentation = getToolStatusPresentation({ toolStatus, toolOutput });
 
   const formatJson = (obj) => {
     try {
@@ -213,7 +209,12 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
     if (!isSpawnTeammate || !cardTeammate) return null;
 
     const state = cardTeammate.state || 'unknown';
-    const color = state === 'completed' ? 'var(--green)' : state === 'failed' || state === 'turn_limit' ? 'var(--red)' : 'var(--blue)';
+    const presentation = getTeammateStatusPresentation(cardTeammate);
+    const color = presentation.tone === 'success'
+      ? 'var(--green)'
+      : presentation.tone === 'danger'
+        ? 'var(--red)'
+        : 'var(--blue)';
     const briefSummary = cardTeammate.brief?.objective || cardTeammate.prompt || '';
     const trimmedBrief = briefSummary.length > 64 ? `${briefSummary.slice(0, 61)}...` : briefSummary;
     const label = `${cardTeammate.name || cardTeammate.agentId}: ${state}${trimmedBrief ? ` · ${trimmedBrief}` : ''}`;
@@ -230,7 +231,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
         fontSize: 11,
       }}>
         <span className="badge" style={{ color, border: `1px solid ${color}`, background: 'transparent', fontSize: 10 }}>
-          {state}
+          {presentation.label}
         </span>
         <span style={{ color: 'var(--text-muted)', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {label}
@@ -245,7 +246,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
         <span style={{ fontSize: 15 }}>{icon}</span>
         <span className="tool-call-name">{toolName}</span>
         <span className="badge badge-cyan" style={{ fontSize: 10 }}>Tool Call</span>
-        {statusLabel && <span className={`badge ${statusTone}`} style={{ fontSize: 10 }}>{statusLabel}</span>}
+        {toolPresentation && (
+          <span className={`badge ${getBadgeClassForTone(toolPresentation.tone)}`} style={{ fontSize: 10 }}>
+            {toolPresentation.label}
+          </span>
+        )}
         {renderSubAgentStatus()}
         {renderTeamStatus()}
         <svg
