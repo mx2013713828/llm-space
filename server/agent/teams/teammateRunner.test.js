@@ -1,8 +1,26 @@
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
 
 import { createTeammateHarnessId, runTeammate } from './teammateRunner.js';
 import { EMPTY_TEAMMATE_RESULT } from './teammateProfile.js';
+
+let originalCwd;
+let testRoot;
+
+before(async () => {
+  originalCwd = process.cwd();
+  testRoot = await mkdtemp(path.join(tmpdir(), 'teammate-runner-'));
+  process.chdir(testRoot);
+});
+
+after(async () => {
+  process.chdir(originalCwd);
+  await rm(testRoot, { recursive: true, force: true });
+});
 
 class FakeExecutor {
   static instances = [];
@@ -109,11 +127,14 @@ test('runTeammate creates a teammate child executor, marks running then complete
   assert.match(updates[0].updates.startedAt, /^\d{4}-/);
   assert.equal(updates[1].updates.state, 'completed');
   assert.equal(updates[1].updates.lastResult, 'done');
+  assert.equal(updates[1].updates.traceRef.traceId, 'team_1_reviewer');
+  assert.equal(updates[1].updates.traceRef.summary.messageCount, 1);
   assert.match(updates[1].updates.completedAt, /^\d{4}-/);
   assert.deepEqual(events.map(event => event.type), ['team_update', 'team_update']);
   assert.equal(events[0].payload.teammates[0].state, 'running');
   assert.equal(events[1].payload.teammates[0].state, 'completed');
   assert.equal(events[1].payload.teammates[0].lastResult, 'done');
+  assert.equal(events[1].payload.teammates[0].traceRef.traceId, 'team_1_reviewer');
 
   assert.deepEqual(sentMessages, [
     {

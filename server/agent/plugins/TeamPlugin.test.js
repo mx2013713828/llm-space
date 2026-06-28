@@ -140,8 +140,8 @@ test('spawn_teammate clamps maxTurns to a finite positive integer with safe defa
   });
 
   assert.equal(runCalls.length, 2);
-  assert.equal(runCalls[0].maxTurns, 12);
-  assert.equal(runCalls[1].maxTurns, 6);
+  assert.equal(runCalls[0].maxTurns, 24);
+  assert.equal(runCalls[1].maxTurns, 8);
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });

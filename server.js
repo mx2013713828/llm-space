@@ -25,6 +25,7 @@ import { createCronApiHandlers } from './server/agent/scheduler/cronApi.js';
 import { buildPersistedSessionState, readSessionState, resolveRunTeamContext } from './server/sessions/sessionState.js';
 import { listExecutionStrategies, resolveSelectedStrategyId } from './server/agent/strategies/strategyRegistry.js';
 import { loadSubAgentTrace } from './server/agent/subagents/subAgentTraceStore.js';
+import { loadTeammateTrace } from './server/agent/teams/teammateTraceStore.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -853,6 +854,16 @@ app.get('/api/tools', (req, res) => {
 app.get('/api/sub-agent-traces/:harnessId/:traceId', async (req, res) => {
   try {
     const trace = await loadSubAgentTrace(req.params.harnessId, req.params.traceId);
+    res.json(trace);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+/** 获取 teammate 完整运行轨迹 */
+app.get('/api/team-traces/:harnessId/:teamId/:teammateId', async (req, res) => {
+  try {
+    const trace = await loadTeammateTrace(req.params.harnessId, req.params.teamId, req.params.teammateId);
     res.json(trace);
   } catch (err) {
     res.status(404).json({ error: err.message });

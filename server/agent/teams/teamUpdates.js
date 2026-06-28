@@ -12,6 +12,7 @@ export function summarizeTeamState(state) {
         completedAt: teammate.completedAt,
         lastResult: teammate.lastResult,
         error: teammate.error,
+        traceRef: teammate.traceRef,
       };
 
       return Object.fromEntries(

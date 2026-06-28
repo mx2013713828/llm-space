@@ -9,8 +9,8 @@ import { runTeammate } from '../teams/teammateRunner.js';
 import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'wait_for_teammates', 'check_team_inbox']);
-const DEFAULT_TEAMMATE_MAX_TURNS = 6;
-const MAX_TEAMMATE_MAX_TURNS = 12;
+const DEFAULT_TEAMMATE_MAX_TURNS = 8;
+const MAX_TEAMMATE_MAX_TURNS = 24;
 const DEFAULT_WAIT_TIMEOUT_MS = 15000;
 const MAX_WAIT_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;

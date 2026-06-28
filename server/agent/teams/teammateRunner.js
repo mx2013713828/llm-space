@@ -10,6 +10,7 @@ import {
   createTeammateSystemPrompt,
   selectTeammateTools,
 } from './teammateProfile.js';
+import { saveTeammateTrace } from './teammateTraceStore.js';
 
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
@@ -125,6 +126,20 @@ export async function runTeammate({
       ? `Teammate exhausted max turns (${maxTurns}) before producing a final answer.`
       : null;
     const messageType = finalState === 'turn_limit' ? 'error' : 'result';
+    const completedAt = new Date().toISOString();
+    const traceRef = await saveTeammateTrace({
+      harnessId: parentExecutor.harnessId,
+      teamId,
+      teammateId,
+      name,
+      role: role ?? null,
+      prompt: initialPrompt,
+      messages: teammateExecutor.messages,
+      finalAnswer: content,
+      status: finalState,
+      startedAt,
+      completedAt,
+    });
 
     await bus.sendMessage({
       harnessId: parentExecutor.harnessId,
@@ -151,8 +166,9 @@ export async function runTeammate({
       agentId: teammateId,
       updates: {
         state: finalState,
-        completedAt: new Date().toISOString(),
+        completedAt,
         lastResult: content,
+        traceRef,
         ...(finalError ? { error: finalError } : {}),
       },
     });
@@ -167,6 +183,7 @@ export async function runTeammate({
         role: role ?? null,
         state: finalState,
         lastResult: content,
+        traceRef,
         ...(finalError ? { error: finalError } : {}),
       },
     });
