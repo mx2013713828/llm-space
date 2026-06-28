@@ -15,6 +15,11 @@ import {
   createStreamMessageState,
 } from '../lib/streamMessageUpdates.js';
 import { createStreamEventBatcher } from '../lib/streamEventBatcher.js';
+import {
+  applyRunEvent,
+  applySessionSnapshotToRunState,
+  createRunViewModelState,
+} from '../lib/runViewModel.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -89,12 +94,23 @@ export function useAgentLoop({
   const lastStreamEventAtRef = useRef(0);
   const streamMessageStatesRef = useRef(new Map());
   const streamBatcherRef = useRef(null);
+  const runViewModelRef = useRef(createRunViewModelState());
   useEffect(() => {
     liveStateRef.current = { messages, todos, backgroundTasks };
   }, [messages, todos, backgroundTasks]);
 
-  const applySessionSnapshot = (session, { markReported = true } = {}) => {
-    const snapshot = normalizeSessionSnapshot(session);
+  const applySessionSnapshot = (session, { markReported = true, phase = 'done' } = {}) => {
+    const nextRunState = applySessionSnapshotToRunState(
+      runViewModelRef.current || createRunViewModelState(liveStateRef.current),
+      session,
+      { phase },
+    );
+    runViewModelRef.current = nextRunState;
+    const snapshot = {
+      messages: nextRunState.messages,
+      todos: nextRunState.todos,
+      backgroundTasks: nextRunState.backgroundTasks,
+    };
     liveStateRef.current = snapshot;
     lastSavedSessionRef.current = JSON.stringify(snapshot);
     if (markReported) {
@@ -138,6 +154,7 @@ export function useAgentLoop({
     lastReportedRef.current.messages = JSON.stringify(incoming.messages);
     lastReportedRef.current.todos = JSON.stringify(incoming.todos);
     lastReportedRef.current.backgroundTasks = JSON.stringify(incoming.backgroundTasks);
+    runViewModelRef.current = createRunViewModelState(incoming);
 
     setMessages(incoming.messages);
     setTodos(incoming.todos);
@@ -156,7 +173,7 @@ export function useAgentLoop({
           now: Date.now(),
           lastStreamAt: lastStreamEventAtRef.current,
         })) return;
-        applySessionSnapshot(session);
+        applySessionSnapshot(session, { phase: 'active' });
       } catch (err) {
         if (!cancelled) console.warn('Failed to reconcile active agent session:', err);
       }
@@ -191,6 +208,7 @@ export function useAgentLoop({
         lastReportedRef.current.messages = JSON.stringify(incoming.messages);
         lastReportedRef.current.todos = JSON.stringify(incoming.todos);
         lastReportedRef.current.backgroundTasks = JSON.stringify(incoming.backgroundTasks);
+        runViewModelRef.current = createRunViewModelState(incoming);
         setMessages(incoming.messages);
         setTodos(incoming.todos);
         setBackgroundTasks(incoming.backgroundTasks);
@@ -225,6 +243,11 @@ export function useAgentLoop({
     streamMessageStatesRef.current = new Map();
     streamBatcherRef.current?.dispose?.();
     streamBatcherRef.current = null;
+    runViewModelRef.current = createRunViewModelState({
+      messages: currentMessages,
+      todos: currentTodos,
+      backgroundTasks: liveStateRef.current.backgroundTasks,
+    });
 
     // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
     let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
@@ -290,13 +313,21 @@ export function useAgentLoop({
       // 辅助更新消息轨：支持 parentToolCallId 的多层嵌套更新
       const updateMessages = (parentToolCallId, updater) => {
         setMessages(prev => {
-          if (!parentToolCallId) return updater(prev);
-          return prev.map(m => {
+          const nextMessages = !parentToolCallId ? updater(prev) : prev.map(m => {
             if (m.id === parentToolCallId) {
               return { ...m, subMessages: updater(m.subMessages || []) };
             }
             return m;
           });
+          runViewModelRef.current = {
+            ...(runViewModelRef.current || createRunViewModelState(liveStateRef.current)),
+            messages: nextMessages,
+          };
+          liveStateRef.current = {
+            ...liveStateRef.current,
+            messages: nextMessages,
+          };
+          return nextMessages;
         });
       };
 
@@ -310,6 +341,27 @@ export function useAgentLoop({
 
         for (const [stateKey, group] of groups.entries()) {
           const parentToolCallId = stateKey === '__root__' ? null : stateKey;
+          if (!parentToolCallId) {
+            setMessages(prev => {
+              let nextRunState = {
+                ...(runViewModelRef.current || createRunViewModelState(liveStateRef.current)),
+                messages: prev,
+              };
+              for (const event of group) {
+                nextRunState = applyRunEvent(nextRunState, event, {
+                  lastInputTokens: event._lastInputTokens || 0,
+                });
+              }
+              runViewModelRef.current = nextRunState;
+              liveStateRef.current = {
+                messages: nextRunState.messages,
+                todos: nextRunState.todos,
+                backgroundTasks: nextRunState.backgroundTasks,
+              };
+              return nextRunState.messages;
+            });
+            continue;
+          }
           updateMessages(parentToolCallId, (list) => {
             let nextList = list;
             let nextState = streamMessageStatesRef.current.get(stateKey) || createStreamMessageState();
@@ -380,7 +432,7 @@ export function useAgentLoop({
             if (harness?.id) {
               try {
                 const finalSession = await fetchHarnessSession(harness.id);
-                applySessionSnapshot(finalSession, { markReported: false });
+                applySessionSnapshot(finalSession, { markReported: false, phase: 'done' });
               } catch (err) {
                 console.warn('Failed to refresh final session after done:', err);
               }
@@ -431,7 +483,11 @@ export function useAgentLoop({
             case 'messages_update':
               // 接收后端触发的上下文压缩或历史变更
               flushStreamEvents();
-              setMessages(evt.messages);
+              applySessionSnapshot({
+                messages: evt.messages,
+                todos: liveStateRef.current.todos,
+                backgroundTasks: liveStateRef.current.backgroundTasks,
+              }, { phase: 'active' });
               break;
 
             case 'todo_update':
