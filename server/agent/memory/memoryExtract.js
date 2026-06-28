@@ -3,6 +3,24 @@ import { listMemoryFiles, writeMemoryFile } from './memoryStore.js';
 
 const VALID_TYPES = new Set(['user', 'feedback', 'project', 'reference']);
 const MIN_TEXT_MESSAGES = 2; // 消息太少时不提取
+const MAX_EXTRACTED_ITEMS_PER_RUN = 2;
+const TRANSIENT_MEMORY_PATTERNS = [
+  /teammate|checker|审查报告|P0|P1|P2|当前任务|这次|本轮|执行轨迹/i,
+];
+
+function isTransientMemoryItem(item) {
+  const text = `${item?.name || ''}\n${item?.description || ''}\n${item?.body || ''}`;
+  return TRANSIENT_MEMORY_PATTERNS.some(pattern => pattern.test(text));
+}
+
+export function filterMemoryExtractionItems(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter(item => item?.name && item?.description && item?.body)
+    .filter(item => !isTransientMemoryItem(item))
+    .slice(0, MAX_EXTRACTED_ITEMS_PER_RUN);
+}
 
 /**
  * 从最近对话中提取用户偏好、项目事实，写入记忆文件
@@ -49,11 +67,10 @@ export async function extractMemories(callLLM, harnessId, messages) {
     const match = raw.match(/\[[\s\S]*\]/);
     if (!match) return;
 
-    const items = JSON.parse(match[0]);
-    if (!Array.isArray(items) || items.length === 0) return;
+    const items = filterMemoryExtractionItems(JSON.parse(match[0]));
+    if (items.length === 0) return;
 
     for (const item of items) {
-      if (!item.name || !item.description || !item.body) continue;
       const validType = VALID_TYPES.has(item.type) ? item.type : 'user';
 
       try {

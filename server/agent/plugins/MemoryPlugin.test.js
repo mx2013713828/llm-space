@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { injectMemoryContext, stripApiMemoryContexts, stripPersistedMemoryContexts } from './MemoryPlugin.js';
+import {
+  injectMemoryContext,
+  shouldDisableMemoryForTurn,
+  stripApiMemoryContexts,
+  stripPersistedMemoryContexts,
+} from './MemoryPlugin.js';
 
 test('injects memory into API messages without changing persisted user messages', () => {
   const persisted = [{ role: 'user', type: 'scheduled', content: '[Scheduled] weather' }];
@@ -34,4 +39,13 @@ test('removes legacy memory blocks from an already-built API context', () => {
   stripApiMemoryContexts(apiMessages);
 
   assert.equal(apiMessages[0].content[0].text, '[Scheduled] weather');
+});
+
+test('disables memory injection and extraction for trace inspection turns', () => {
+  assert.equal(shouldDisableMemoryForTurn({
+    interactionMode: { mode: 'trace_inspection', toolPolicy: 'none' },
+  }), true);
+  assert.equal(shouldDisableMemoryForTurn({
+    interactionMode: { mode: 'normal', toolPolicy: 'normal' },
+  }), false);
 });

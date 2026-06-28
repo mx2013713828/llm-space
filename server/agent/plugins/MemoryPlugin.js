@@ -49,6 +49,10 @@ export function injectMemoryContext(apiMessages, memoryContents) {
   return false;
 }
 
+export function shouldDisableMemoryForTurn(executor) {
+  return executor?.interactionMode?.mode === 'trace_inspection';
+}
+
 export const MemoryPlugin = {
   name: 'MemoryPlugin',
 
@@ -73,6 +77,8 @@ export const MemoryPlugin = {
       executor.onEvent('messages_update', { messages: executor.messages });
     }
     stripApiMemoryContexts(context.apiMessages);
+
+    if (shouldDisableMemoryForTurn(executor)) return;
 
     // ① 将 MEMORY.md 索引注入 system prompt（不含具体内容，仅清单，利于缓存）
     try {
@@ -110,6 +116,7 @@ export const MemoryPlugin = {
 
     const harnessId = executor.harnessId;
     if (!harnessId) return;
+    if (shouldDisableMemoryForTurn(executor)) return;
 
     // 判断是否为文字回复结束（对话告一段落）
     // 排除工具调用轮（此时最后一条消息是 tool_call 或 tool_result）
