@@ -570,7 +570,15 @@ export function useAgentLoop({
               enqueueStreamEvent(evt);
               break;
 
+            case 'tool_exec_start':
+              enqueueStreamEvent(evt);
+              break;
+
             case 'tool_exec_chunk':
+              enqueueStreamEvent(evt);
+              break;
+
+            case 'tool_exec_invalid':
               enqueueStreamEvent(evt);
               break;
 

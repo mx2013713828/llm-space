@@ -541,6 +541,7 @@ export class AgentExecutor {
           const toolsToRun = this.messages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
 
           const executeToolCall = async (tool) => {
+            tool.toolStatus = 'running';
             this.onEvent('tool_exec_start', { id: tool.id, toolName: tool.toolName });
             
             const toolContext = { ...context, tool };
@@ -592,22 +593,39 @@ export class AgentExecutor {
                 tool.handled = true;
               } else {
                 try {
-                  const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
-                    tool.toolOutput = (tool.toolOutput || '') + chunk;
-                    this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
-                  });
-                  tool.toolOutput = String(finalOutput);
+                  const validation = toolRegistry.validate(tool.toolName, tool.toolInput);
+                  if (!validation.ok) {
+                    tool.toolStatus = 'invalid_args';
+                    tool.toolOutput = `[Invalid tool arguments]\n${validation.message}`;
+                    this.onEvent('tool_exec_invalid', {
+                      id: tool.id,
+                      toolName: tool.toolName,
+                      error: validation,
+                    });
+                  } else {
+                    const finalOutput = await toolRegistry.execute(tool.toolName, tool.toolInput, (chunk) => {
+                      tool.toolOutput = (tool.toolOutput || '') + chunk;
+                      this.onEvent('tool_exec_chunk', { id: tool.id, content: chunk });
+                    });
+                    tool.toolOutput = String(finalOutput);
+                    tool.toolStatus = 'completed';
+                  }
                 } catch (err) {
                   tool.toolOutput = `[工具执行错误]\n${err.message}`;
+                  tool.toolStatus = 'failed';
                 }
               }
+            }
+
+            if (!tool.toolStatus || tool.toolStatus === 'running') {
+              tool.toolStatus = 'completed';
             }
 
             // 生命周期：postToolUse (大文本卸载)
             await this.hooks.dispatch('postToolUse', toolContext);
 
             this.contextTokens = 0;
-            this.onEvent('tool_exec_done', { id: tool.id, output: tool.toolOutput });
+            this.onEvent('tool_exec_done', { id: tool.id, output: tool.toolOutput, status: tool.toolStatus });
             await this.saveSession();
           };
 
@@ -950,7 +968,8 @@ export class AgentExecutor {
                 id: blk.id,
                 toolName: blk.name,
                 toolInputRaw: '',
-                toolInput: {}
+                toolInput: {},
+                toolStatus: 'pending'
               };
               this.messages.push(currentMsg);
               this.onEvent('tool_start', { index: evt.index, name: blk.name, id: blk.id, turn: turnIndex });

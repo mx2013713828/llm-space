@@ -65,7 +65,7 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
  * 工具调用卡片
  * 展示工具名称、输入参数、输出结果，支持折叠
  */
-export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, subAgentStatus, subAgentTrace, teamStatus }) {
+export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subMessages, subAgentStatus, subAgentTrace, teamStatus }) {
   const [expanded, setExpanded] = useState(false);
   const [traceExpanded, setTraceExpanded] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
@@ -82,6 +82,16 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
   const isSubAgent = toolName === 'sub_agent';
   const isSpawnTeammate = toolName === 'spawn_teammate';
   const cardTeammate = isSpawnTeammate ? getSpawnCardTeammate(teamStatus, toolInput) : null;
+  const statusTone = toolStatus === 'invalid_args' || toolStatus === 'failed'
+    ? 'badge-red'
+    : toolStatus === 'completed'
+      ? 'badge-green'
+      : 'badge-cyan';
+  const statusLabel = toolStatus === 'invalid_args'
+    ? 'Invalid Args'
+    : toolStatus
+      ? toolStatus.replace(/_/g, ' ')
+      : '';
 
   const formatJson = (obj) => {
     try {
@@ -235,6 +245,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
         <span style={{ fontSize: 15 }}>{icon}</span>
         <span className="tool-call-name">{toolName}</span>
         <span className="badge badge-cyan" style={{ fontSize: 10 }}>Tool Call</span>
+        {statusLabel && <span className={`badge ${statusTone}`} style={{ fontSize: 10 }}>{statusLabel}</span>}
         {renderSubAgentStatus()}
         {renderTeamStatus()}
         <svg
@@ -277,7 +288,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                   const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                   if (msg.role === 'user') return null; // Hide internal user prompts from sub-agent view
                   if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                  if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                  if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                   if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
                   return null;
                 })}
@@ -318,7 +329,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                     const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                     if (msg.role === 'user') return null;
                     if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                     if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
                     return null;
                   })}
@@ -370,7 +381,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, subMessages, sub
                     const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
                     if (msg.role === 'user') return null;
                     if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
                     if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
                     return null;
                   })}

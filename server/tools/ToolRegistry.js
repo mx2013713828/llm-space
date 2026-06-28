@@ -20,6 +20,7 @@ import spawnTeammate from './spawn_teammate.js';
 import sendTeamMessage from './send_team_message.js';
 import checkTeamInbox from './check_team_inbox.js';
 import waitForTeammates from './wait_for_teammates.js';
+import { validateToolInput } from './toolValidation.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
@@ -86,6 +87,10 @@ class ToolRegistry {
    */
   getTool(name) {
     return this.tools[name] || null;
+  }
+
+  validate(toolName, toolInput) {
+    return validateToolInput(this.getTool(toolName), toolInput);
   }
 
   /**

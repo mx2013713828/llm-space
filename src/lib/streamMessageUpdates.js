@@ -146,8 +146,24 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           toolName: event.name,
           toolInputRaw: '',
           toolInput: {},
+          toolStatus: 'pending',
         },
       ],
+    };
+  }
+
+  if (event.type === 'tool_exec_start') {
+    const targetIdx = findStreamTargetIndex(
+      messages,
+      event.id,
+      message => message.role === 'assistant' && message.type === 'tool_call',
+    );
+    return {
+      state: currentState,
+      messages: updateMessageByIndex(messages, targetIdx, message => ({
+        ...message,
+        toolStatus: 'running',
+      })),
     };
   }
 
@@ -183,6 +199,22 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
     };
   }
 
+  if (event.type === 'tool_exec_invalid') {
+    const targetIdx = findStreamTargetIndex(
+      messages,
+      event.id,
+      message => message.role === 'assistant' && message.type === 'tool_call',
+    );
+    return {
+      state: currentState,
+      messages: updateMessageByIndex(messages, targetIdx, message => ({
+        ...message,
+        toolStatus: 'invalid_args',
+        toolOutput: `[Invalid tool arguments]\n${event.error?.message || 'Invalid tool arguments.'}`,
+      })),
+    };
+  }
+
   if (event.type === 'tool_exec_chunk' || event.type === 'tool_exec_done') {
     const targetIdx = findStreamTargetIndex(
       messages,
@@ -193,6 +225,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
       state: currentState,
       messages: updateMessageByIndex(messages, targetIdx, message => ({
         ...message,
+        toolStatus: event.type === 'tool_exec_done' ? (event.status || 'completed') : (message.toolStatus || 'running'),
         toolOutput: event.type === 'tool_exec_done'
           ? String(event.output)
           : `${message.toolOutput || ''}${event.content || ''}`,

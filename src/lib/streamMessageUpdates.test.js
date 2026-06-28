@@ -92,3 +92,27 @@ test('keeps thinking deltas attached to their stream block after messages_update
   assert.equal(afterDelta.messages[0].content, 'Plan more');
   assert.equal(afterDelta.messages[1].type, 'tool_call');
 });
+
+test('marks invalid tool arguments as a typed tool state', () => {
+  const state = createStreamMessageState();
+  const messages = [{
+    id: 'tool_read',
+    role: 'assistant',
+    type: 'tool_call',
+    turn: 1,
+    toolName: 'read_file',
+    toolInput: {},
+  }];
+
+  const result = applyStreamMessageEvent(messages, state, {
+    type: 'tool_exec_invalid',
+    id: 'tool_read',
+    toolName: 'read_file',
+    error: {
+      message: 'read_file requires parameter "path".',
+    },
+  });
+
+  assert.equal(result.messages[0].toolStatus, 'invalid_args');
+  assert.match(result.messages[0].toolOutput, /requires parameter "path"/);
+});
