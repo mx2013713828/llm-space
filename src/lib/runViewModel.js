@@ -72,7 +72,7 @@ function mergeActiveMessages(currentMessages, incomingMessages, activeMessageIds
   });
 
   for (const message of currentMessages) {
-    if (message?.id && activeMessageIds.has(message.id) && !incomingIds.has(message.id)) {
+    if (message?.id && !incomingIds.has(message.id)) {
       merged.push(message);
     }
   }
