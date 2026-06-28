@@ -7,7 +7,6 @@ import { fetchHarnessSession } from '../lib/sessionApi.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 import {
   isAgentDoneEvent,
-  normalizeSessionSnapshot,
   shouldApplyActiveSessionSnapshot,
 } from '../lib/agentRunCompletion.js';
 import {
