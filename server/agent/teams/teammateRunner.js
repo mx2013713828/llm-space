@@ -1,9 +1,9 @@
 import process from 'node:process';
 import { AgentExecutor } from '../AgentExecutor.js';
-import { getLastAssistantText } from '../subAgentProfile.js';
 import { createTeamBus } from './teamBus.js';
 import { createTeamStateStore } from './teamStateStore.js';
 import { emitTeamUpdate } from './teamUpdates.js';
+import { buildTeammateOutcome } from './teammateOutcome.js';
 import {
   EMPTY_TEAMMATE_RESULT,
   createTeammateFeatures,
@@ -14,30 +14,6 @@ import { saveTeammateTrace } from './teammateTraceStore.js';
 
 const defaultTeamBus = createTeamBus();
 const defaultTeamStateStore = createTeamStateStore();
-
-function getFinalAssistantTextAfterLastTool(messages) {
-  const entries = Array.isArray(messages) ? messages : [];
-  let lastToolIndex = -1;
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    if (entries[i]?.role === 'assistant' && entries[i]?.type === 'tool_call') {
-      lastToolIndex = i;
-      break;
-    }
-  }
-
-  const finalText = getLastAssistantText(entries);
-  if (!finalText) return null;
-  if (lastToolIndex === -1) return finalText;
-
-  const finalTextIndex = entries.findLastIndex(message =>
-    message?.role === 'assistant'
-    && message?.type === 'text'
-    && typeof message?.content === 'string'
-    && message.content.trim()
-  );
-
-  return finalTextIndex > lastToolIndex ? finalText : null;
-}
 
 export function createTeammateHarnessId(parentHarnessId, teammateId) {
   const safeParentHarnessId = String(parentHarnessId || 'team')
@@ -117,15 +93,15 @@ export async function runTeammate({
 
     await teammateExecutor.run(maxTurns);
 
-    const finalText = getFinalAssistantTextAfterLastTool(teammateExecutor.messages);
-    const content = finalText ?? EMPTY_TEAMMATE_RESULT;
-    const finalState = teammateExecutor.lastRunStopReason === 'turn_limit'
-      ? 'turn_limit'
-      : (finalText ? 'completed' : 'no_result');
-    const finalError = finalState === 'turn_limit'
-      ? `Teammate exhausted max turns (${maxTurns}) before producing a final answer.`
-      : null;
-    const messageType = finalState === 'turn_limit' ? 'error' : 'result';
+    const outcome = buildTeammateOutcome({
+      messages: teammateExecutor.messages,
+      stopReason: teammateExecutor.lastRunStopReason,
+      maxTurns,
+    });
+    const content = outcome.content || EMPTY_TEAMMATE_RESULT;
+    const finalState = outcome.status;
+    const finalError = outcome.error;
+    const messageType = finalState === 'completed' ? 'result' : 'error';
     const completedAt = new Date().toISOString();
     const traceRef = await saveTeammateTrace({
       harnessId: parentExecutor.harnessId,
@@ -147,16 +123,18 @@ export async function runTeammate({
       from: teammateId,
       to: 'lead',
       type: messageType,
-      payload: finalState === 'turn_limit' ? {
-        teammateId,
-        name,
-        role: role ?? null,
-        error: finalError,
-      } : {
+      payload: finalState === 'completed' ? {
         teammateId,
         name,
         role: role ?? null,
         content,
+      } : {
+        teammateId,
+        name,
+        role: role ?? null,
+        error: finalError,
+        status: finalState,
+        lastToolName: outcome.lastToolName,
       },
     });
 

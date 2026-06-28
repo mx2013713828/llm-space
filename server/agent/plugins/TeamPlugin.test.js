@@ -385,6 +385,47 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('check_team_inbox labels teammate no_result messages as errors with trace guidance', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.bus.sendMessage({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    from: 'teammate_frontend',
+    to: 'lead',
+    type: 'error',
+    payload: {
+      teammateId: 'teammate_frontend',
+      status: 'no_result',
+      error: 'Teammate finished without a final text report after its last tool call.',
+    },
+  });
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      { agentId: 'teammate_frontend', name: 'frontend', state: 'no_result', error: 'missing report' },
+    ],
+  });
+
+  const tool = createTool('check_team_inbox', { teamId: 'team_1' });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.match(tool.toolOutput, /type=error/);
+  assert.match(tool.toolOutput, /status=no_result/);
+  assert.match(tool.toolOutput, /Use the teammate trace for details/);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('check_team_inbox bounds large inbox output', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({

@@ -294,9 +294,11 @@ test('runTeammate marks no_result when child finishes without final assistant te
 
   assert.equal(updates[1].updates.state, 'no_result');
   assert.equal(updates[1].updates.lastResult, EMPTY_TEAMMATE_RESULT);
+  assert.match(updates[1].updates.error, /final text report/i);
   assert.equal(events[1].payload.teammates[0].state, 'no_result');
-  assert.equal(sentMessages[0].type, 'result');
-  assert.equal(sentMessages[0].payload.content, EMPTY_TEAMMATE_RESULT);
+  assert.equal(sentMessages[0].type, 'error');
+  assert.equal(sentMessages[0].payload.status, 'no_result');
+  assert.match(sentMessages[0].payload.error, /final text report/i);
 });
 
 test('runTeammate does not treat pre-tool progress text as the final report', async () => {
@@ -335,8 +337,11 @@ test('runTeammate does not treat pre-tool progress text as the final report', as
 
   assert.equal(updates[1].updates.state, 'no_result');
   assert.equal(updates[1].updates.lastResult, EMPTY_TEAMMATE_RESULT);
-  assert.equal(sentMessages[0].type, 'result');
-  assert.equal(sentMessages[0].payload.content, EMPTY_TEAMMATE_RESULT);
+  assert.match(updates[1].updates.error, /final text report/i);
+  assert.equal(sentMessages[0].type, 'error');
+  assert.equal(sentMessages[0].payload.status, 'no_result');
+  assert.equal(sentMessages[0].payload.lastToolName, 'read_file');
+  assert.match(sentMessages[0].payload.error, /final text report/i);
 });
 
 test('runTeammate still reports failure to lead when initial running-state update fails', async () => {

@@ -24,7 +24,13 @@ const defaultTeamOutputRootDir = path.join(globalThis.process?.cwd?.() || '.', '
 function getInboxText(payload) {
   if (payload?.message) return payload.message;
   if (payload?.content) return payload.content;
-  if (payload?.error) return `ERROR: ${payload.error}`;
+  if (payload?.error) {
+    const status = payload.status ? ` status=${payload.status}` : '';
+    const traceHint = payload.status === 'no_result' || payload.status === 'turn_limit'
+      ? ' Use the teammate trace for details if needed.'
+      : '';
+    return `ERROR${status}: ${payload.error}${traceHint}`;
+  }
   if (payload == null) return '';
   return JSON.stringify(payload);
 }
