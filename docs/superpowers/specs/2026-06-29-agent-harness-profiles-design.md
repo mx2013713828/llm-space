@@ -1,7 +1,7 @@
 # Agent Harness Profiles and Unbounded Child Runtime Design
 
 Date: 2026-06-29
-Status: Proposed design for review
+Status: In progress; Phases 1-3 implemented, cancellation runtime still pending
 Scope: `sub_agent`, async teammates, future agent teams, and child-agent runtime foundations
 
 ## Summary
@@ -350,12 +350,12 @@ Goals:
 
 Work:
 
-1. Add `childOutcome` shared module.
-2. Add `childEventBridge` shared module.
-3. Update sub-agent to bridge permissions through shared bridge.
-4. Update teammate to use shared bridge.
-5. Convert unavailable text-encoded tool call handling to non-final system status.
-6. Stop using child `maxTurns` in new profile paths.
+1. Done: Add `childOutcome` shared module.
+2. Done: Add `childEventBridge` shared module.
+3. Done: Update sub-agent to bridge permissions through shared bridge.
+4. Done: Update teammate to use shared bridge.
+5. Done: Convert unavailable text-encoded tool call handling to non-final system status.
+6. Done: Stop using child `maxTurns` in new profile paths.
 
 ### Phase 2: Profiles and Policies
 
@@ -366,11 +366,11 @@ Goals:
 
 Work:
 
-1. Add `childAgentProfile` module.
-2. Move sub-agent feature/tool policy into profile builder.
-3. Move teammate feature/tool policy into profile builder.
-4. Add `reviewer` and `verifier` profile presets as internal building blocks.
-5. Add scratch workspace policy.
+1. Done: Add `childAgentProfile` module.
+2. Done: Move sub-agent feature/tool policy into profile builder.
+3. Done: Move teammate feature/tool policy into profile builder.
+4. Done: Add `reviewer` and `verifier` profile presets as internal building blocks.
+5. Done: Add scratch workspace policy.
 
 ### Phase 3: UI Unification
 
@@ -380,11 +380,11 @@ Goals:
 
 Work:
 
-1. Add shared `ChildAgentStatus` presentation model.
-2. Show permission source consistently for lead, sub-agent, and teammate.
-3. Show `awaiting_permission` on the child card.
-4. Add child cancel action.
-5. Add trace lazy loading through shared schema.
+1. Done: Add shared `ChildAgentStatus` presentation model.
+2. Done: Show permission source consistently for lead, sub-agent, and teammate.
+3. Done: Show `awaiting_permission` on the child card.
+4. Deferred: Add child cancel action after the runtime has an abort/cancellation signal contract.
+5. Done: Add trace lazy loading through shared trace-reference normalization.
 
 ### Phase 4: Team Runtime Cleanup
 
