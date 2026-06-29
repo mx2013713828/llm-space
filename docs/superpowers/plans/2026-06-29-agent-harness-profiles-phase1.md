@@ -8,6 +8,18 @@
 
 **Tech Stack:** Node.js ESM, `node:test`, React/Vite frontend, existing `AgentExecutor` and plugin architecture.
 
+**Completed:** 2026-06-29
+
+**Phase 1 Commits:**
+- `247174f feat: add shared child outcome`
+- `80bbe31 feat: share child event bridge`
+- `498d698 feat: make child agent runs unbounded`
+- `a6088cb feat: preserve child permission source`
+
+**Verification:**
+- `node --test $(rg --files -g '*test.js' | sort)` — PASS, 255 tests
+- `npm run build` — PASS
+
 ## Global Constraints
 
 - `sub_agent` and teammates are harness profiles over the same executor runtime.
@@ -33,7 +45,7 @@
 - Produces statuses: `completed | failed | cancelled | no_result`
 - Legacy: `stopReason === 'turn_limit'` maps to `no_result` for new shared outcome.
 
-- [ ] **Step 1: Write failing child outcome tests**
+- [x] **Step 1: Write failing child outcome tests**
 
 Add tests that expect:
 
@@ -56,25 +68,25 @@ buildChildOutcome({
 }).status === 'no_result';
 ```
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run: `node --test server/agent/child/childOutcome.test.js`
 
 Expected: FAIL because `server/agent/child/childOutcome.js` does not exist.
 
-- [ ] **Step 3: Implement child outcome**
+- [x] **Step 3: Implement child outcome**
 
 Create `buildChildOutcome` by generalizing teammate outcome behavior, but do not emit `turn_limit`.
 
-- [ ] **Step 4: Rewire teammate outcome wrapper**
+- [x] **Step 4: Rewire teammate outcome wrapper**
 
 Make `server/agent/teams/teammateOutcome.js` call `buildChildOutcome` and preserve the old exported `buildTeammateOutcome` function name for adapter compatibility.
 
-- [ ] **Step 5: Rewire sub-agent final handling**
+- [x] **Step 5: Rewire sub-agent final handling**
 
 Use `buildChildOutcome` in `runSubAgent`. If `no_result`, set `tool.toolOutput` to the existing empty result string and emit trace/status with `status: 'no_result'`.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 
@@ -84,7 +96,7 @@ node --test server/agent/child/childOutcome.test.js server/agent/teams/teammateO
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/agent/child/childOutcome.js server/agent/child/childOutcome.test.js server/agent/teams/teammateOutcome.js server/agent/teams/teammateOutcome.test.js server/agent/subAgentProfile.js server/agent/plugins/SubAgentPlugin.test.js
@@ -106,29 +118,29 @@ git commit -m "feat: add shared child outcome"
 - For sub-agent, maps child tool/thinking/text events into existing `sub_agent_status`.
 - For teammate, preserves existing `team_update` forwarding and permission bridging.
 
-- [ ] **Step 1: Write failing event bridge tests**
+- [x] **Step 1: Write failing event bridge tests**
 
 Test that a child `permission_request` sets `parentExecutor.pendingPermission` and forwards a parent event with child metadata.
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run: `node --test server/agent/child/childEventBridge.test.js`
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement event bridge**
+- [x] **Step 3: Implement event bridge**
 
 Move shared permission forwarding and lightweight status helpers into `childEventBridge.js`.
 
-- [ ] **Step 4: Rewire sub-agent**
+- [x] **Step 4: Rewire sub-agent**
 
 Use `createChildEventBridge` in `runSubAgent`, preserving current sub-agent status UI events and adding permission forwarding.
 
-- [ ] **Step 5: Rewire teammate**
+- [x] **Step 5: Rewire teammate**
 
 Use `createChildEventBridge` in `runTeammate` for permission events while keeping TeamBus/team status adapter behavior.
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 
@@ -138,7 +150,7 @@ node --test server/agent/child/childEventBridge.test.js server/agent/plugins/Sub
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/agent/child/childEventBridge.js server/agent/child/childEventBridge.test.js server/agent/subAgentProfile.js server/agent/teams/teammateRunner.js server/agent/teams/teammateRunner.test.js
@@ -160,7 +172,7 @@ git commit -m "feat: share child event bridge"
 - `spawn_teammate.maxTurns` is accepted for legacy input but ignored for new child execution.
 - Existing finite `AgentExecutor.run(maxTurns)` behavior remains for lead/manual tests until later phases.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests asserting:
 
@@ -170,7 +182,7 @@ assert.equal(FakeExecutor.lastRunMaxTurns, Number.POSITIVE_INFINITY);
 
 for both sub-agent and teammate paths.
 
-- [ ] **Step 2: Run red tests**
+- [x] **Step 2: Run red tests**
 
 Run:
 
@@ -180,15 +192,15 @@ node --test server/agent/plugins/SubAgentPlugin.test.js server/agent/teams/teamm
 
 Expected: FAIL because child runs still use finite/default turns.
 
-- [ ] **Step 3: Implement unbounded child execution**
+- [x] **Step 3: Implement unbounded child execution**
 
 Call child executors with `Number.POSITIVE_INFINITY`. Keep parent/lead finite loop behavior unchanged.
 
-- [ ] **Step 4: Deprecate teammate maxTurns handling**
+- [x] **Step 4: Deprecate teammate maxTurns handling**
 
 Keep `maxTurns` in schema/tool input for compatibility, but do not pass it to `runTeammate`. Remove assertions that clamp `maxTurns` as active behavior and replace with an ignored-legacy-input test.
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -198,7 +210,7 @@ node --test server/agent/plugins/SubAgentPlugin.test.js server/agent/teams/teamm
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/agent/subAgentProfile.js server/agent/teams/teammateRunner.js server/agent/plugins/TeamPlugin.js server/agent/plugins/TeamPlugin.test.js server/agent/teams/teammateRunner.test.js server/agent/AgentExecutor.stream.test.js
@@ -216,15 +228,15 @@ git commit -m "feat: make child agent runs unbounded"
 - Permission state includes `runtimeRole`, `childType`, `childId`, `teammateId`, `teammateName`, `teammateRole`, and `parentToolCallId`.
 - UI displays `Sub-agent` and `Teammate` source labels.
 
-- [ ] **Step 1: Add presentation helper test if needed**
+- [x] **Step 1: Add presentation helper test if needed**
 
 If no existing helper exists, create a small helper for permission source labels and test lead/sub-agent/teammate formatting.
 
-- [ ] **Step 2: Implement source display**
+- [x] **Step 2: Implement source display**
 
 Update permission modal to show sub-agent source, not only teammate source.
 
-- [ ] **Step 3: Run frontend tests/build**
+- [x] **Step 3: Run frontend tests/build**
 
 Run:
 
@@ -235,7 +247,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/hooks/useAgentLoop.js src/components/TrajectoryView.jsx src/lib
@@ -250,7 +262,7 @@ git commit -m "feat: show child permission sources"
 **Interfaces:**
 - Whole Phase 1 must build and targeted tests must pass.
 
-- [ ] **Step 1: Run full targeted backend suite**
+- [x] **Step 1: Run full targeted backend suite**
 
 Run:
 
@@ -260,13 +272,13 @@ node --test server/agent/child/*.test.js server/agent/plugins/SubAgentPlugin.tes
 
 Expected: PASS.
 
-- [ ] **Step 2: Run build**
+- [x] **Step 2: Run build**
 
 Run: `npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 3: Check git status**
+- [x] **Step 3: Check git status**
 
 Run: `git status --short`
 
