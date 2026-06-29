@@ -110,6 +110,8 @@ test('createTeammateProfile returns executor-ready teammate profile data', () =>
   });
   assert.deepEqual(profile.messages, [{ role: 'user', content: 'Review backend code.' }]);
   assert.match(profile.systemPrompt, /teammate backend/);
+  assert.match(profile.systemPrompt, /\.agent-scratch\/h1\/teammate_backend/);
+  assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/h1/teammate_backend');
   assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }, 'send_team_message']);
   assert.equal(profile.features.task_orchestration.mode, 'todo');
   assert.equal(profile.features.task_orchestration.enable_agent_teams, true);

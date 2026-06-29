@@ -3,6 +3,7 @@ import {
   createChildFeatures,
   selectChildTools,
 } from '../child/childAgentProfile.js';
+import { createScratchWorkspacePolicy } from '../child/scratchWorkspacePolicy.js';
 
 export const EMPTY_TEAMMATE_RESULT = '(teammate finished without a final text result)';
 
@@ -75,6 +76,10 @@ export function createTeammateProfile({
       toolFilter: 'hidden_orchestration',
       appendTools: ['send_team_message'],
     },
+    scratchWorkspace: createScratchWorkspacePolicy({
+      runId: parentExecutor.harnessId || 'default',
+      childId: teammateId,
+    }),
     extra: {
       cwd,
       runtimeRole: 'teammate',

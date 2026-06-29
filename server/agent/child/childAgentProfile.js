@@ -3,6 +3,7 @@ import {
 	TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
 	getToolName,
 } from '../../../src/lib/taskOrchestration.js';
+import { createScratchWorkspacePolicy } from './scratchWorkspacePolicy.js';
 
 const WRITE_ORIENTED_TOOL_NAMES = new Set([
 	'write_file',
@@ -24,6 +25,14 @@ const VERIFIER_SYSTEM_PROMPT = [
 	'Prefer a scratch workspace for temporary files when you need to create fixtures or scripts.',
 	'Return the commands, results, and conclusion as concise verification evidence.',
 ].join('\n');
+
+function appendScratchInstruction(systemPrompt, scratchWorkspace) {
+	if (!scratchWorkspace?.enabled || !scratchWorkspace.instruction) {
+		return systemPrompt;
+	}
+
+	return `${systemPrompt}\n\nScratch workspace:\n${scratchWorkspace.instruction}`;
+}
 
 function cloneFeatures(parentFeatures) {
 	return structuredClone(parentFeatures ?? {});
@@ -95,6 +104,7 @@ export function createChildAgentProfile({
 	featurePolicy = {},
 	toolPolicy = {},
 	messages = null,
+	scratchWorkspace = null,
 	extra = {},
 }) {
 	return {
@@ -106,9 +116,10 @@ export function createChildAgentProfile({
 			parentHarnessId,
 		},
 		messages: messages ?? [{ role: 'user', content: prompt }],
-		systemPrompt,
+		systemPrompt: appendScratchInstruction(systemPrompt, scratchWorkspace),
 		tools: selectChildTools(parentTools, toolPolicy),
 		features: createChildFeatures(parentFeatures, featurePolicy),
+		...(scratchWorkspace ? { scratchWorkspace } : {}),
 		...extra,
 	};
 }
@@ -173,5 +184,9 @@ export function createVerifierProfile({
 		toolPolicy: {
 			toolFilter: 'hidden_orchestration',
 		},
+		scratchWorkspace: createScratchWorkspacePolicy({
+			runId: parentExecutor.harnessId || 'default',
+			childId,
+		}),
 	});
 }

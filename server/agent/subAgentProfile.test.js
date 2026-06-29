@@ -92,6 +92,8 @@ test('createSubAgentProfile returns executor-ready child profile data', () => {
   assert.equal(profile.identity.parentHarnessId, 'h1');
   assert.deepEqual(profile.messages, [{ role: 'user', content: 'Inspect the code.' }]);
   assert.match(profile.systemPrompt, /one-off sub-agent/i);
+  assert.match(profile.systemPrompt, /\.agent-scratch\/h1\/tool_123/);
+  assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/h1/tool_123');
   assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }]);
   assert.equal(profile.features.task_orchestration.enabled, false);
   assert.equal(profile.features.task_orchestration.enable_sub_agents, false);

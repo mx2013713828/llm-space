@@ -155,6 +155,46 @@ test('createVerifierProfile keeps atomic verification tools and prepares verifie
 	assert.equal(profile.identity.childType, 'verifier');
 	assert.deepEqual(profile.tools, ['bash', 'read_file', 'write_file', { name: 'custom_tool' }]);
 	assert.equal(profile.features.enable_memory.enabled, false);
+	assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/h1/verifier_1');
 	assert.match(profile.systemPrompt, /verification evidence/i);
 	assert.match(profile.systemPrompt, /scratch workspace/i);
+});
+
+test('createReviewerProfile does not attach scratch workspace by default', () => {
+	const profile = createReviewerProfile({
+		parentExecutor: {
+			harnessId: 'h1',
+			tools: ['bash', 'read_file'],
+			features: {},
+		},
+		prompt: 'Review.',
+		childId: 'reviewer_1',
+	});
+
+	assert.equal(profile.scratchWorkspace, undefined);
+	assert.doesNotMatch(profile.systemPrompt, /\.agent-scratch/);
+});
+
+test('child profiles attach scratch workspace metadata when scratch is enabled', () => {
+	const profile = createChildAgentProfile({
+		childType: 'sub_agent',
+		childId: 'tool:123',
+		parentHarnessId: 'harness/1',
+		prompt: 'Do work.',
+		systemPrompt: 'Base child prompt.',
+		parentTools: ['bash'],
+		parentFeatures: {},
+		featurePolicy: {},
+		toolPolicy: {},
+		scratchWorkspace: {
+			enabled: true,
+			relativePath: '.agent-scratch/harness_1/tool_123',
+			absolutePath: '/workspace/.agent-scratch/harness_1/tool_123',
+			instruction: 'Use .agent-scratch/harness_1/tool_123 for temporary files.',
+		},
+	});
+
+	assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/harness_1/tool_123');
+	assert.match(profile.systemPrompt, /Base child prompt/);
+	assert.match(profile.systemPrompt, /Use \.agent-scratch\/harness_1\/tool_123/);
 });

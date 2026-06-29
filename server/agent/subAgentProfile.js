@@ -6,6 +6,7 @@ import {
 } from './child/childAgentProfile.js';
 import { createChildEventBridge } from './child/childEventBridge.js';
 import { buildChildOutcome } from './child/childOutcome.js';
+import { createScratchWorkspacePolicy } from './child/scratchWorkspacePolicy.js';
 import { saveSubAgentTrace } from './subagents/subAgentTraceStore.js';
 
 const EMPTY_SUB_AGENT_RESULT = '(子代理运行完毕，未返回任何文字总结)';
@@ -55,6 +56,10 @@ export function createSubAgentProfile({ parentExecutor, prompt, childId }) {
     toolPolicy: {
       toolFilter: 'managed_orchestration',
     },
+    scratchWorkspace: createScratchWorkspacePolicy({
+      runId: parentExecutor.harnessId || 'default',
+      childId,
+    }),
   });
 }
 
