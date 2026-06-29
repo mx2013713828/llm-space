@@ -72,3 +72,12 @@ test('presents teammate no_result as an error state', () => {
     tone: 'danger',
   });
 });
+
+test('presents teammate awaiting_permission as a warning state', () => {
+  assert.deepEqual(getTeammateStatusPresentation({
+    state: 'awaiting_permission',
+  }), {
+    label: 'awaiting permission',
+    tone: 'warning',
+  });
+});

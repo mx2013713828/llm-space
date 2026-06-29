@@ -8,6 +8,7 @@ const TOOL_STATUS = {
 
 const TEAMMATE_STATUS = {
   running: { label: 'running', tone: 'info' },
+  awaiting_permission: { label: 'awaiting permission', tone: 'warning' },
   completed: { label: 'completed', tone: 'success' },
   failed: { label: 'failed', tone: 'danger' },
   turn_limit: { label: 'turn limit', tone: 'danger' },
