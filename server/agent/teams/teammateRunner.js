@@ -1,5 +1,6 @@
 import process from 'node:process';
 import { AgentExecutor } from '../AgentExecutor.js';
+import { createChildEventBridge } from '../child/childEventBridge.js';
 import { createTeamBus } from './teamBus.js';
 import { createTeamStateStore } from './teamStateStore.js';
 import { emitTeamUpdate } from './teamUpdates.js';
@@ -61,40 +62,15 @@ export async function runTeammate({
       },
     });
 
-    const forwardChildEvent = (type, payload) => {
-      if (type === 'team_update') {
-        parentExecutor.onEvent(type, payload);
-        return;
-      }
-
-      if (type === 'permission_request') {
-        const bridgedPayload = {
-          ...payload,
-          runtimeRole: 'teammate',
-          teamId,
-          teammateId,
-          teammateName: name,
-          teammateRole: role ?? null,
-        };
-        parentExecutor.pendingPermission = bridgedPayload;
-        parentExecutor.onEvent(type, bridgedPayload);
-        return;
-      }
-
-      if (type === 'permission_resolved') {
-        if (parentExecutor.pendingPermission?.toolCallId === payload?.toolCallId) {
-          parentExecutor.pendingPermission = null;
-        }
-        parentExecutor.onEvent(type, {
-          ...payload,
-          runtimeRole: 'teammate',
-          teamId,
-          teammateId,
-          teammateName: name,
-          teammateRole: role ?? null,
-        });
-      }
-    };
+    const forwardChildEvent = createChildEventBridge({
+      parentExecutor,
+      childType: 'teammate',
+      childId: teammateId,
+      name,
+      role: role ?? null,
+      teamId,
+      forwardEvents: ['team_update'],
+    });
 
     const teammateExecutor = new ExecutorClass({
       cwd,

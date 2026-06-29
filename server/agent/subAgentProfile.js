@@ -3,6 +3,7 @@ import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
   getToolName,
 } from '../../src/lib/taskOrchestration.js';
+import { createChildEventBridge } from './child/childEventBridge.js';
 import { buildChildOutcome } from './child/childOutcome.js';
 import { saveSubAgentTrace } from './subagents/subAgentTraceStore.js';
 
@@ -53,91 +54,42 @@ function summarizePrompt(prompt = '') {
 }
 
 function createSubAgentEventForwarder(parentExecutor, parentToolCallId, startedAt) {
-  let toolCount = 0;
-  let previewTruncated = false;
-
-  const forward = (type, payload = {}) => {
-    parentExecutor.onEvent(type, {
-      ...payload,
-      parentToolCallId,
-    });
-  };
-
-  const emitStatus = (patch) => {
-    forward('sub_agent_status', {
-      id: parentToolCallId,
-      status: 'running',
-      phase: 'running',
-      toolCount,
-      previewTruncated,
-      startedAt,
-      ...patch,
-    });
-  };
-
-  return (subType, subPayload = {}) => {
-    if (subType === 'messages_update') {
-      return;
-    }
-
-    if (subType === 'thinking_start') {
-      emitStatus({ phase: 'thinking', currentAction: 'thinking' });
-      return;
-    }
-
-    if (subType === 'text_start') {
-      emitStatus({ phase: 'finalizing', currentAction: 'writing final answer' });
-      return;
-    }
-
-    if (subType === 'tool_start') {
-      toolCount += 1;
-      emitStatus({
-        phase: 'tool_use',
-        currentAction: subPayload.name ? `calling ${subPayload.name}` : 'calling tool',
-        currentTool: subPayload.name || '',
+  return createChildEventBridge({
+    parentExecutor,
+    childType: 'sub_agent',
+    childId: parentToolCallId,
+    parentToolCallId,
+    startedAt,
+    textPreviewLimit: SUB_AGENT_STREAM_TEXT_LIMIT,
+    toolOutputPreviewLimit: SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT,
+    onStatus(patch) {
+      parentExecutor.onEvent('sub_agent_status', {
+        id: parentToolCallId,
+        ...patch,
+        parentToolCallId,
       });
-      return;
-    }
+    },
+  });
+}
 
-    if (subType === 'tool_exec_start') {
-      emitStatus({
-        phase: 'tool_use',
-        currentAction: subPayload.toolName ? `executing ${subPayload.toolName}` : 'executing tool',
-        currentTool: subPayload.toolName || '',
-      });
-      return;
-    }
-
-    if (subType === 'tool_exec_done') {
-      if (typeof subPayload.output === 'string' && subPayload.output.length > SUB_AGENT_STREAM_TOOL_OUTPUT_LIMIT) {
-        previewTruncated = true;
-      }
-      emitStatus({
-        phase: 'tool_result',
-        currentAction: subPayload.toolName ? `finished ${subPayload.toolName}` : 'received tool result',
-      });
-      return;
-    }
-
-    if ((subType === 'thinking_delta' || subType === 'text_delta') && String(subPayload.text || '').length > SUB_AGENT_STREAM_TEXT_LIMIT) {
-      previewTruncated = true;
-    }
-  };
+function emitInitialSubAgentStatus(parentExecutor, parentToolCallId, startedAt, patch) {
+  parentExecutor.onEvent('sub_agent_status', {
+    id: parentToolCallId,
+    parentToolCallId,
+    startedAt,
+    ...patch,
+  });
 }
 
 export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentExecutor }) {
   const startedAt = new Date().toISOString();
   const prompt = tool.toolInput.prompt;
-  parentExecutor.onEvent('sub_agent_status', {
-    id: tool.id,
+  emitInitialSubAgentStatus(parentExecutor, tool.id, startedAt, {
     status: 'running',
     phase: 'starting',
     currentAction: summarizePrompt(prompt),
     toolCount: 0,
     previewTruncated: false,
-    startedAt,
-    parentToolCallId: tool.id,
   });
 
   const forwardSubAgentEvent = createSubAgentEventForwarder(parentExecutor, tool.id, startedAt);
