@@ -87,7 +87,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   const isSubAgent = toolName === 'sub_agent';
   const isSpawnTeammate = toolName === 'spawn_teammate';
   const cardTeammate = isSpawnTeammate ? getSpawnCardTeammate(teamStatus, toolInput) : null;
-  const toolPresentation = getToolStatusPresentation({ toolStatus, toolOutput });
+  const toolPresentation = getToolStatusPresentation({ toolName, toolStatus, toolOutput });
 
   const formatJson = (obj) => {
     try {

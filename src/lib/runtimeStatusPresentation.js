@@ -15,6 +15,18 @@ const TEAMMATE_STATUS = {
 };
 
 export function getToolStatusPresentation(message = {}) {
+  if (message.toolName === 'spawn_teammate') {
+    if (message.toolStatus === 'invalid_args' || message.toolStatus === 'failed') {
+      return TOOL_STATUS[message.toolStatus];
+    }
+    if (message.toolStatus === 'pending' || message.toolStatus === 'running') {
+      return { label: 'launching', tone: 'info' };
+    }
+    if (message.toolStatus === 'completed' || message.toolOutput != null) {
+      return { label: 'launched', tone: 'info' };
+    }
+  }
+
   const explicit = TOOL_STATUS[message.toolStatus];
   if (explicit) return explicit;
   if (message.toolOutput != null) return TOOL_STATUS.completed;
