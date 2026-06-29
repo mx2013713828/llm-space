@@ -117,7 +117,7 @@ test('runTeammate creates a teammate child executor, marks running then complete
   );
   assert.equal(FakeExecutor.lastArgs.features.task_orchestration.mode, 'todo');
   assert.equal(FakeExecutor.lastArgs.features.enable_memory.enabled, false);
-  assert.equal(FakeExecutor.lastRunMaxTurns, 4);
+  assert.equal(FakeExecutor.lastRunMaxTurns, Number.POSITIVE_INFINITY);
 
   assert.equal(updates.length, 2);
   assert.equal(updates[0].harnessId, 'h1');

@@ -105,7 +105,7 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
-test('spawn_teammate clamps maxTurns to a finite positive integer with safe defaults', async () => {
+test('spawn_teammate accepts legacy maxTurns input without using it as child runtime control', async () => {
   const fixture = await createFixture();
   const runCalls = [];
   const plugin = createTeamPlugin({
@@ -140,8 +140,8 @@ test('spawn_teammate clamps maxTurns to a finite positive integer with safe defa
   });
 
   assert.equal(runCalls.length, 2);
-  assert.equal(runCalls[0].maxTurns, 24);
-  assert.equal(runCalls[1].maxTurns, 8);
+  assert.equal(runCalls[0].maxTurns, undefined);
+  assert.equal(runCalls[1].maxTurns, undefined);
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
@@ -360,7 +360,7 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
     teammates: [
       { agentId: 'teammate_reviewer', name: 'reviewer', state: 'completed' },
       { agentId: 'teammate_backend', name: 'backend', state: 'running' },
-      { agentId: 'teammate_tests', name: 'tests', state: 'turn_limit', error: 'max turns exhausted' },
+      { agentId: 'teammate_tests', name: 'tests', state: 'no_result', error: 'legacy turn limit' },
     ],
   });
 
@@ -375,7 +375,7 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
   assert.match(tool.toolOutput, /Review complete/);
   assert.match(tool.toolOutput, /Team status/);
   assert.match(tool.toolOutput, /backend: running/);
-  assert.match(tool.toolOutput, /tests: turn_limit/);
+  assert.match(tool.toolOutput, /tests: no_result/);
   assert.match(tool.toolOutput, /Do not give a final answer as if all teammates completed/);
   assert.deepEqual(
     await fixture.bus.peekInbox({ harnessId: 'h1', teamId: 'team_1', agentId: 'lead' }),

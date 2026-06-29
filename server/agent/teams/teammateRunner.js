@@ -94,7 +94,7 @@ export async function runTeammate({
       onEvent: forwardChildEvent,
     });
 
-    await teammateExecutor.run(maxTurns);
+    await teammateExecutor.run(Number.POSITIVE_INFINITY);
 
     const outcome = buildTeammateOutcome({
       messages: teammateExecutor.messages,

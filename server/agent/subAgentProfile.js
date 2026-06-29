@@ -107,7 +107,7 @@ export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentE
   });
 
   try {
-    await subExecutor.run();
+    await subExecutor.run(Number.POSITIVE_INFINITY);
   } catch (err) {
     const completedAt = new Date().toISOString();
     const finalAnswer = `[子代理异常崩溃]\n${err.message}`;

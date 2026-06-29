@@ -9,8 +9,6 @@ import { runTeammate } from '../teams/teammateRunner.js';
 import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'wait_for_teammates', 'check_team_inbox']);
-const DEFAULT_TEAMMATE_MAX_TURNS = 8;
-const MAX_TEAMMATE_MAX_TURNS = 24;
 const DEFAULT_WAIT_TIMEOUT_MS = 15000;
 const MAX_WAIT_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;
@@ -224,15 +222,6 @@ function resolveTeamHarnessId(executor) {
   return executor.teamContext?.harnessId || executor.harnessId;
 }
 
-function sanitizeMaxTurns(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return DEFAULT_TEAMMATE_MAX_TURNS;
-  }
-
-  return Math.min(MAX_TEAMMATE_MAX_TURNS, Math.floor(parsed));
-}
-
 function normalizeBriefText(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
@@ -427,7 +416,6 @@ export function createTeamPlugin({
             name: args.name,
             role: args.role ?? null,
             initialPrompt: teammateBrief.prompt,
-            maxTurns: sanitizeMaxTurns(args.maxTurns),
           })).catch(error => {
             console.error('[TeamPlugin] Teammate runner failed:', error);
           });

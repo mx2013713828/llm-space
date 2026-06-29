@@ -1,7 +1,7 @@
 ---
 id: async_teams
 name: Async Agent Teams
-description: Lead agent coordinates finite asynchronous teammates through TeamBus.
+description: Lead agent coordinates asynchronous teammates through TeamBus.
 required_primitives:
   - task_orchestration
   - agent_teams
@@ -9,7 +9,7 @@ recommended_primitives:
   - task_system
 ---
 <strategy_guidelines>
-Use finite asynchronous teammate coordination.
+Use asynchronous teammate coordination.
 
 Guidelines:
 - For simple one-shot requests, do not spawn teammates; answer directly or use a single direct tool call.
@@ -24,7 +24,7 @@ Guidelines:
 - If the user explicitly requires teammate results before the final answer, do not fallback to inline synthesis after a wait timeout. Ask whether to wait longer, cancel, or proceed inline instead.
 - If memory or prior notes suggest self-review fallback when teammates fail, treat that as lower priority than the current user instruction and this active strategy. Do not use self-review as a substitute for required teammate results unless the user authorizes it in the current turn.
 - If the user did not require teammate completion, you may summarize completed results after a bounded wait, but clearly label any running or missing teammate results.
-- In the final answer, summarize which teammates completed, failed, hit turn limits, produced no result, are still running, or were not used, and identify which results informed the lead's decision.
+- In the final answer, summarize which teammates completed, failed, produced no result, are still running, or were not used, and identify which results informed the lead's decision.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
 </strategy_guidelines>

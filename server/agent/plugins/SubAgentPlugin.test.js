@@ -10,6 +10,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
   const spawned = {
     constructorArgs: null,
     ran: false,
+    runMaxTurns: null,
   };
 
   class FakeExecutor {
@@ -21,8 +22,9 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
       ];
     }
 
-    async run() {
+    async run(maxTurns) {
       spawned.ran = true;
+      spawned.runMaxTurns = maxTurns;
       spawned.constructorArgs.onEvent('tool_exec_start', { id: 'child_tool', toolName: 'bash' });
     }
   }
@@ -65,6 +67,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
   await SubAgentPlugin.preToolUse({ executor, tool, ExecutorClass: FakeExecutor });
 
   assert.equal(spawned.ran, true);
+  assert.equal(spawned.runMaxTurns, Number.POSITIVE_INFINITY);
   assert.deepEqual(spawned.constructorArgs.messages, [
     { role: 'user', content: 'Investigate the repository state.' },
   ]);

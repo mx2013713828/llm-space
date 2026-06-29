@@ -22,7 +22,7 @@ test('exposes canonical task orchestration sections', () => {
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /wait timeout means teammates are still running/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /do not fallback to inline synthesis/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /check_team_inbox/);
-  assert.match(group.children.async_teams_strategy_prompt.defaultValue, /hit turn limits/);
+  assert.doesNotMatch(group.children.async_teams_strategy_prompt.defaultValue, /hit turn limits/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /are still running/);
   assert.match(group.children.async_teams_strategy_prompt.defaultValue, /structured brief fields/);
   assert.equal(group.children.custom_strategy_prompt.type, 'text_area');
@@ -35,7 +35,7 @@ test('exposes canonical task orchestration sections', () => {
     type: 'boolean',
     section: 'Delegation',
     label: 'Enable Agent Teams',
-    description: 'Allow the lead agent to spawn finite asynchronous teammates and exchange structured team messages.',
+    description: 'Allow the lead agent to spawn asynchronous teammates and exchange structured team messages.',
     defaultValue: false,
     failSafeValue: false,
   });

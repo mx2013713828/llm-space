@@ -122,7 +122,7 @@ Guidelines:
         label: 'Async Agent Teams Guideline (XML Format)',
         description: 'Editable guideline injected when Async Agent Teams is selected. Reset restores the built-in preset.',
         defaultValue: `<strategy_guidelines>
-Use finite asynchronous teammate coordination.
+Use asynchronous teammate coordination.
 
 Guidelines:
 - For simple one-shot requests, do not spawn teammates; answer directly or use a single direct tool call.
@@ -136,7 +136,7 @@ Guidelines:
 - Do not repeatedly poll indefinitely without user visibility. After one normal wait and at most one follow-up wait, call \`check_team_inbox\` if unread messages exist; otherwise report unresolved teammate states.
 - If the user explicitly requires teammate results before the final answer, do not fallback to inline synthesis after a wait timeout. Ask whether to wait longer, cancel, or proceed inline instead.
 - If the user did not require teammate completion, you may summarize completed results after a bounded wait, but clearly label any running or missing teammate results.
-- In the final answer, summarize which teammates completed, failed, hit turn limits, produced no result, are still running, or were not used, and identify which results informed the lead's decision.
+- In the final answer, summarize which teammates completed, failed, produced no result, are still running, or were not used, and identify which results informed the lead's decision.
 - Keep ownership clear: the lead integrates, verifies, and communicates final status.
 - If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
 </strategy_guidelines>`,
@@ -222,7 +222,7 @@ When task-system tracking is warranted:
         type: 'boolean',
         section: 'Delegation',
         label: 'Enable Agent Teams',
-        description: 'Allow the lead agent to spawn finite asynchronous teammates and exchange structured team messages.',
+        description: 'Allow the lead agent to spawn asynchronous teammates and exchange structured team messages.',
         defaultValue: false,
         failSafeValue: false,
       },
@@ -385,6 +385,27 @@ Guidelines:
 </execution_strategy>`,
       `<execution_strategy id="async_teams">
 Use finite asynchronous teammate coordination.
+
+Guidelines:
+- Split independent work into clear teammate briefs.
+- Spawn teammates only for work that can proceed independently.
+- Use \`wait_for_teammates\` as the join/status point; it does not return teammate report content.
+- If unread lead inbox messages are reported, call \`check_team_inbox\` to read teammate results before making final decisions.
+- Keep ownership clear: the lead integrates, verifies, and communicates final status.
+- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
+</execution_strategy>`,
+      `<execution_strategy id="async_teams">
+Use asynchronous teammate coordination.
+
+Guidelines:
+- Split independent work into clear teammate briefs.
+- Spawn teammates only for work that can proceed independently.
+- Use \`wait_for_teammates\` as the join point before making final decisions.
+- Keep ownership clear: the lead integrates, verifies, and communicates final status.
+- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
+</execution_strategy>`,
+      `<execution_strategy id="async_teams">
+Use asynchronous teammate coordination.
 
 Guidelines:
 - Split independent work into clear teammate briefs.
