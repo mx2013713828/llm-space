@@ -3,6 +3,7 @@ import {
   ORCHESTRATION_MANAGED_TOOL_NAMES,
   getToolName,
 } from '../../src/lib/taskOrchestration.js';
+import { buildChildOutcome } from './child/childOutcome.js';
 import { saveSubAgentTrace } from './subagents/subAgentTraceStore.js';
 
 const EMPTY_SUB_AGENT_RESULT = '(子代理运行完毕，未返回任何文字总结)';
@@ -39,21 +40,11 @@ export function selectSubAgentTools(parentTools) {
 }
 
 export function getLastAssistantText(messages) {
-  const entries = Array.isArray(messages) ? messages : [];
-
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    const message = entries[i];
-    if (
-      message?.role === 'assistant' &&
-      message?.type === 'text' &&
-      typeof message?.content === 'string' &&
-      message.content.trim()
-    ) {
-      return message.content;
-    }
-  }
-
-  return null;
+  const outcome = buildChildOutcome({
+    messages,
+    requireFinalText: false,
+  });
+  return outcome.content || null;
 }
 
 function summarizePrompt(prompt = '') {
@@ -208,7 +199,12 @@ export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentE
   }
 
   const completedAt = new Date().toISOString();
-  const finalAnswer = getLastAssistantText(subExecutor.messages) ?? EMPTY_SUB_AGENT_RESULT;
+  const outcome = buildChildOutcome({
+    messages: subExecutor.messages,
+    stopReason: subExecutor.lastRunStopReason,
+    childLabel: 'Sub-agent',
+  });
+  const finalAnswer = outcome.content || EMPTY_SUB_AGENT_RESULT;
   const traceRef = await saveSubAgentTrace({
     harnessId: parentExecutor.harnessId || 'default',
     parentToolCallId: tool.id,
@@ -217,16 +213,16 @@ export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentE
     finalAnswer,
     startedAt,
     completedAt,
-    status: 'completed',
+    status: outcome.status,
   });
 
   tool.subAgentTrace = traceRef;
   tool.toolOutput = finalAnswer;
   parentExecutor.onEvent('sub_agent_trace_ready', {
     id: tool.id,
-    status: 'completed',
-    phase: 'completed',
-    currentAction: 'completed',
+    status: outcome.status,
+    phase: outcome.status === 'completed' ? 'completed' : outcome.status,
+    currentAction: outcome.error || outcome.status,
     finalPreview: summarizePrompt(finalAnswer),
     trace: traceRef,
     toolCount: traceRef.summary.toolCallCount,

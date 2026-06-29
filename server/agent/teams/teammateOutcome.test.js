@@ -35,14 +35,15 @@ test('accepts final text after the last tool call', () => {
   assert.equal(outcome.error, null);
 });
 
-test('marks turn limit as an error outcome', () => {
+test('maps legacy turn limit to no_result', () => {
   const outcome = buildTeammateOutcome({
     messages: [{ role: 'assistant', type: 'text', content: 'Partial.' }],
     stopReason: 'turn_limit',
     maxTurns: 4,
   });
 
-  assert.equal(outcome.status, 'turn_limit');
+  assert.equal(outcome.status, 'no_result');
   assert.equal(outcome.content, '');
+  assert.match(outcome.error, /legacy turn limit/i);
   assert.match(outcome.error, /4/);
 });

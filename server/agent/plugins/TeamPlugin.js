@@ -14,7 +14,7 @@ const MAX_TEAMMATE_MAX_TURNS = 24;
 const DEFAULT_WAIT_TIMEOUT_MS = 15000;
 const MAX_WAIT_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;
-const TERMINAL_TEAMMATE_STATES = new Set(['completed', 'failed', 'turn_limit', 'no_result']);
+const TERMINAL_TEAMMATE_STATES = new Set(['completed', 'failed', 'no_result', 'cancelled']);
 const TEAM_OUTPUT_INLINE_LIMIT = 4000;
 const TEAM_MESSAGE_PREVIEW_LIMIT = 800;
 const defaultTeamBus = createTeamBus();
@@ -26,7 +26,7 @@ function getInboxText(payload) {
   if (payload?.content) return payload.content;
   if (payload?.error) {
     const status = payload.status ? ` status=${payload.status}` : '';
-    const traceHint = payload.status === 'no_result' || payload.status === 'turn_limit'
+    const traceHint = payload.status === 'no_result'
       ? ' Use the teammate trace for details if needed.'
       : '';
     return `ERROR${status}: ${payload.error}${traceHint}`;
@@ -92,7 +92,7 @@ function formatTeamStatus(state) {
     return `- ${teammate.name || teammate.agentId}: ${teammate.state}${issue}`;
   });
   const unresolved = summary.teammates.filter(teammate =>
-    ['running', 'turn_limit', 'no_result', 'failed'].includes(teammate.state)
+    ['running', 'no_result', 'failed', 'cancelled'].includes(teammate.state)
   );
   const reminder = unresolved.length > 0
     ? '\nDo not give a final answer as if all teammates completed; explicitly account for unresolved teammate states.'

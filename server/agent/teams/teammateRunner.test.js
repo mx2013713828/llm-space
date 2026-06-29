@@ -217,7 +217,7 @@ test('runTeammate marks failed and sends an error message when execution throws'
   ]);
 });
 
-test('runTeammate marks turn_limit when child exhausts max turns', async () => {
+test('runTeammate maps legacy turn_limit to no_result when child exhausts max turns', async () => {
   class TurnLimitedExecutor extends FakeExecutor {
     async run() {
       this.lastRunStopReason = 'turn_limit';
@@ -251,11 +251,11 @@ test('runTeammate marks turn_limit when child exhausts max turns', async () => {
     },
   });
 
-  assert.equal(updates[1].updates.state, 'turn_limit');
-  assert.match(updates[1].updates.error, /max turns/i);
-  assert.equal(events[1].payload.teammates[0].state, 'turn_limit');
+  assert.equal(updates[1].updates.state, 'no_result');
+  assert.match(updates[1].updates.error, /legacy turn limit/i);
+  assert.equal(events[1].payload.teammates[0].state, 'no_result');
   assert.equal(sentMessages[0].type, 'error');
-  assert.match(sentMessages[0].payload.error, /max turns/i);
+  assert.match(sentMessages[0].payload.error, /legacy turn limit/i);
 });
 
 test('runTeammate marks no_result when child finishes without final assistant text', async () => {
