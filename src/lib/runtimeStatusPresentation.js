@@ -27,6 +27,26 @@ export function getToolStatusPresentation(message = {}) {
     }
   }
 
+  if (message.toolName === 'wait_for_teammates') {
+    if (message.toolStatus === 'invalid_args' || message.toolStatus === 'failed') {
+      return TOOL_STATUS[message.toolStatus];
+    }
+    if (message.toolStatus === 'pending' || message.toolStatus === 'running') {
+      return { label: 'waiting', tone: 'info' };
+    }
+
+    const output = String(message.toolOutput || '');
+    if (output.startsWith('All teammates reached terminal states.')) {
+      return { label: 'joined', tone: 'success' };
+    }
+    if (output.startsWith('Timed out waiting for teammates;')) {
+      return { label: 'still running', tone: 'warning' };
+    }
+    if (message.toolStatus === 'completed' || message.toolOutput != null) {
+      return { label: 'checked', tone: 'info' };
+    }
+  }
+
   const explicit = TOOL_STATUS[message.toolStatus];
   if (explicit) return explicit;
   if (message.toolOutput != null) return TOOL_STATUS.completed;

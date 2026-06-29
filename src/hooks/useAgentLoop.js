@@ -475,8 +475,18 @@ export function useAgentLoop({
                 toolCallId: evt.toolCallId,
                 toolName: evt.toolName,
                 toolInput: evt.toolInput,
-                reason: evt.reason
+                reason: evt.reason,
+                runtimeRole: evt.runtimeRole,
+                teammateId: evt.teammateId,
+                teammateName: evt.teammateName,
+                teammateRole: evt.teammateRole,
               });
+              break;
+
+            case 'permission_resolved':
+              setPendingPermission(prev => (
+                !prev || prev.toolCallId === evt.toolCallId ? null : prev
+              ));
               break;
 
             case 'messages_update':

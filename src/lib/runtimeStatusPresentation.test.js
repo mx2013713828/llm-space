@@ -40,6 +40,30 @@ test('presents completed spawn_teammate tool calls as launched, not teammate com
   });
 });
 
+test('presents wait_for_teammates timeout output as still running', () => {
+  assert.deepEqual(getToolStatusPresentation({
+    type: 'tool_call',
+    toolName: 'wait_for_teammates',
+    toolStatus: 'completed',
+    toolOutput: 'Timed out waiting for teammates; 1 teammate(s) still unresolved.',
+  }), {
+    label: 'still running',
+    tone: 'warning',
+  });
+});
+
+test('presents wait_for_teammates all-terminal output as joined', () => {
+  assert.deepEqual(getToolStatusPresentation({
+    type: 'tool_call',
+    toolName: 'wait_for_teammates',
+    toolStatus: 'completed',
+    toolOutput: 'All teammates reached terminal states.',
+  }), {
+    label: 'joined',
+    tone: 'success',
+  });
+});
+
 test('presents teammate no_result as an error state', () => {
   assert.deepEqual(getTeammateStatusPresentation({
     state: 'no_result',

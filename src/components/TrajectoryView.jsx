@@ -364,6 +364,22 @@ export function TrajectoryView({
                 The Agent is attempting to trigger a sensitive system action. Under the safety guard policy, the current ReAct loop has been suspended. Please review this action to prevent potential hazards:
               </div>
 
+              {pendingPermission.runtimeRole === 'teammate' && (
+                <div style={{
+                  padding: '10px 12px',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 12,
+                  color: 'var(--blue)',
+                  lineHeight: 1.5,
+                  fontWeight: 600
+                }}>
+                  Teammate: {pendingPermission.teammateName || pendingPermission.teammateId || 'unknown'}
+                  {pendingPermission.teammateRole ? ` · ${pendingPermission.teammateRole}` : ''}
+                </div>
+              )}
+
               {/* 规则命中说明 */}
               <div style={{
                 padding: '12px 14px',

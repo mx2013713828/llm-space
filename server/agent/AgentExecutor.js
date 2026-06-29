@@ -21,6 +21,7 @@ import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
 import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
+import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 
@@ -1089,12 +1090,61 @@ export class AgentExecutor {
       }
     }
 
+    const recoveredStopReason = this._recoverTextEncodedToolCalls({ turnIndex, tools });
+    if (recoveredStopReason) {
+      stopReason = recoveredStopReason;
+    }
+
     if (isContinuation) {
       const generatedTokens = Math.round(newCharsGenerated / 3);
       recoveryState.continuation_tokens.push(generatedTokens);
     }
 
     return stopReason;
+  }
+
+  _recoverTextEncodedToolCalls({ turnIndex, tools }) {
+    const textIndex = this.messages.findLastIndex(message =>
+      message?.turn === turnIndex
+      && message.role === 'assistant'
+      && message.type === 'text'
+      && typeof message.content === 'string'
+    );
+    if (textIndex === -1) return null;
+
+    const textMessage = this.messages[textIndex];
+    const calls = parseTextEncodedToolCalls(textMessage.content);
+    if (!calls) return null;
+
+    const unavailable = calls.find(call => !isToolEnabled(tools, call.name));
+    if (unavailable) {
+      textMessage.content = `⚠️ Model emitted a text-encoded tool call for unavailable tool \`${unavailable.name}\`; it was not executed.`;
+      this.onEvent('messages_update', { messages: this.messages });
+      this.onEvent('error', {
+        message: `Text-encoded tool call could not be executed: ${unavailable.name}`,
+      });
+      return 'end_turn';
+    }
+
+    const toolMessages = calls.map((call, index) => ({
+      role: 'assistant',
+      type: 'tool_call',
+      turn: turnIndex,
+      id: `toolu_text_${turnIndex}_${index}`,
+      toolName: call.name,
+      toolInputRaw: JSON.stringify(call.input),
+      toolInput: call.input,
+      toolStatus: 'pending',
+    }));
+
+    this.messages.splice(textIndex, 1, ...toolMessages);
+    this.onEvent('messages_update', { messages: this.messages });
+    this.onEvent('text_encoded_tool_call_recovered', {
+      turn: turnIndex,
+      toolNames: calls.map(call => call.name),
+    });
+
+    return 'tool_use';
   }
 
   /**

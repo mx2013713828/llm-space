@@ -449,6 +449,59 @@ test('runTeammate isolates child harness state and suppresses raw child stream e
   ]);
 });
 
+test('runTeammate bridges child security permission events to the parent executor', async () => {
+  const forwardedEvents = [];
+  const parentExecutor = {
+    ...createParentExecutor(),
+    onEvent(type, payload) {
+      forwardedEvents.push({ type, payload });
+    },
+  };
+
+  class PermissionExecutor extends FakeExecutor {
+    async run() {
+      FakeExecutor.lastArgs.onEvent('permission_request', {
+        toolCallId: 'toolu_child_write',
+        toolName: 'write_file',
+        toolInput: { path: '/tmp/outside.txt' },
+        reason: '越界写入',
+      });
+      FakeExecutor.lastArgs.onEvent('permission_resolved', {
+        toolCallId: 'toolu_child_write',
+        toolName: 'write_file',
+        decision: 'deny',
+      });
+    }
+  }
+
+  await runTeammate({
+    parentExecutor,
+    teamId: 'team_1',
+    teammateId: 'reviewer',
+    name: 'Reviewer',
+    role: 'Critic',
+    initialPrompt: 'Review the patch.',
+    ExecutorClass: PermissionExecutor,
+    stateStore: {
+      async updateTeammate() {}
+    },
+    bus: {
+      async sendMessage() {}
+    },
+  });
+
+  const permissionRequest = forwardedEvents.find(event => event.type === 'permission_request');
+  assert.equal(permissionRequest.payload.toolCallId, 'toolu_child_write');
+  assert.equal(permissionRequest.payload.runtimeRole, 'teammate');
+  assert.equal(permissionRequest.payload.teammateId, 'reviewer');
+  assert.equal(permissionRequest.payload.teammateName, 'Reviewer');
+  assert.equal(parentExecutor.pendingPermission, null);
+
+  const permissionResolved = forwardedEvents.find(event => event.type === 'permission_resolved');
+  assert.equal(permissionResolved.payload.toolCallId, 'toolu_child_write');
+  assert.equal(permissionResolved.payload.decision, 'deny');
+});
+
 test('createTeammateHarnessId returns a non-empty storage-safe id', () => {
   assert.equal(
     createTeammateHarnessId('harness/with spaces', 'teammate:reviewer'),

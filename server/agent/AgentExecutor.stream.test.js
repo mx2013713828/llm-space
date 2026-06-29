@@ -229,6 +229,47 @@ test('DeepSeek model hints use DeepSeek request semantics even through a proxy U
   assert.equal('anthropic-beta' in requests[0].headers, false);
 });
 
+test('recovers full-text DSML tool calls into executable tool_call messages', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => sseResponse([
+    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+    {
+      type: 'content_block_delta',
+      index: 0,
+      delta: {
+        type: 'text_delta',
+        text: '<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="wait_for_teammates">\n<｜｜DSML｜｜parameter name="timeoutMs" string="false">20000</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>',
+      },
+    },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+  ]);
+
+  const emittedEvents = [];
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    tools: ['wait_for_teammates'],
+    onEvent: (type, payload) => emittedEvents.push({ type, payload }),
+  });
+
+  const stopReason = await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'wait' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: ['wait_for_teammates'],
+  }, { continuation_tokens: [] });
+
+  assert.equal(stopReason, 'tool_use');
+  assert.deepEqual(executor.messages.map(({ type, toolName, toolInput }) => ({ type, toolName, toolInput })), [
+    { type: 'tool_call', toolName: 'wait_for_teammates', toolInput: { timeoutMs: 20000 } },
+  ]);
+  assert.equal(emittedEvents.some(event => event.type === 'text_encoded_tool_call_recovered'), true);
+});
+
 test('run still emits done when final cleanup hook fails', async (t) => {
   const originalFetch = globalThis.fetch;
   const originalCwd = process.cwd();

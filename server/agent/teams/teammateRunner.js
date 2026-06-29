@@ -62,11 +62,38 @@ export async function runTeammate({
     });
 
     const forwardChildEvent = (type, payload) => {
-      if (type !== 'team_update') {
+      if (type === 'team_update') {
+        parentExecutor.onEvent(type, payload);
         return;
       }
 
-      parentExecutor.onEvent(type, payload);
+      if (type === 'permission_request') {
+        const bridgedPayload = {
+          ...payload,
+          runtimeRole: 'teammate',
+          teamId,
+          teammateId,
+          teammateName: name,
+          teammateRole: role ?? null,
+        };
+        parentExecutor.pendingPermission = bridgedPayload;
+        parentExecutor.onEvent(type, bridgedPayload);
+        return;
+      }
+
+      if (type === 'permission_resolved') {
+        if (parentExecutor.pendingPermission?.toolCallId === payload?.toolCallId) {
+          parentExecutor.pendingPermission = null;
+        }
+        parentExecutor.onEvent(type, {
+          ...payload,
+          runtimeRole: 'teammate',
+          teamId,
+          teammateId,
+          teammateName: name,
+          teammateRole: role ?? null,
+        });
+      }
     };
 
     const teammateExecutor = new ExecutorClass({

@@ -200,6 +200,11 @@ export const SecurityPlugin = {
 
     // 清理挂起状态
     executor.pendingPermission = null;
+    executor.onEvent('permission_resolved', {
+      toolCallId: tool.id,
+      toolName,
+      decision,
+    });
 
     if (decision === 'deny') {
       console.log(`❌ [Security Authorization] 用户拒绝了此操作: ${tool.id}`);
