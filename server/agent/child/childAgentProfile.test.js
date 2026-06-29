@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
 	createChildAgentProfile,
 	createChildFeatures,
+	createReviewerProfile,
+	createVerifierProfile,
 	selectChildTools,
 } from './childAgentProfile.js';
 
@@ -110,4 +112,49 @@ test('createChildAgentProfile composes identity, prompt, tools, features, and me
 	assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }]);
 	assert.equal(profile.features.task_orchestration.enabled, false);
 	assert.equal(profile.features.enable_memory.enabled, false);
+});
+
+test('createReviewerProfile is read-only by default and strips orchestration plus write tools', () => {
+	const profile = createReviewerProfile({
+		parentExecutor: {
+			harnessId: 'h1',
+			tools: ['bash', 'read_file', 'write_file', 'run_command', 'spawn_teammate', { name: 'custom_tool' }],
+			features: {
+				task_orchestration: { enabled: true, enable_agent_teams: true },
+				enable_memory: { enabled: true },
+			},
+		},
+		prompt: 'Review the code.',
+		childId: 'reviewer_1',
+		role: 'Code reviewer',
+	});
+
+	assert.equal(profile.identity.childType, 'reviewer');
+	assert.equal(profile.identity.role, 'Code reviewer');
+	assert.deepEqual(profile.tools, ['bash', 'read_file', { name: 'custom_tool' }]);
+	assert.equal(profile.features.enable_memory.enabled, false);
+	assert.match(profile.systemPrompt, /read-only by default/i);
+	assert.match(profile.systemPrompt, /structured findings/i);
+});
+
+test('createVerifierProfile keeps atomic verification tools and prepares verifier prompt', () => {
+	const profile = createVerifierProfile({
+		parentExecutor: {
+			harnessId: 'h1',
+			tools: ['bash', 'read_file', 'write_file', 'sub_agent', 'check_team_inbox', { name: 'custom_tool' }],
+			features: {
+				task_orchestration: { enabled: true, enable_sub_agents: true, enable_agent_teams: true },
+				enable_memory: { enabled: true },
+			},
+		},
+		prompt: 'Verify the fix.',
+		childId: 'verifier_1',
+		role: 'Test verifier',
+	});
+
+	assert.equal(profile.identity.childType, 'verifier');
+	assert.deepEqual(profile.tools, ['bash', 'read_file', 'write_file', { name: 'custom_tool' }]);
+	assert.equal(profile.features.enable_memory.enabled, false);
+	assert.match(profile.systemPrompt, /verification evidence/i);
+	assert.match(profile.systemPrompt, /scratch workspace/i);
 });

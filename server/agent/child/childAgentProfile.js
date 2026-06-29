@@ -4,6 +4,27 @@ import {
 	getToolName,
 } from '../../../src/lib/taskOrchestration.js';
 
+const WRITE_ORIENTED_TOOL_NAMES = new Set([
+	'write_file',
+	'replace_file_content',
+	'multi_replace_file_content',
+	'run_command',
+]);
+
+const REVIEWER_SYSTEM_PROMPT = [
+	'You are a focused reviewer child agent.',
+	'You are read-only by default: inspect code and report findings without modifying files.',
+	'Return structured findings with severity, file references, and a concise recommendation.',
+	'If no blocking issues are found, say so clearly.',
+].join('\n');
+
+const VERIFIER_SYSTEM_PROMPT = [
+	'You are a verifier child agent.',
+	'Use available tools to gather verification evidence for the assigned claim or change.',
+	'Prefer a scratch workspace for temporary files when you need to create fixtures or scripts.',
+	'Return the commands, results, and conclusion as concise verification evidence.',
+].join('\n');
+
 function cloneFeatures(parentFeatures) {
 	return structuredClone(parentFeatures ?? {});
 }
@@ -90,4 +111,67 @@ export function createChildAgentProfile({
 		features: createChildFeatures(parentFeatures, featurePolicy),
 		...extra,
 	};
+}
+
+export function createReviewerProfile({
+	parentExecutor,
+	prompt,
+	childId,
+	role = 'Reviewer',
+	name = 'reviewer',
+}) {
+	const baseProfile = createChildAgentProfile({
+		childType: 'reviewer',
+		childId,
+		name,
+		role,
+		parentHarnessId: parentExecutor.harnessId || 'default',
+		prompt,
+		systemPrompt: REVIEWER_SYSTEM_PROMPT,
+		parentTools: parentExecutor.tools,
+		parentFeatures: parentExecutor.features,
+		featurePolicy: {
+			taskOrchestration: {
+				enabled: false,
+			},
+			memoryEnabled: false,
+		},
+		toolPolicy: {
+			toolFilter: 'hidden_orchestration',
+		},
+	});
+
+	return {
+		...baseProfile,
+		tools: baseProfile.tools.filter(tool => !WRITE_ORIENTED_TOOL_NAMES.has(getToolName(tool))),
+	};
+}
+
+export function createVerifierProfile({
+	parentExecutor,
+	prompt,
+	childId,
+	role = 'Verifier',
+	name = 'verifier',
+}) {
+	return createChildAgentProfile({
+		childType: 'verifier',
+		childId,
+		name,
+		role,
+		parentHarnessId: parentExecutor.harnessId || 'default',
+		prompt,
+		systemPrompt: VERIFIER_SYSTEM_PROMPT,
+		parentTools: parentExecutor.tools,
+		parentFeatures: parentExecutor.features,
+		featurePolicy: {
+			taskOrchestration: {
+				enabled: false,
+			},
+			memoryEnabled: false,
+		},
+		toolPolicy: {
+			toolFilter: 'hidden_orchestration',
+		},
+	});
 }
