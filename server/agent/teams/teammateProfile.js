@@ -1,38 +1,30 @@
 import {
-  TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
-  getToolName,
-} from '../../../src/lib/taskOrchestration.js';
+  createChildAgentProfile,
+  createChildFeatures,
+  selectChildTools,
+} from '../child/childAgentProfile.js';
 
 export const EMPTY_TEAMMATE_RESULT = '(teammate finished without a final text result)';
 
 export function createTeammateFeatures(parentFeatures) {
-  const childFeatures = structuredClone(parentFeatures ?? {});
-
-  childFeatures.task_orchestration = {
-    ...(childFeatures.task_orchestration ?? {}),
-    enabled: true,
-    mode: 'todo',
-    enable_background_tasks: false,
-    enable_sub_agents: false,
-    enable_agent_teams: true,
-    enable_cron_scheduler: false,
-  };
-  childFeatures.enable_memory = {
-    ...(childFeatures.enable_memory ?? {}),
-    enabled: false,
-  };
-
-  return childFeatures;
+  return createChildFeatures(parentFeatures, {
+    taskOrchestration: {
+      enabled: true,
+      mode: 'todo',
+      enable_background_tasks: false,
+      enable_sub_agents: false,
+      enable_agent_teams: true,
+      enable_cron_scheduler: false,
+    },
+    memoryEnabled: false,
+  });
 }
 
 export function selectTeammateTools(parentTools) {
-  const tools = Array.isArray(parentTools) ? parentTools : [];
-  const atomicParentTools = tools.filter(tool => {
-    const name = getToolName(tool);
-    return name !== 'send_team_message' && !TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES.includes(name);
+  return selectChildTools(parentTools, {
+    toolFilter: 'hidden_orchestration',
+    appendTools: ['send_team_message'],
   });
-
-  return [...atomicParentTools, 'send_team_message'];
 }
 
 export function createTeammateSystemPrompt({ name, role }) {
@@ -47,4 +39,51 @@ export function createTeammateSystemPrompt({ name, role }) {
     'If you used tools, synthesize their results in that final text report.',
     'When done, return a concise final answer.',
   ].filter(Boolean).join('\n');
+}
+
+export function createTeammateProfile({
+  parentExecutor,
+  teamId,
+  teammateId,
+  name,
+  role,
+  initialPrompt,
+  cwd,
+}) {
+  return createChildAgentProfile({
+    childType: 'teammate',
+    childId: teammateId,
+    name,
+    role: role ?? null,
+    parentHarnessId: parentExecutor.harnessId,
+    prompt: initialPrompt,
+    systemPrompt: createTeammateSystemPrompt({ name, role }),
+    parentTools: parentExecutor.tools,
+    parentFeatures: parentExecutor.features,
+    featurePolicy: {
+      taskOrchestration: {
+        enabled: true,
+        mode: 'todo',
+        enable_background_tasks: false,
+        enable_sub_agents: false,
+        enable_agent_teams: true,
+        enable_cron_scheduler: false,
+      },
+      memoryEnabled: false,
+    },
+    toolPolicy: {
+      toolFilter: 'hidden_orchestration',
+      appendTools: ['send_team_message'],
+    },
+    extra: {
+      cwd,
+      runtimeRole: 'teammate',
+      teamContext: {
+        teamId,
+        agentId: teammateId,
+        leadId: 'lead',
+        harnessId: parentExecutor.harnessId,
+      },
+    },
+  });
 }

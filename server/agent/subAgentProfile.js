@@ -1,8 +1,9 @@
 import { AgentExecutor } from './AgentExecutor.js';
 import {
-  ORCHESTRATION_MANAGED_TOOL_NAMES,
-  getToolName,
-} from '../../src/lib/taskOrchestration.js';
+  createChildAgentProfile,
+  createChildFeatures,
+  selectChildTools,
+} from './child/childAgentProfile.js';
 import { createChildEventBridge } from './child/childEventBridge.js';
 import { buildChildOutcome } from './child/childOutcome.js';
 import { saveSubAgentTrace } from './subagents/subAgentTraceStore.js';
@@ -20,24 +21,41 @@ const SUB_AGENT_SYSTEM_PROMPT = [
 ].join(' ');
 
 export function createSubAgentFeatures(parentFeatures) {
-  const childFeatures = structuredClone(parentFeatures ?? {});
-
-  childFeatures.task_orchestration = {
-    ...(childFeatures.task_orchestration ?? {}),
-    enabled: false,
-    enable_sub_agents: false,
-  };
-  childFeatures.enable_memory = {
-    ...(childFeatures.enable_memory ?? {}),
-    enabled: false,
-  };
-
-  return childFeatures;
+  return createChildFeatures(parentFeatures, {
+    taskOrchestration: {
+      enabled: false,
+      enable_sub_agents: false,
+    },
+    memoryEnabled: false,
+  });
 }
 
 export function selectSubAgentTools(parentTools) {
-  const tools = Array.isArray(parentTools) ? parentTools : [];
-  return tools.filter(tool => !ORCHESTRATION_MANAGED_TOOL_NAMES.includes(getToolName(tool)));
+  return selectChildTools(parentTools, {
+    toolFilter: 'managed_orchestration',
+  });
+}
+
+export function createSubAgentProfile({ parentExecutor, prompt, childId }) {
+  return createChildAgentProfile({
+    childType: 'sub_agent',
+    childId,
+    parentHarnessId: parentExecutor.harnessId || 'default',
+    prompt,
+    systemPrompt: SUB_AGENT_SYSTEM_PROMPT,
+    parentTools: parentExecutor.tools,
+    parentFeatures: parentExecutor.features,
+    featurePolicy: {
+      taskOrchestration: {
+        enabled: false,
+        enable_sub_agents: false,
+      },
+      memoryEnabled: false,
+    },
+    toolPolicy: {
+      toolFilter: 'managed_orchestration',
+    },
+  });
 }
 
 export function getLastAssistantText(messages) {
@@ -93,11 +111,16 @@ export async function runSubAgent({ parentExecutor, tool, ExecutorClass = AgentE
   });
 
   const forwardSubAgentEvent = createSubAgentEventForwarder(parentExecutor, tool.id, startedAt);
+  const profile = createSubAgentProfile({
+    parentExecutor,
+    prompt,
+    childId: tool.id,
+  });
   const subExecutor = new ExecutorClass({
-    messages: [{ role: 'user', content: prompt }],
-    systemPrompt: SUB_AGENT_SYSTEM_PROMPT,
-    tools: selectSubAgentTools(parentExecutor.tools),
-    features: createSubAgentFeatures(parentExecutor.features),
+    messages: profile.messages,
+    systemPrompt: profile.systemPrompt,
+    tools: profile.tools,
+    features: profile.features,
     model: parentExecutor.model,
     temperature: parentExecutor.temperature,
     maxTokens: parentExecutor.maxTokens,

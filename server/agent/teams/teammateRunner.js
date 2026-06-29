@@ -7,9 +7,7 @@ import { emitTeamUpdate } from './teamUpdates.js';
 import { buildTeammateOutcome } from './teammateOutcome.js';
 import {
   EMPTY_TEAMMATE_RESULT,
-  createTeammateFeatures,
-  createTeammateSystemPrompt,
-  selectTeammateTools,
+  createTeammateProfile,
 } from './teammateProfile.js';
 import { saveTeammateTrace } from './teammateTraceStore.js';
 
@@ -72,20 +70,24 @@ export async function runTeammate({
       forwardEvents: ['team_update'],
     });
 
-    const teammateExecutor = new ExecutorClass({
+    const profile = createTeammateProfile({
+      parentExecutor,
+      teamId,
+      teammateId,
+      name,
+      role: role ?? null,
+      initialPrompt,
       cwd,
+    });
+    const teammateExecutor = new ExecutorClass({
+      cwd: profile.cwd,
       harnessId: createTeammateHarnessId(parentExecutor.harnessId, teammateId),
-      runtimeRole: 'teammate',
-      teamContext: {
-        teamId,
-        agentId: teammateId,
-        leadId: 'lead',
-        harnessId: parentExecutor.harnessId,
-      },
-      messages: [{ role: 'user', content: initialPrompt }],
-      systemPrompt: createTeammateSystemPrompt({ name, role }),
-      tools: selectTeammateTools(parentExecutor.tools),
-      features: createTeammateFeatures(parentExecutor.features),
+      runtimeRole: profile.runtimeRole,
+      teamContext: profile.teamContext,
+      messages: profile.messages,
+      systemPrompt: profile.systemPrompt,
+      tools: profile.tools,
+      features: profile.features,
       model: parentExecutor.model,
       temperature: parentExecutor.temperature,
       maxTokens: parentExecutor.maxTokens,

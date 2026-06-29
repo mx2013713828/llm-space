@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createSubAgentProfile,
   createSubAgentFeatures,
   getLastAssistantText,
   selectSubAgentTools,
@@ -63,6 +64,38 @@ test('selectSubAgentTools removes every orchestration-managed tool by normalized
   ]);
 
   assert.deepEqual(selectedTools, ['bash', { name: 'custom_tool', description: 'kept' }]);
+});
+
+test('createSubAgentProfile returns executor-ready child profile data', () => {
+  const parentExecutor = {
+    harnessId: 'h1',
+    tools: ['bash', 'sub_agent', { name: 'custom_tool' }],
+    features: {
+      task_orchestration: {
+        enabled: true,
+        enable_sub_agents: true,
+      },
+      enable_memory: {
+        enabled: true,
+      },
+    },
+  };
+
+  const profile = createSubAgentProfile({
+    parentExecutor,
+    prompt: 'Inspect the code.',
+    childId: 'tool_123',
+  });
+
+  assert.equal(profile.identity.childType, 'sub_agent');
+  assert.equal(profile.identity.childId, 'tool_123');
+  assert.equal(profile.identity.parentHarnessId, 'h1');
+  assert.deepEqual(profile.messages, [{ role: 'user', content: 'Inspect the code.' }]);
+  assert.match(profile.systemPrompt, /one-off sub-agent/i);
+  assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }]);
+  assert.equal(profile.features.task_orchestration.enabled, false);
+  assert.equal(profile.features.task_orchestration.enable_sub_agents, false);
+  assert.equal(profile.features.enable_memory.enabled, false);
 });
 
 test('getLastAssistantText returns only the final non-empty assistant text block', () => {
