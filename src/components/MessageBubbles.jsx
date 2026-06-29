@@ -4,6 +4,7 @@ import {
   getChildDisplayName,
   getChildStatusPresentation,
 } from '../lib/childStatusPresentation.js';
+import { getChildTraceRequest } from '../lib/childTraceReference.js';
 import { getThinkingDisplayContent } from '../lib/messagePresentation.js';
 import { getSpawnCardTeammate } from '../lib/teamStatusPresentation.js';
 import {
@@ -91,6 +92,12 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   const isSpawnTeammate = toolName === 'spawn_teammate';
   const cardTeammate = isSpawnTeammate ? getSpawnCardTeammate(teamStatus, toolInput) : null;
   const toolPresentation = getToolStatusPresentation({ toolName, toolStatus, toolOutput });
+  const subAgentTraceRequest = isSubAgent
+    ? getChildTraceRequest({ childType: 'sub_agent', traceRef: subAgentTrace })
+    : null;
+  const teammateTraceRequest = isSpawnTeammate
+    ? getChildTraceRequest({ childType: 'teammate', traceRef: cardTeammate?.traceRef })
+    : null;
 
   const getToneColor = (tone) => {
     if (tone === 'success') return 'var(--green)';
@@ -120,46 +127,16 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
     return processedLines.join('\n');
   };
 
-  const loadSubAgentTrace = async () => {
-    if (!subAgentTrace?.traceId || !subAgentTrace?.path || loadedTrace || traceLoading) return;
-
-    const match = subAgentTrace.path.match(/^server\/sessions\/([^/]+)_subagents\/([^/]+)\.json$/);
-    if (!match) {
-      setTraceError('Trace reference is not readable.');
+  const loadChildTrace = async (traceRequest) => {
+    if (!traceRequest?.url || loadedTrace || traceLoading) {
+      if (!traceRequest?.url) setTraceError('Trace reference is not readable.');
       return;
     }
 
     setTraceLoading(true);
     setTraceError('');
     try {
-      const res = await fetch(`http://localhost:3001/api/sub-agent-traces/${match[1]}/${match[2]}`);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      setLoadedTrace(await res.json());
-      setTraceVisibleCount(20);
-    } catch (err) {
-      setTraceError(err.message || 'Failed to load trace');
-    } finally {
-      setTraceLoading(false);
-    }
-  };
-
-  const loadTeammateTrace = async () => {
-    const traceRef = cardTeammate?.traceRef;
-    if (!traceRef?.path || loadedTrace || traceLoading) return;
-
-    const match = traceRef.path.match(/^server\/sessions\/([^/]+)_teammates\/([^/]+)\/([^/]+)\.json$/);
-    if (!match) {
-      setTraceError('Trace reference is not readable.');
-      return;
-    }
-
-    setTraceLoading(true);
-    setTraceError('');
-    try {
-      const res = await fetch(`http://localhost:3001/api/team-traces/${match[1]}/${match[2]}/${match[3]}`);
+      const res = await fetch(traceRequest.url);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
@@ -251,6 +228,65 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
     );
   };
 
+  const renderLoadedTraceMessages = () => (
+    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflow: 'auto' }}>
+      {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
+        const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
+        if (msg.role === 'user') return null;
+        if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
+        if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+        if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
+        return null;
+      })}
+      {(loadedTrace.messages || []).length > traceVisibleCount && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setTraceVisibleCount(count => count + 20)}
+          style={{ alignSelf: 'center', padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+        >
+          Load more trace messages ({traceVisibleCount}/{loadedTrace.messages.length})
+        </button>
+      )}
+    </div>
+  );
+
+  const renderChildTracePanel = (traceRequest) => {
+    if (!traceRequest) return null;
+
+    return (
+      <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+        <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
+          <span>🗂️</span> {traceRequest.title}
+          {traceRequest.summary && (
+            <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>
+              {traceRequest.summary.messageCount} messages · {traceRequest.summary.toolCallCount} tools
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={async () => {
+            const nextExpanded = !traceExpanded;
+            setTraceExpanded(nextExpanded);
+            if (nextExpanded) await loadChildTrace(traceRequest);
+          }}
+          style={{ padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+        >
+          {traceExpanded ? traceRequest.expandedLabel : traceRequest.collapsedLabel}
+        </button>
+        {traceLoading && (
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>Loading trace...</div>
+        )}
+        {traceError && (
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--red)' }}>{traceError}</div>
+        )}
+        {traceExpanded && loadedTrace && renderLoadedTraceMessages()}
+      </div>
+    );
+  };
+
   return (
     <div className="message-bubble msg-tool animate-fade-in" style={{ padding: 0 }}>
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
@@ -311,110 +347,8 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
               </div>
             </div>
           )}
-          {isSubAgent && subAgentTrace && (
-            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-              <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
-                <span>🗂️</span> Full Sub-agent Trace
-                {subAgentTrace.summary && (
-                  <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>
-                    {subAgentTrace.summary.messageCount} messages · {subAgentTrace.summary.toolCallCount} tools
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                className="btn"
-                onClick={async () => {
-                  const nextExpanded = !traceExpanded;
-                  setTraceExpanded(nextExpanded);
-                  if (nextExpanded) await loadSubAgentTrace();
-                }}
-                style={{ padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                {traceExpanded ? 'Hide full trace' : 'Load full trace'}
-              </button>
-              {traceLoading && (
-                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>Loading trace...</div>
-              )}
-              {traceError && (
-                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--red)' }}>{traceError}</div>
-              )}
-              {traceExpanded && loadedTrace && (
-                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflow: 'auto' }}>
-                  {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
-                    const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
-                    if (msg.role === 'user') return null;
-                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                    if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
-                    return null;
-                  })}
-                  {(loadedTrace.messages || []).length > traceVisibleCount && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setTraceVisibleCount(count => count + 20)}
-                      style={{ alignSelf: 'center', padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                    >
-                      Load more trace messages ({traceVisibleCount}/{loadedTrace.messages.length})
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {isSpawnTeammate && cardTeammate?.traceRef && (
-            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-base)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-              <div className="tool-section-label" style={{ marginBottom: 8, color: 'var(--blue)' }}>
-                <span>🗂️</span> Teammate Trace
-                {cardTeammate.traceRef.summary && (
-                  <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10, fontWeight: 400 }}>
-                    {cardTeammate.traceRef.summary.messageCount} messages · {cardTeammate.traceRef.summary.toolCallCount} tools
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                className="btn"
-                onClick={async () => {
-                  const nextExpanded = !traceExpanded;
-                  setTraceExpanded(nextExpanded);
-                  if (nextExpanded) await loadTeammateTrace();
-                }}
-                style={{ padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                {traceExpanded ? 'Hide teammate trace' : 'Load teammate trace'}
-              </button>
-              {traceLoading && (
-                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>Loading trace...</div>
-              )}
-              {traceError && (
-                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--red)' }}>{traceError}</div>
-              )}
-              {traceExpanded && loadedTrace && (
-                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 520, overflow: 'auto' }}>
-                  {(loadedTrace.messages || []).slice(0, traceVisibleCount).map((msg, idx) => {
-                    const messageKey = msg.id || `${msg.role || 'message'}-${msg.type || 'text'}-${idx}`;
-                    if (msg.role === 'user') return null;
-                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
-                    if (msg.type === 'text') return <AssistantMessage key={messageKey} content={msg.content} streaming={msg.streaming} />;
-                    return null;
-                  })}
-                  {(loadedTrace.messages || []).length > traceVisibleCount && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setTraceVisibleCount(count => count + 20)}
-                      style={{ alignSelf: 'center', padding: '4px 10px', fontSize: 11, height: 26, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                    >
-                      Load more trace messages ({traceVisibleCount}/{loadedTrace.messages.length})
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {renderChildTracePanel(subAgentTraceRequest)}
+          {renderChildTracePanel(teammateTraceRequest)}
         </div>
       )}
     </div>
