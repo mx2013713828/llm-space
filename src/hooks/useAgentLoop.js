@@ -19,6 +19,7 @@ import {
   applySessionSnapshotToRunState,
   createRunViewModelState,
 } from '../lib/runViewModel.js';
+import { normalizePermissionPayload } from '../lib/permissionPresentation.js';
 
 /**
  * useAgentLoop — Agent 循环引擎 Hook
@@ -471,16 +472,7 @@ export function useAgentLoop({
               break;
 
             case 'permission_request':
-              setPendingPermission({
-                toolCallId: evt.toolCallId,
-                toolName: evt.toolName,
-                toolInput: evt.toolInput,
-                reason: evt.reason,
-                runtimeRole: evt.runtimeRole,
-                teammateId: evt.teammateId,
-                teammateName: evt.teammateName,
-                teammateRole: evt.teammateRole,
-              });
+              setPendingPermission(normalizePermissionPayload(evt));
               break;
 
             case 'permission_resolved':

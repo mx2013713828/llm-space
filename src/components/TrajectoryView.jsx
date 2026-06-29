@@ -6,6 +6,7 @@ import { formatTokenCount, getModelContextWindow } from '../lib/modelContext.js'
 import { getUserMessagePresentation, isAssistantTextFinalAnswer } from '../lib/messagePresentation.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
+import { getPermissionSourcePresentation } from '../lib/permissionPresentation.js';
 
 export function TrajectoryView({
   activeRightTab,
@@ -59,6 +60,7 @@ export function TrajectoryView({
   const providerLabel = cacheStats.provider || '';
   const orchestration = parseFeatures(harness?.features || {}).task_orchestration;
   const taskBoardLabel = orchestration?.mode === 'task_system' ? 'Task DAG' : 'TODO';
+  const permissionSource = getPermissionSourcePresentation(pendingPermission || {});
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
@@ -364,19 +366,19 @@ export function TrajectoryView({
                 The Agent is attempting to trigger a sensitive system action. Under the safety guard policy, the current ReAct loop has been suspended. Please review this action to prevent potential hazards:
               </div>
 
-              {pendingPermission.runtimeRole === 'teammate' && (
+              {permissionSource.visible && (
                 <div style={{
                   padding: '10px 12px',
-                  background: 'rgba(59, 130, 246, 0.08)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  background: permissionSource.tone === 'purple' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                  border: `1px solid ${permissionSource.tone === 'purple' ? 'rgba(139, 92, 246, 0.24)' : 'rgba(59, 130, 246, 0.2)'}`,
                   borderRadius: 'var(--radius-sm)',
                   fontSize: 12,
-                  color: 'var(--blue)',
+                  color: permissionSource.tone === 'purple' ? 'var(--purple)' : 'var(--blue)',
                   lineHeight: 1.5,
                   fontWeight: 600
                 }}>
-                  Teammate: {pendingPermission.teammateName || pendingPermission.teammateId || 'unknown'}
-                  {pendingPermission.teammateRole ? ` · ${pendingPermission.teammateRole}` : ''}
+                  {permissionSource.label}: {permissionSource.title}
+                  {permissionSource.detail ? ` · ${permissionSource.detail}` : ''}
                 </div>
               )}
 
