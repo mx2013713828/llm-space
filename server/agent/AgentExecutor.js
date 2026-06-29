@@ -654,7 +654,7 @@ export class AgentExecutor {
       }
       if (exhaustedTurns && this.lastRunStopReason === 'tool_use') {
         const finalStopReason = await this.synthesizeFinalAfterToolTurnLimit(turnIndex, recoveryState);
-        if (finalStopReason === 'tool_use') {
+        if (finalStopReason === 'tool_use' || finalStopReason === 'text_encoded_tool_unavailable') {
           this.lastRunStopReason = 'turn_limit';
         }
       }
@@ -1118,12 +1118,14 @@ export class AgentExecutor {
 
     const unavailable = calls.find(call => !isToolEnabled(tools, call.name));
     if (unavailable) {
+      textMessage.role = 'system';
+      textMessage.type = 'system_alert';
       textMessage.content = `⚠️ Model emitted a text-encoded tool call for unavailable tool \`${unavailable.name}\`; it was not executed.`;
       this.onEvent('messages_update', { messages: this.messages });
       this.onEvent('error', {
         message: `Text-encoded tool call could not be executed: ${unavailable.name}`,
       });
-      return 'end_turn';
+      return 'text_encoded_tool_unavailable';
     }
 
     const toolMessages = calls.map((call, index) => ({

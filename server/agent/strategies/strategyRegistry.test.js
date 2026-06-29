@@ -28,6 +28,14 @@ test('loads selected strategy body lazily', async () => {
   assert.match(strategy.body, /simple one-shot requests/);
 });
 
+test('async teams strategy prioritizes explicit teammate completion over memory fallback', async () => {
+  const strategy = await loadExecutionStrategy('async_teams');
+
+  assert.match(strategy.body, /do not fallback to inline synthesis/i);
+  assert.match(strategy.body, /memory or prior notes suggest self-review fallback/i);
+  assert.match(strategy.body, /Do not use self-review as a substitute/i);
+});
+
 test('sequential strategy allows simple direct sub-agent delegation', async () => {
   const strategy = await loadExecutionStrategy('sequential_subagent');
 

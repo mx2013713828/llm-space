@@ -270,6 +270,48 @@ test('recovers full-text DSML tool calls into executable tool_call messages', as
   assert.equal(emittedEvents.some(event => event.type === 'text_encoded_tool_call_recovered'), true);
 });
 
+test('does not treat unavailable text-encoded tool calls as final assistant text', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => sseResponse([
+    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+    {
+      type: 'content_block_delta',
+      index: 0,
+      delta: {
+        type: 'text_delta',
+        text: '<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="read_file">\n<｜｜DSML｜｜parameter name="path" string="true">server.js</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>',
+      },
+    },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+  ]);
+
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    tools: [],
+  });
+
+  const stopReason = await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'finalize' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: [],
+  }, { continuation_tokens: [] });
+
+  assert.equal(stopReason, 'text_encoded_tool_unavailable');
+  assert.deepEqual(executor.messages.map(({ role, type, content }) => ({ role, type, content })), [
+    {
+      role: 'system',
+      type: 'system_alert',
+      content: '⚠️ Model emitted a text-encoded tool call for unavailable tool `read_file`; it was not executed.',
+    },
+  ]);
+});
+
 test('run still emits done when final cleanup hook fails', async (t) => {
   const originalFetch = globalThis.fetch;
   const originalCwd = process.cwd();
@@ -357,4 +399,50 @@ test('run gives one final synthesis turn after tool use exhausts max turns', asy
   assert.equal(calls, 2);
   assert.equal(executor.lastRunStopReason, 'end_turn');
   assert.equal(executor.messages.at(-1).content, 'Final answer after tool result.');
+});
+
+test('run marks turn limit when final synthesis still attempts unavailable text-encoded tools', async (t) => {
+  const originalCwd = process.cwd();
+  const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-tool-limit-unavailable-'));
+  await mkdir(path.join(rootDir, 'server', 'sessions'), { recursive: true });
+  process.chdir(rootDir);
+
+  t.after(async () => {
+    process.chdir(originalCwd);
+    await rm(rootDir, { recursive: true, force: true });
+  });
+
+  const executor = new AgentExecutor({
+    harnessId: 'tool-limit-unavailable',
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    tools: ['get_current_time'],
+  });
+  let calls = 0;
+  executor._callLLM = async (context) => {
+    calls++;
+    if (calls === 1) {
+      executor.messages.push({
+        role: 'assistant',
+        type: 'tool_call',
+        turn: context.turnIndex,
+        id: 'toolu_time',
+        toolName: 'get_current_time',
+        toolInput: {},
+      });
+      return 'tool_use';
+    }
+
+    executor.messages.push({
+      role: 'system',
+      type: 'system_alert',
+      turn: context.turnIndex,
+      content: '⚠️ Model emitted a text-encoded tool call for unavailable tool `read_file`; it was not executed.',
+    });
+    return 'text_encoded_tool_unavailable';
+  };
+
+  await executor.run(1);
+
+  assert.equal(calls, 2);
+  assert.equal(executor.lastRunStopReason, 'turn_limit');
 });
