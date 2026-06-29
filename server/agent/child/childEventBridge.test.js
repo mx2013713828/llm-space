@@ -5,6 +5,7 @@ import { createChildEventBridge } from './childEventBridge.js';
 
 test('bridges child permission events with source metadata', () => {
 	const events = [];
+	const statusPatches = [];
 	const parentExecutor = {
 		pendingPermission: null,
 		onEvent(type, payload) {
@@ -19,6 +20,9 @@ test('bridges child permission events with source metadata', () => {
 		role: 'Backend reviewer',
 		teamId: 'team_1',
 		parentToolCallId: 'tool_spawn',
+		onStatus(patch) {
+			statusPatches.push(patch);
+		},
 	});
 
 	bridge('permission_request', {
@@ -55,6 +59,26 @@ test('bridges child permission events with source metadata', () => {
 	assert.equal(events[1].payload.decision, 'deny');
 	assert.equal(events[1].payload.childType, 'teammate');
 	assert.equal(events[1].payload.teammateName, 'backend-checker');
+	assert.deepEqual(statusPatches, [
+		{
+			status: 'awaiting_permission',
+			phase: 'awaiting_permission',
+			currentAction: 'waiting for permission: write_file',
+			currentTool: 'write_file',
+			toolCount: 0,
+			previewTruncated: false,
+			startedAt: null,
+		},
+		{
+			status: 'running',
+			phase: 'permission_resolved',
+			currentAction: 'permission denied: write_file',
+			currentTool: 'write_file',
+			toolCount: 0,
+			previewTruncated: false,
+			startedAt: null,
+		},
+	]);
 });
 
 test('maps sub-agent child events into bounded status patches', () => {

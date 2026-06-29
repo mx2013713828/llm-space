@@ -451,6 +451,7 @@ test('runTeammate isolates child harness state and suppresses raw child stream e
 
 test('runTeammate bridges child security permission events to the parent executor', async () => {
   const forwardedEvents = [];
+  const updates = [];
   const parentExecutor = {
     ...createParentExecutor(),
     onEvent(type, payload) {
@@ -483,7 +484,9 @@ test('runTeammate bridges child security permission events to the parent executo
     initialPrompt: 'Review the patch.',
     ExecutorClass: PermissionExecutor,
     stateStore: {
-      async updateTeammate() {}
+      async updateTeammate(input) {
+        updates.push(input);
+      },
     },
     bus: {
       async sendMessage() {}
@@ -500,6 +503,15 @@ test('runTeammate bridges child security permission events to the parent executo
   const permissionResolved = forwardedEvents.find(event => event.type === 'permission_resolved');
   assert.equal(permissionResolved.payload.toolCallId, 'toolu_child_write');
   assert.equal(permissionResolved.payload.decision, 'deny');
+  assert.deepEqual(updates.map(update => update.updates.state), [
+    'running',
+    'awaiting_permission',
+    'running',
+    'completed',
+  ]);
+  assert.equal(updates[1].updates.currentAction, 'waiting for permission: write_file');
+  assert.equal(updates[1].updates.currentTool, 'write_file');
+  assert.equal(updates[2].updates.currentAction, 'permission denied: write_file');
 });
 
 test('createTeammateHarnessId returns a non-empty storage-safe id', () => {

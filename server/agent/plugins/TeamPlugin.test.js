@@ -605,6 +605,45 @@ test('wait_for_teammates times out with unresolved status', async () => {
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
+test('wait_for_teammates treats awaiting permission as unresolved', async () => {
+  const fixture = await createFixture();
+  const plugin = createTeamPlugin({
+    bus: fixture.bus,
+    stateStore: fixture.stateStore,
+    async runTeammateFn() {},
+  });
+
+  await fixture.stateStore.createTeam({
+    harnessId: 'h1',
+    teamId: 'team_1',
+    teammates: [
+      {
+        agentId: 'teammate_tests',
+        name: 'tests',
+        state: 'awaiting_permission',
+        currentAction: 'waiting for permission: write_file',
+      },
+    ],
+  });
+
+  const tool = createTool('wait_for_teammates', {
+    teamId: 'team_1',
+    timeoutMs: 25,
+    pollIntervalMs: 5,
+  });
+  await plugin.preToolUse({
+    executor: { harnessId: 'h1', teamContext: null },
+    tool,
+  });
+
+  assert.equal(tool.handled, true);
+  assert.match(tool.toolOutput, /Timed out waiting for teammates/);
+  assert.match(tool.toolOutput, /tests: awaiting_permission/);
+  assert.match(tool.toolOutput, /Do not give a final answer as if all teammates completed/);
+
+  await rm(fixture.rootDir, { recursive: true, force: true });
+});
+
 test('preLLM asks async team leads to call check_team_inbox without consuming inbox', async () => {
   const fixture = await createFixture();
   const plugin = createTeamPlugin({

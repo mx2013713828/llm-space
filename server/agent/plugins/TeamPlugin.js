@@ -90,7 +90,7 @@ function formatTeamStatus(state) {
     return `- ${teammate.name || teammate.agentId}: ${teammate.state}${issue}`;
   });
   const unresolved = summary.teammates.filter(teammate =>
-    ['running', 'no_result', 'failed', 'cancelled'].includes(teammate.state)
+    ['running', 'awaiting_permission', 'no_result', 'failed', 'cancelled'].includes(teammate.state)
   );
   const reminder = unresolved.length > 0
     ? '\nDo not give a final answer as if all teammates completed; explicitly account for unresolved teammate states.'

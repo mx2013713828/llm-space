@@ -30,6 +30,16 @@ function buildChildSourceMetadata({
 	);
 }
 
+function formatPermissionTool(payload = {}) {
+	return payload.toolName || payload.name || 'tool';
+}
+
+function formatPermissionDecision(payload = {}) {
+	if (payload.decision === 'approve') return 'approved';
+	if (payload.decision === 'deny') return 'denied';
+	return payload.decision || 'resolved';
+}
+
 export function createChildEventBridge({
 	parentExecutor,
 	childType,
@@ -75,6 +85,13 @@ export function createChildEventBridge({
 		}
 
 		if (type === 'permission_request') {
+			const toolName = formatPermissionTool(payload);
+			emitStatus({
+				status: 'awaiting_permission',
+				phase: 'awaiting_permission',
+				currentAction: `waiting for permission: ${toolName}`,
+				currentTool: toolName,
+			});
 			const bridgedPayload = {
 				...payload,
 				...sourceMetadata,
@@ -85,6 +102,13 @@ export function createChildEventBridge({
 		}
 
 		if (type === 'permission_resolved') {
+			const toolName = formatPermissionTool(payload);
+			emitStatus({
+				status: 'running',
+				phase: 'permission_resolved',
+				currentAction: `permission ${formatPermissionDecision(payload)}: ${toolName}`,
+				currentTool: toolName,
+			});
 			if (parentExecutor.pendingPermission?.toolCallId === payload?.toolCallId) {
 				parentExecutor.pendingPermission = null;
 			}

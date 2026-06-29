@@ -1,10 +1,13 @@
 import { memo, useState } from 'react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
+import {
+  getChildDisplayName,
+  getChildStatusPresentation,
+} from '../lib/childStatusPresentation.js';
 import { getThinkingDisplayContent } from '../lib/messagePresentation.js';
 import { getSpawnCardTeammate } from '../lib/teamStatusPresentation.js';
 import {
   getBadgeClassForTone,
-  getTeammateStatusPresentation,
   getToolStatusPresentation,
 } from '../lib/runtimeStatusPresentation.js';
 
@@ -89,6 +92,13 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   const cardTeammate = isSpawnTeammate ? getSpawnCardTeammate(teamStatus, toolInput) : null;
   const toolPresentation = getToolStatusPresentation({ toolName, toolStatus, toolOutput });
 
+  const getToneColor = (tone) => {
+    if (tone === 'success') return 'var(--green)';
+    if (tone === 'danger') return 'var(--red)';
+    if (tone === 'warning') return 'var(--amber)';
+    return 'var(--blue)';
+  };
+
   const formatJson = (obj) => {
     try {
       return typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
@@ -165,9 +175,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
 
   const renderSubAgentStatus = () => {
     if (!isSubAgent || !subAgentStatus) return null;
-    const status = subAgentStatus.status || 'running';
-    const isDone = status === 'completed';
-    const color = isDone ? 'var(--green)' : status === 'failed' ? 'var(--red)' : 'var(--blue)';
+    const presentation = getChildStatusPresentation({
+      childType: 'sub_agent',
+      ...subAgentStatus,
+    });
+    const color = getToneColor(presentation.tone);
     const elapsedSeconds = subAgentStatus.startedAt
       ? Math.max(0, Math.round(((subAgentStatus.completedAt ? new Date(subAgentStatus.completedAt) : new Date()) - new Date(subAgentStatus.startedAt)) / 1000))
       : null;
@@ -184,11 +196,11 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
         fontSize: 11,
       }}>
         <span className="badge" style={{ color, border: `1px solid ${color}`, background: 'transparent', fontSize: 10 }}>
-          {status}
+          {presentation.label}
         </span>
-        {subAgentStatus.currentAction && (
+        {presentation.action && (
           <span style={{ color: 'var(--text-muted)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {subAgentStatus.currentAction}
+            {presentation.action}
           </span>
         )}
         {Number.isFinite(subAgentStatus.toolCount) && (
@@ -208,16 +220,15 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   const renderTeamStatus = () => {
     if (!isSpawnTeammate || !cardTeammate) return null;
 
-    const state = cardTeammate.state || 'unknown';
-    const presentation = getTeammateStatusPresentation(cardTeammate);
-    const color = presentation.tone === 'success'
-      ? 'var(--green)'
-      : presentation.tone === 'danger'
-        ? 'var(--red)'
-        : 'var(--blue)';
+    const presentation = getChildStatusPresentation({
+      childType: 'teammate',
+      ...cardTeammate,
+    });
+    const color = getToneColor(presentation.tone);
     const briefSummary = cardTeammate.brief?.objective || cardTeammate.prompt || '';
     const trimmedBrief = briefSummary.length > 64 ? `${briefSummary.slice(0, 61)}...` : briefSummary;
-    const label = `${cardTeammate.name || cardTeammate.agentId}: ${state}${trimmedBrief ? ` · ${trimmedBrief}` : ''}`;
+    const detail = presentation.action || trimmedBrief;
+    const label = `${getChildDisplayName(cardTeammate)}${detail ? ` · ${detail}` : ''}`;
 
     return (
       <div style={{

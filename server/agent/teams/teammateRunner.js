@@ -25,6 +25,16 @@ export function createTeammateHarnessId(parentHarnessId, teammateId) {
   return `${safeParentHarnessId}_${safeTeammateId}`;
 }
 
+function compactObject(object) {
+  return Object.fromEntries(
+    Object.entries(object).filter(([, value]) => value !== undefined),
+  );
+}
+
+function shouldPublishTeammateChildStatus(patch = {}) {
+  return patch.status === 'awaiting_permission' || patch.phase === 'permission_resolved';
+}
+
 export async function runTeammate({
   parentExecutor,
   teamId,
@@ -60,6 +70,46 @@ export async function runTeammate({
       },
     });
 
+    let statusUpdateQueue = Promise.resolve();
+    const queueTeammateChildStatus = (patch = {}) => {
+      if (!shouldPublishTeammateChildStatus(patch)) return;
+
+      const updates = compactObject({
+        state: patch.status === 'awaiting_permission' ? 'awaiting_permission' : 'running',
+        phase: patch.phase,
+        currentAction: patch.currentAction,
+        currentTool: patch.currentTool,
+        toolCount: patch.toolCount,
+        previewTruncated: patch.previewTruncated,
+      });
+      statusUpdateQueue = statusUpdateQueue.catch(() => {}).then(async () => {
+        try {
+          await stateStore.updateTeammate({
+            harnessId: parentExecutor.harnessId,
+            teamId,
+            agentId: teammateId,
+            updates,
+          });
+          await emitTeamUpdate({
+            executor: parentExecutor,
+            stateStore,
+            harnessId: parentExecutor.harnessId,
+            teamId,
+            fallbackTeammate: {
+              agentId: teammateId,
+              name,
+              role: role ?? null,
+              state: updates.state,
+              startedAt,
+              ...updates,
+            },
+          });
+        } catch (error) {
+          console.error('[runTeammate] Failed to publish child status update:', error);
+        }
+      });
+    };
+
     const forwardChildEvent = createChildEventBridge({
       parentExecutor,
       childType: 'teammate',
@@ -67,6 +117,7 @@ export async function runTeammate({
       name,
       role: role ?? null,
       teamId,
+      onStatus: queueTeammateChildStatus,
       forwardEvents: ['team_update'],
     });
 
@@ -97,6 +148,7 @@ export async function runTeammate({
     });
 
     await teammateExecutor.run(Number.POSITIVE_INFINITY);
+    await statusUpdateQueue;
 
     const outcome = buildTeammateOutcome({
       messages: teammateExecutor.messages,
