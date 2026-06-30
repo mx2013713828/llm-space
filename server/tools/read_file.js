@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
-import path from 'path';
+
+import { resolveToolPathForRead } from './pathPolicy.js';
 
 export default {
   name: 'read_file',
@@ -10,8 +11,7 @@ export default {
   execute: async (params) => {
     try {
       const filePath = params.path || params.filePath;
-      if (!filePath) throw new Error('Missing parameter: path or filePath');
-      const targetPath = path.resolve(process.cwd(), filePath);
+      const targetPath = resolveToolPathForRead(filePath);
       const content = await fs.readFile(targetPath, 'utf-8');
       return content;
     } catch (error) {

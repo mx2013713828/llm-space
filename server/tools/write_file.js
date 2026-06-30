@@ -1,6 +1,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+import { resolveToolPathForWrite } from './pathPolicy.js';
+
 export default {
   name: 'write_file',
   description: 'Write or overwrite contents into a file on the local filesystem.',
@@ -11,9 +13,8 @@ export default {
   execute: async (params) => {
     try {
       const filePath = params.path || params.filePath;
-      if (!filePath) throw new Error('Missing parameter: path or filePath');
       const content = params.content;
-      const targetPath = path.resolve(process.cwd(), filePath);
+      const targetPath = resolveToolPathForWrite(filePath);
       // Ensure directory exists
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
       await fs.writeFile(targetPath, content, 'utf-8');

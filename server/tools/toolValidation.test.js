@@ -1,8 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import readFile from './read_file.js';
+import writeFile from './write_file.js';
 import { validateToolInput } from './toolValidation.js';
+
+async function withTempWorkspace(fn) {
+  const originalCwd = process.cwd();
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'llm-space-tools-'));
+  const workspace = path.join(tempRoot, 'workspace');
+  await fs.mkdir(workspace, { recursive: true });
+  process.chdir(workspace);
+
+  try {
+    return await fn({ tempRoot, workspace });
+  } finally {
+    process.chdir(originalCwd);
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+}
 
 test('rejects missing required string parameters', () => {
   assert.deepEqual(validateToolInput(readFile, {}), {
@@ -24,4 +43,47 @@ test('rejects invalid primitive parameter types', () => {
 
 test('accepts valid required parameters', () => {
   assert.deepEqual(validateToolInput(readFile, { path: 'server.js' }), { ok: true });
+});
+
+test('read_file rejects path traversal outside the workspace', async () => {
+  await withTempWorkspace(async ({ tempRoot }) => {
+    await fs.writeFile(path.join(tempRoot, 'outside.txt'), 'outside secret', 'utf-8');
+
+    const output = await readFile.execute({ path: '../outside.txt' });
+
+    assert.match(output, /Access denied/i);
+  });
+});
+
+test('read_file rejects sensitive workspace files', async () => {
+  await withTempWorkspace(async ({ workspace }) => {
+    await fs.writeFile(path.join(workspace, '.env'), 'API_KEY=secret', 'utf-8');
+
+    const output = await readFile.execute({ path: '.env' });
+
+    assert.match(output, /Access denied/i);
+  });
+});
+
+test('write_file rejects path traversal outside the workspace', async () => {
+  await withTempWorkspace(async ({ tempRoot }) => {
+    const outsidePath = path.join(tempRoot, 'outside.txt');
+
+    const output = await writeFile.execute({ path: '../outside.txt', content: 'leak' });
+
+    assert.match(output, /Access denied/i);
+    await assert.rejects(() => fs.readFile(outsidePath, 'utf-8'), /ENOENT/);
+  });
+});
+
+test('write_file allows ordinary workspace scratch files', async () => {
+  await withTempWorkspace(async ({ workspace }) => {
+    const output = await writeFile.execute({
+      path: '.agent-scratch/test.txt',
+      content: 'ok',
+    });
+
+    assert.match(output, /Successfully wrote/);
+    assert.equal(await fs.readFile(path.join(workspace, '.agent-scratch/test.txt'), 'utf-8'), 'ok');
+  });
 });
