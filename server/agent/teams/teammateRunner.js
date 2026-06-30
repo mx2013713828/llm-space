@@ -43,7 +43,6 @@ export async function runTeammate({
   role,
   initialPrompt,
   cwd = process.cwd(),
-  maxTurns = 6,
   ExecutorClass = AgentExecutor,
   bus = defaultTeamBus,
   stateStore = defaultTeamStateStore,
@@ -153,7 +152,6 @@ export async function runTeammate({
     const outcome = buildTeammateOutcome({
       messages: teammateExecutor.messages,
       stopReason: teammateExecutor.lastRunStopReason,
-      maxTurns,
     });
     const content = outcome.content || EMPTY_TEAMMATE_RESULT;
     const finalState = outcome.status;

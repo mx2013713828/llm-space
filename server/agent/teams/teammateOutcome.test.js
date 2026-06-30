@@ -10,7 +10,6 @@ test('does not treat a pre-tool progress text as final result', () => {
       { role: 'assistant', type: 'tool_call', toolName: 'read_file', toolOutput: 'source' },
     ],
     stopReason: 'end_turn',
-    maxTurns: 8,
   });
 
   assert.equal(outcome.status, 'no_result');
@@ -27,7 +26,6 @@ test('accepts final text after the last tool call', () => {
       { role: 'assistant', type: 'text', content: 'Final report.' },
     ],
     stopReason: 'end_turn',
-    maxTurns: 8,
   });
 
   assert.equal(outcome.status, 'completed');
@@ -39,11 +37,10 @@ test('maps legacy turn limit to no_result', () => {
   const outcome = buildTeammateOutcome({
     messages: [{ role: 'assistant', type: 'text', content: 'Partial.' }],
     stopReason: 'turn_limit',
-    maxTurns: 4,
   });
 
   assert.equal(outcome.status, 'no_result');
   assert.equal(outcome.content, '');
   assert.match(outcome.error, /legacy turn limit/i);
-  assert.match(outcome.error, /4/);
+  assert.doesNotMatch(outcome.error, /\(\d+\)/);
 });
