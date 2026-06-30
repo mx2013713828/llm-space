@@ -107,6 +107,7 @@
 20. **长期记忆系统（Memory System）**：实现跨会话、跨压缩的知识积累层（阶段十，commit d5128f9）。包含 memoryStore（写锁+路径校验+UTF-8安全截断）、memorySelect（LLM side-query+关键词降级）、memoryExtract（对话结束后自动提取）、memoryConsolidate（三层门控定期整理）、MemoryPlugin（preLLM 注入 + onLoopEnd fire-and-forget）。索引注入 system prompt 保护 Prompt Cache，具体内容注入 user turn 不破坏缓存前缀。FeatureSchema 新增 enable_memory group，含子级联动约束。
 21. **可恢复的任务依赖系统 (DAG Task System) 与一键式合并重构**：实现类似 Claude Code 的持久化任务图系统，内置 Kahn 算法环检测、Claim 排他文件锁、Release Path 中断回滚事务，以及静前动后前缀缓存友好拆分。更进一步，进行了任务系统一键一类合并重构，在前端 Tools 面板中彻底隐藏 6 个物理原子工具，在 FeatureSchema 中引入统一的 `task_manager` 实验特性组，支持 `todo`/`task_system` 双模式动态净化与自动搭载。
 22. **Task Orchestration 与 Agent Teams MVP 闭环**：将任务看板、DAG Task System、Sub-agent、Cron、Background Tasks、Agent Teams 统一到 Task Orchestration 下，新增可实时切换的执行策略层。Agent Teams 已实现有限异步 teammate、TeamBus、结构化 brief、前端 teammate live status、`completed`/`failed`/`cancelled`/`no_result` 终态语义，以及 `wait_for_teammates` join 工具，使 lead 能等待团队收敛后再汇总，完成 MVP 最小闭环。
+23. **Security Runtime Hardening 首轮收口**：在进入 teams-v2 前补齐平台地基问题：`read_file`/`write_file` 接入工具自身的 workspace path policy 与敏感文件拒绝；Harness 创建/复制增加 ID 冲突防护；旧 `/api/chat` 直连代理端点改为 410 并删除遗留代理代码；前端 API 调用统一收敛到 `apiClient`，支持 `VITE_API_BASE_URL`；新增 `AppErrorBoundary` 和 `npm test`，为后续复杂团队运行提供基础稳定性。
 
 ## 6. Task Orchestration / Agent Teams 后续计划
 

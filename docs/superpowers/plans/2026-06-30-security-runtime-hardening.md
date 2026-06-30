@@ -1,5 +1,7 @@
 # Security Runtime Hardening Implementation Plan
 
+Status: Completed on 2026-06-30.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Harden the experimental platform's security and runtime foundations before starting teams-v2.
@@ -7,6 +9,14 @@
 **Architecture:** Add small reusable boundary helpers instead of scattering guards across tools and routes. Server tools enforce their own path policy even when plugin-level security is bypassed. Frontend API calls go through a single client helper so deployment configuration and tests stop depending on hard-coded localhost URLs.
 
 **Tech Stack:** Node.js ESM, Express 5, React 19, Vite, `node:test`.
+
+**Completed Commits:**
+
+- `9e08f70 docs: plan security runtime hardening`
+- `42d6a23 fix: guard tool filesystem access`
+- `165b47d fix: harden harness identity boundaries`
+- `13dedd9 refactor: remove legacy chat proxy code`
+- `062aa75 refactor: centralize frontend api boundary`
 
 ## Global Constraints
 
@@ -66,7 +76,7 @@
 - Produces: `resolveToolPathForWrite(filePath, options?)`
 - Consumes: `process.cwd()` as the default workspace root.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests that assert:
 
@@ -77,7 +87,7 @@ assert.match(await writeFile.execute({ path: '../outside.txt', content: 'x' }), 
 assert.match(await writeFile.execute({ path: '.agent-scratch/test.txt', content: 'x' }), /Successfully wrote/);
 ```
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -87,7 +97,7 @@ node --test server/tools/toolValidation.test.js
 
 Expected: traversal and sensitive-file tests fail because the tools currently call `path.resolve` directly.
 
-- [ ] **Step 3: Implement path policy**
+- [x] **Step 3: Implement path policy**
 
 Implement a helper that:
 
@@ -96,7 +106,7 @@ Implement a helper that:
 - rejects basename `.env`, names starting `.env.`, and extensions `.pem`, `.key`, `.p12`, `.pfx`
 - returns `{ ok: true, path: resolvedPath }` or throws a readable error
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -106,7 +116,7 @@ node --test server/tools/toolValidation.test.js
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/tools/pathPolicy.js server/tools/read_file.js server/tools/write_file.js server/tools/toolValidation.test.js
@@ -125,7 +135,7 @@ git commit -m "fix: guard tool filesystem access"
 - Produces: duplicate-id rejection during harness create/copy.
 - Produces: `/api/chat` returns `410 Gone`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Cover pure helper behavior if extracted, or route behavior if server route extraction is introduced:
 
@@ -135,21 +145,21 @@ assert.equal(ensureUniqueHarnessId([{ id: 'demo' }], 'demo').ok, false);
 
 For `/api/chat`, assert the handler returns HTTP 410 and does not call the model provider.
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run the focused server tests.
 
-- [ ] **Step 3: Implement minimal backend cleanup**
+- [x] **Step 3: Implement minimal backend cleanup**
 
 - Add a helper that scans existing harness JSON files for duplicate ids.
 - Reject create/copy when the generated id already exists.
 - Replace legacy `/api/chat` implementation with a `410 Gone` response and a short deprecation message.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run focused tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server.js server/harnessRoutes.test.js
@@ -172,7 +182,7 @@ git commit -m "fix: harden harness identity boundaries"
 - Produces: app-level error boundary fallback.
 - Produces: `npm test` script.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add `src/lib/apiClient.test.js`:
 
@@ -183,7 +193,7 @@ assert.equal(apiUrl('api/health'), 'http://localhost:3001/api/health');
 
 Add a lightweight ErrorBoundary test if practical.
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -193,14 +203,14 @@ node --test src/lib/apiClient.test.js
 
 Expected: FAIL because `apiClient.js` does not exist.
 
-- [ ] **Step 3: Implement client helper and migrate callers**
+- [x] **Step 3: Implement client helper and migrate callers**
 
 - Use `import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'`.
 - Replace hard-coded fetch URLs with `apiFetch` or `apiUrl`.
 - Add `npm test` as `node --test $(rg --files -g '*test.js' | sort)`.
 - Wrap the application tree with `AppErrorBoundary`.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -211,7 +221,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json src
@@ -226,7 +236,7 @@ git commit -m "refactor: centralize frontend api boundary"
 - Modify: `docs/superpowers/plans/2026-06-30-security-runtime-hardening.md`
 - Modify if needed: `docs/memory/status.md`
 
-- [ ] **Step 1: Run source scans**
+- [x] **Step 1: Run source scans**
 
 ```bash
 rg "http://localhost:3001" src
@@ -238,7 +248,12 @@ Expected:
 - no direct frontend localhost API calls outside tests or `apiClient`
 - no direct tool path resolution bypassing `pathPolicy`
 
-- [ ] **Step 2: Run full verification**
+Observed on 2026-06-30:
+
+- `rg -n "http://localhost:3001" src -g '!*.test.js'`: only `src/lib/apiClient.js`.
+- `rg -n "path\.resolve\(process\.cwd\(\), filePath\)" server/tools`: no matches.
+
+- [x] **Step 2: Run full verification**
 
 ```bash
 npm test
@@ -247,11 +262,16 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 3: Update plan checkboxes and status**
+Observed on 2026-06-30:
+
+- `npm test`: 291 passed.
+- `npm run build`: passed.
+
+- [x] **Step 3: Update plan checkboxes and status**
 
 Record completed commits and verification results.
 
-- [ ] **Step 4: Commit docs**
+- [x] **Step 4: Commit docs**
 
 ```bash
 git add docs/superpowers/plans/2026-06-30-security-runtime-hardening.md docs/memory/status.md
