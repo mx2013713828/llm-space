@@ -283,3 +283,31 @@ git commit -m "docs: mark security hardening progress"
 - Spec coverage: Covers the immediate hardening issues accepted from review: tool path safety, harness id collision, stale `/api/chat`, frontend API hardcode, Error Boundary, and test script.
 - Placeholder scan: No placeholder steps remain.
 - Type consistency: Helper names are defined before use.
+
+## Addendum: Bash Sensitive-File Escape
+
+Manual validation found a remaining P0 escape: `read_file` and direct `bash` reads rejected `.env`, but `bash` could still invoke an interpreter such as Python or Node to read the same sensitive file indirectly.
+
+Fix committed:
+
+```bash
+git commit -m "fix: sandbox bash sensitive file access"
+```
+
+Implemented:
+
+- Shared `bashSandbox` execution boundary for foreground and background bash tasks.
+- macOS `sandbox-exec` profile denying process-level reads of workspace sensitive files and common home credential locations.
+- Sensitive output redaction fallback for bash streams.
+- SecurityPlugin fast rejection for obvious sensitive-file command text.
+- Regression tests for direct command-text attempts and obfuscated runtime reads.
+
+Verification:
+
+```bash
+node --test server/tools/toolValidation.test.js server/agent/plugins/SecurityPlugin.test.js
+node --test server/agent/plugins/SubAgentPlugin.test.js server/agent/plugins/TeamPlugin.test.js
+npm run build
+```
+
+Observed: all above passed. `npm test` is currently blocked by a local, unstaged harness config change in `harnesses/04-subagent.json` (`task_orchestration.mode` is `task_system` while the tracked fixture test expects `todo`); that file was not included in the security fix commit.

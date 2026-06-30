@@ -80,7 +80,7 @@
 
 ## 4. 已知的瓶颈与风险
 - **后台任务缺失**：超过 2 分钟的极长任务仍依赖 HTTP Keep-alive。需引入 Job 管理器。
-- **安全性**：`bash` 缺乏沙箱化。
+- **安全性**：`read_file`/`write_file` 统一走 workspace 路径策略；`bash` 前台与后台执行在 macOS 下通过 `sandbox-exec` 拒读工作区敏感文件和常见 home 凭据路径，并有输出脱敏兜底。后续仍需补跨平台进程级 sandbox。
 - **web_fetch 内容截断**：Tavily `/extract` 对超长页面会截断，需评估最大可接受长度。
 - **会话持久化缺失**：刷新页面后对话历史会丢失，需引入后端存储层。
 
