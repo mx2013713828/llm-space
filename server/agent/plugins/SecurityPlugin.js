@@ -13,6 +13,14 @@ const DENY_LIST = [
   'chmod 777' // 危险的提权
 ];
 
+function commandReferencesSensitiveFile(command) {
+  const normalized = String(command || '');
+  return (
+    /(^|[^A-Za-z0-9_-])\.env(?:$|[^A-Za-z0-9_-])/.test(normalized) ||
+    /\.(pem|key|p12|pfx)(?:$|[^A-Za-z0-9_-])/i.test(normalized)
+  );
+}
+
 // 需要用户确认的可疑规则
 const SUSPICIOUS_RULES = [
   {
@@ -109,6 +117,13 @@ export const SecurityPlugin = {
           tool.toolOutput = `⛔ [Security Blocked] The command '${command}' is permanently blocked by the system deny list.`;
           return;
         }
+      }
+
+      if (commandReferencesSensitiveFile(command)) {
+        console.warn(`⛔ [Security Blocked] 拦截到试图通过 bash 访问敏感文件: "${command}"`);
+        tool.handled = true;
+        tool.toolOutput = `⛔ [Security Blocked] Sensitive file access is blocked for bash commands.`;
+        return;
       }
 
       // B. 限制通过 bash 进行文件写入（含有重定向且非重定向到 /dev/null，或者含有常用的编辑器与写入命令）

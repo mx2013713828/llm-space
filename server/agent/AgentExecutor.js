@@ -3,6 +3,7 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { spawn } from 'child_process';
 import { toolRegistry } from '../tools/ToolRegistry.js';
+import { buildBashSpawnInvocation, createSensitiveOutputRedactor } from '../tools/bashSandbox.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 import { COMPACT_PROMPT } from './compactPrompt.js';
 import { HookManager } from './HookManager.js';
@@ -1193,6 +1194,8 @@ export class AgentExecutor {
   }
 
   _runBackgroundTask(bgTask) {
+    const redactSensitiveOutput = createSensitiveOutputRedactor();
+    const invocation = buildBashSpawnInvocation(bgTask.command);
     const env = { 
       ...process.env, 
       FORCE_COLOR: '1', 
@@ -1201,7 +1204,7 @@ export class AgentExecutor {
       TERM: 'xterm-256color' 
     };
 
-    const child = spawn('bash', ['-c', bgTask.command], { env });
+    const child = spawn(invocation.command, invocation.args, { env });
     
     let lastOutputTime = Date.now();
 
@@ -1231,13 +1234,13 @@ export class AgentExecutor {
 
     child.stdout.on('data', (data) => {
       lastOutputTime = Date.now();
-      bgTask.output += data.toString();
+      bgTask.output += redactSensitiveOutput(data.toString());
       this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
     });
 
     child.stderr.on('data', (data) => {
       lastOutputTime = Date.now();
-      bgTask.output += data.toString();
+      bgTask.output += redactSensitiveOutput(data.toString());
       this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
     });
 

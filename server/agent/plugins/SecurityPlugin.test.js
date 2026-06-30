@@ -40,3 +40,41 @@ test('manual approval gate emits permission_request and permission_resolved even
   assert.equal(events[1].payload.toolCallId, tool.id);
   assert.equal(events[1].payload.decision, 'deny');
 });
+
+test('bash cannot bypass sensitive file policy through python', async () => {
+  const tool = {
+    id: 'toolu_python_env_read',
+    toolName: 'bash',
+    toolInput: { command: `python -c "print(open('.env').read())"` },
+  };
+  const executor = {
+    features: { security_mode: 'relaxed' },
+    pendingPermission: null,
+    onEvent() {},
+  };
+
+  await SecurityPlugin.preToolUse({ executor, tool });
+
+  assert.equal(tool.handled, true);
+  assert.match(tool.toolOutput, /Sensitive file access/i);
+  assert.equal(SecurityPlugin.pendingRequests.has(tool.id), false);
+});
+
+test('bash cannot bypass sensitive file policy through node', async () => {
+  const tool = {
+    id: 'toolu_node_env_read',
+    toolName: 'bash',
+    toolInput: { command: `node -e "console.log(require('fs').readFileSync('.env.local', 'utf8'))"` },
+  };
+  const executor = {
+    features: { security_mode: 'full' },
+    pendingPermission: null,
+    onEvent() {},
+  };
+
+  await SecurityPlugin.preToolUse({ executor, tool });
+
+  assert.equal(tool.handled, true);
+  assert.match(tool.toolOutput, /Sensitive file access/i);
+  assert.equal(SecurityPlugin.pendingRequests.has(tool.id), false);
+});

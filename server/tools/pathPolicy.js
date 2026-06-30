@@ -11,7 +11,7 @@ function isInsideOrEqualPath(rootPath, targetPath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function isSensitivePath(targetPath) {
+export function isSensitivePath(targetPath) {
   const basename = path.basename(targetPath);
   const extname = path.extname(targetPath).toLowerCase();
 

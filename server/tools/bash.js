@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
 
+import { buildBashSpawnInvocation, createSensitiveOutputRedactor } from './bashSandbox.js';
+
 export default {
   name: 'bash',
   description: 'Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS. CRITICAL: When running commands like npm install, apt-get, or any package manager, ALWAYS use non-interactive flags (e.g., -y, --quiet). The system will strictly kill any process that stalls on an interactive prompt.',
@@ -14,6 +16,9 @@ export default {
    */
   execute: async ({ command }, onData) => {
     return new Promise((resolve) => {
+      const redactSensitiveOutput = createSensitiveOutputRedactor();
+      const invocation = buildBashSpawnInvocation(command);
+
       // 注入环境变量，诱导工具产生彩色输出和进度条
       const env = { 
         ...process.env, 
@@ -23,14 +28,14 @@ export default {
         TERM: 'xterm-256color' 
       };
 
-      const child = spawn('bash', ['-c', command], { env });
+      const child = spawn(invocation.command, invocation.args, { env });
       
       let fullOutput = '';
       let lastOutputTime = Date.now();
 
       const handleData = (data) => {
         lastOutputTime = Date.now();
-        const chunk = data.toString();
+        const chunk = redactSensitiveOutput(data.toString());
         fullOutput += chunk;
         if (onData) onData(chunk);
       };

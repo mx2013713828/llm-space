@@ -6,6 +6,8 @@ import path from 'node:path';
 
 import readFile from './read_file.js';
 import writeFile from './write_file.js';
+import bash from './bash.js';
+import { isBashSandboxAvailable } from './bashSandbox.js';
 import { validateToolInput } from './toolValidation.js';
 
 async function withTempWorkspace(fn) {
@@ -85,5 +87,24 @@ test('write_file allows ordinary workspace scratch files', async () => {
 
     assert.match(output, /Successfully wrote/);
     assert.equal(await fs.readFile(path.join(workspace, '.agent-scratch/test.txt'), 'utf-8'), 'ok');
+  });
+});
+
+test('bash sandbox blocks obfuscated runtime reads of sensitive workspace files', async (t) => {
+  if (!isBashSandboxAvailable()) {
+    t.skip('process-level bash sandbox is only available when sandbox-exec exists');
+    return;
+  }
+
+  await withTempWorkspace(async ({ workspace }) => {
+    await fs.writeFile(path.join(workspace, '.env'), 'API_KEY=super-secret-from-env', 'utf-8');
+
+    const script = "const fs=require('node:fs'); const p='.'+'env'; console.log(fs.readFileSync(p,'utf8'))";
+    const output = await bash.execute({
+      command: `"${process.execPath}" -e ${JSON.stringify(script)}`,
+    });
+
+    assert.doesNotMatch(output, /super-secret-from-env/);
+    assert.match(output, /Operation not permitted|Permission denied|Access denied|not allowed/i);
   });
 });
