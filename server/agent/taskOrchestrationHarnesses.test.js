@@ -44,7 +44,7 @@ const trackedHarnessExpectations = {
   },
   '04-subagent.json': {
     enabled: true,
-    mode: 'todo',
+    mode: 'task_system',
     enable_background_tasks: false,
     enable_sub_agents: true,
     enable_agent_teams: false,
