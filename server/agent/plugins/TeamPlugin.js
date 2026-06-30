@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createTeamBus } from '../teams/teamBus.js';
 import { createTeamStateStore } from '../teams/teamStateStore.js';
 import { createTeamId, createTeammateId, validateAgentName } from '../teams/teamEnvelope.js';
+import { formatTeammateStatusLine, getUnresolvedTeammates } from '../teams/teamRuntimeState.js';
 import { runTeammate } from '../teams/teammateRunner.js';
 import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
 
@@ -12,7 +13,6 @@ const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'wait_for_tea
 const DEFAULT_WAIT_TIMEOUT_MS = 15000;
 const MAX_WAIT_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_POLL_INTERVAL_MS = 500;
-const TERMINAL_TEAMMATE_STATES = new Set(['completed', 'failed', 'no_result', 'cancelled']);
 const TEAM_OUTPUT_INLINE_LIMIT = 4000;
 const TEAM_MESSAGE_PREVIEW_LIMIT = 800;
 const defaultTeamBus = createTeamBus();
@@ -85,23 +85,13 @@ function formatTeamStatus(state) {
   const summary = summarizeTeamState(state);
   if (!summary.teammates.length) return '';
 
-  const statusLines = summary.teammates.map(teammate => {
-    const issue = teammate.error ? ` (${teammate.error})` : '';
-    return `- ${teammate.name || teammate.agentId}: ${teammate.state}${issue}`;
-  });
-  const unresolved = summary.teammates.filter(teammate =>
-    ['running', 'awaiting_permission', 'no_result', 'failed', 'cancelled'].includes(teammate.state)
-  );
+  const statusLines = summary.teammates.map(formatTeammateStatusLine);
+  const unresolved = summary.teammates.filter(teammate => !['completed'].includes(teammate.state));
   const reminder = unresolved.length > 0
     ? '\nDo not give a final answer as if all teammates completed; explicitly account for unresolved teammate states.'
     : '';
 
   return `\n\nTeam status:\n${statusLines.join('\n')}${reminder}`;
-}
-
-function getUnresolvedTeammates(state) {
-  const teammates = Object.values(state?.teammates ?? {});
-  return teammates.filter(teammate => !TERMINAL_TEAMMATE_STATES.has(teammate.state));
 }
 
 function sanitizeWaitTimeoutMs(value) {

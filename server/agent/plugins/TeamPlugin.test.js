@@ -638,7 +638,7 @@ test('wait_for_teammates treats awaiting permission as unresolved', async () => 
 
   assert.equal(tool.handled, true);
   assert.match(tool.toolOutput, /Timed out waiting for teammates/);
-  assert.match(tool.toolOutput, /tests: awaiting_permission/);
+  assert.match(tool.toolOutput, /tests: awaiting_permission \(waiting for permission: write_file\)/);
   assert.match(tool.toolOutput, /Do not give a final answer as if all teammates completed/);
 
   await rm(fixture.rootDir, { recursive: true, force: true });

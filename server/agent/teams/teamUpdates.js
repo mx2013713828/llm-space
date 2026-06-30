@@ -12,6 +12,11 @@ export function summarizeTeamState(state) {
         completedAt: teammate.completedAt,
         lastResult: teammate.lastResult,
         error: teammate.error,
+        phase: teammate.phase,
+        currentAction: teammate.currentAction,
+        currentTool: teammate.currentTool,
+        toolCount: teammate.toolCount,
+        previewTruncated: teammate.previewTruncated,
         traceRef: teammate.traceRef,
       };
 
