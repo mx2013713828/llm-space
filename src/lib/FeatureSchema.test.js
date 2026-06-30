@@ -70,49 +70,17 @@ test('preserves disabled child selections and rejects an invalid mode', () => {
   assert.equal(parseFeatures({ task_orchestration: { strategy: 'unknown' } }).task_orchestration.strategy, 'custom');
 });
 
-test('migrates legacy built-in orchestration prompts without overwriting custom prompts', () => {
+test('preserves configured orchestration prompts without legacy migration', () => {
+  const legacyPrompt = `<execution_strategy id="custom">
+No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
+</execution_strategy>`;
   const parsed = parseFeatures({
     task_orchestration: {
-      sequential_subagent_strategy_prompt: `<execution_strategy id="sequential_subagent">
-Use a sequential sub-agent workflow.
-
-Guidelines:
-- If task-system tools are available, create a small DAG with \`create_task\` before the first delegation.
-- Claim exactly one unblocked task with \`claim_task\` before delegating or implementing it.
-- Delegate at most one implementation, investigation, or review step at a time to \`sub_agent\`.
-- Review each sub-agent result before starting the next delegated step.
-- Mark finished tasks with \`complete_task\` so the frontend Task DAG board stays synchronized.
-- Integrate, verify, and report from the lead agent.
-- If \`sub_agent\` is unavailable, continue inline and explain the limitation briefly.
-</execution_strategy>`,
-      async_teams_strategy_prompt: `<execution_strategy id="async_teams">
-Use finite asynchronous teammate coordination.
-
-Guidelines:
-- Split independent work into clear teammate briefs.
-- Spawn teammates only for work that can proceed independently.
-- Use \`wait_for_teammates\` as the join point before making final decisions.
-- Keep ownership clear: the lead integrates, verifies, and communicates final status.
-- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.
-</execution_strategy>`,
-      custom_strategy_prompt: `<execution_strategy id="custom">
-No strategy guideline is active. Follow the currently enabled primitives and the user's instructions.
-</execution_strategy>`,
+      custom_strategy_prompt: legacyPrompt,
     }
   }).task_orchestration;
 
-  assert.equal(
-    parsed.sequential_subagent_strategy_prompt,
-    FEATURE_SCHEMA.task_orchestration.children.sequential_subagent_strategy_prompt.defaultValue,
-  );
-  assert.equal(
-    parsed.async_teams_strategy_prompt,
-    FEATURE_SCHEMA.task_orchestration.children.async_teams_strategy_prompt.defaultValue,
-  );
-  assert.equal(
-    parsed.custom_strategy_prompt,
-    FEATURE_SCHEMA.task_orchestration.children.custom_strategy_prompt.defaultValue,
-  );
+  assert.equal(parsed.custom_strategy_prompt, legacyPrompt);
 
   const custom = parseFeatures({
     task_orchestration: {
