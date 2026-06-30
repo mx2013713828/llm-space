@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { parseFeatures } from '../lib/FeatureSchema.js';
+import { apiFetch } from '../lib/apiClient.js';
 
 export function ContextInspector({ 
   harness,
@@ -38,7 +39,7 @@ export function ContextInspector({
     const toolNames = (tools || []).map(t => typeof t === 'string' ? t : t.name);
     const selectedStrategyId = parseFeatures(harness?.features || {}).task_orchestration?.strategy || 'custom';
 
-    fetch(`http://localhost:3001/api/harnesses/${harness.id}/dry-run`, {
+    apiFetch(`/api/harnesses/${harness.id}/dry-run`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

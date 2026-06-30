@@ -7,6 +7,7 @@ import {
   getMissingStrategyPrimitives,
   getStrategyAfterPrimitiveEdit,
 } from '../lib/taskOrchestration.js';
+import { apiFetch } from '../lib/apiClient.js';
 
 const STRATEGY_PROMPT_VISIBILITY = {
   inline_strategy_prompt: 'inline',
@@ -50,7 +51,7 @@ export function PromptLabPage({ harness, onSave }) {
 
   useEffect(() => {
     let active = true;
-    fetch('http://localhost:3001/api/tools')
+    apiFetch('/api/tools')
       .then(r => r.json())
       .then(data => {
         if (active) {
@@ -59,7 +60,7 @@ export function PromptLabPage({ harness, onSave }) {
       })
       .catch(console.error);
 
-    fetch('http://localhost:3001/api/models')
+    apiFetch('/api/models')
       .then(r => r.json())
       .then(data => {
         if (active) {
@@ -68,7 +69,7 @@ export function PromptLabPage({ harness, onSave }) {
       })
       .catch(console.error);
 
-    fetch('http://localhost:3001/api/execution-strategies')
+    apiFetch('/api/execution-strategies')
       .then(r => r.json())
       .then(data => {
         if (active && Array.isArray(data)) {
@@ -80,7 +81,7 @@ export function PromptLabPage({ harness, onSave }) {
     // 从 parseFeatures 解析后的 features state 读取，格式已统一，避免原始存档新旧格式歧义
     const initState = parseFeatures(harness.features);
     const isGlobalEnabled = !!(initState.enable_skills?.enabled && initState.enable_skills?.enable_global_skills);
-    fetch(`http://localhost:3001/api/skills?global=${isGlobalEnabled}`)
+    apiFetch(`/api/skills?global=${isGlobalEnabled}`)
       .then(r => r.json())
       .then(data => {
         if (active) {
@@ -165,7 +166,7 @@ export function PromptLabPage({ harness, onSave }) {
         const willGlobal = features['enable_skills']?.enabled
           ? !!(features['enable_skills']?.enable_global_skills ?? skillsMeta.children.enable_global_skills.defaultValue)
           : skillsMeta.children.enable_global_skills.defaultValue;
-        fetch(`http://localhost:3001/api/skills?global=${willGlobal}`)
+        apiFetch(`/api/skills?global=${willGlobal}`)
           .then(r => r.json())
           .then(data => setAvailableSkills(data))
           .catch(console.error);
@@ -192,7 +193,7 @@ export function PromptLabPage({ harness, onSave }) {
     }));
     // 联动副作用：enable_global_skills 子开关变更时重新加载 skills 列表
     if (parentKey === 'enable_skills' && subKey === 'enable_global_skills') {
-      fetch(`http://localhost:3001/api/skills?global=${val}`)
+      apiFetch(`/api/skills?global=${val}`)
         .then(r => r.json())
         .then(data => setAvailableSkills(data))
         .catch(console.error);

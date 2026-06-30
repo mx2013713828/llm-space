@@ -6,6 +6,7 @@ import { useAutoScroll } from '../hooks/useAutoScroll';
 import { ConfigPanel } from '../components/ConfigPanel';
 import { TrajectoryView } from '../components/TrajectoryView';
 import { ContextInspector } from '../components/ContextInspector';
+import { apiFetch } from '../lib/apiClient';
 
 export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessionReset, onHarnessUpdate }) {
   // 1. 模型管理 Hook
@@ -45,7 +46,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     const isGlobal = harness?.features?.enable_skills?.enable_global_skills
       ?? harness?.features?.enable_global_skills
       ?? true;
-    fetch(`http://localhost:3001/api/skills?global=${isGlobal}`)
+    apiFetch(`/api/skills?global=${isGlobal}`)
       .then(r => r.json())
       .then(data => setAllSkills(data))
       .catch(console.error);
@@ -96,7 +97,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
       systemPrompt: systemPrompt
     };
 
-    fetch(`http://localhost:3001/api/harnesses/${harness.id}`, {
+    apiFetch(`/api/harnesses/${harness.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedHarness)
@@ -168,7 +169,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         systemPrompt: h.systemPrompt
       };
 
-      fetch(`http://localhost:3001/api/harnesses/${h.id}`, {
+      apiFetch(`/api/harnesses/${h.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedHarness)

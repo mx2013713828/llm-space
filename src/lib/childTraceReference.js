@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001';
+import { apiUrl } from './apiClient.js';
 
 const TRACE_PRESENTATION = {
   sub_agent: {
@@ -16,13 +16,13 @@ const TRACE_PRESENTATION = {
 function getSubAgentTraceUrl(path) {
   const match = String(path || '').match(/^server\/sessions\/([^/]+)_subagents\/([^/]+)\.json$/);
   if (!match) return null;
-  return `${API_BASE}/api/sub-agent-traces/${match[1]}/${match[2]}`;
+  return apiUrl(`/api/sub-agent-traces/${match[1]}/${match[2]}`);
 }
 
 function getTeammateTraceUrl(path) {
   const match = String(path || '').match(/^server\/sessions\/([^/]+)_teammates\/([^/]+)\/([^/]+)\.json$/);
   if (!match) return null;
-  return `${API_BASE}/api/team-traces/${match[1]}/${match[2]}/${match[3]}`;
+  return apiUrl(`/api/team-traces/${match[1]}/${match[2]}/${match[3]}`);
 }
 
 export function getChildTraceRequest({ childType, traceRef } = {}) {

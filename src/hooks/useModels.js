@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
+import { apiFetch } from '../lib/apiClient.js';
 
 /**
  * useModels — 模型管理 Hook
@@ -23,7 +24,7 @@ export function useModels() {
 
   // 初始化：从后端加载模型列表
   useEffect(() => {
-    fetch('http://localhost:3001/api/models')
+    apiFetch('/api/models')
       .then(r => r.json())
       .then(data => {
         setModels(data);
@@ -50,7 +51,7 @@ export function useModels() {
       alert('Please fill in all model information.');
       return;
     }
-    const res = await fetch('http://localhost:3001/api/models', {
+    const res = await apiFetch('/api/models', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newModelConfig)
@@ -74,7 +75,7 @@ export function useModels() {
       return;
     }
 
-    const res = await fetch(`http://localhost:3001/api/models/${editModelConfig.id}`, {
+    const res = await apiFetch(`/api/models/${editModelConfig.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editModelConfig)

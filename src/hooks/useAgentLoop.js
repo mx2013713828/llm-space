@@ -4,6 +4,7 @@ import { parseFeatures } from '../lib/FeatureSchema.js';
 import { createCacheStats, accumulateCacheStats } from '../lib/cacheStats.js';
 import { shouldSubmitMessage } from '../lib/chatInput.js';
 import { fetchHarnessSession } from '../lib/sessionApi.js';
+import { apiFetch } from '../lib/apiClient.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 import {
   isAgentDoneEvent,
@@ -263,7 +264,7 @@ export function useAgentLoop({
         }
       }
 
-      const res = await fetch('http://localhost:3001/api/agent/run', {
+      const res = await apiFetch('/api/agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -692,7 +693,7 @@ export function useAgentLoop({
 
     const attachIfRunning = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/agent/status/${harness.id}`);
+        const res = await apiFetch(`/api/agent/status/${harness.id}`);
         const data = await res.json();
         if (cancelled) return;
         if (data.pendingPermission) {
@@ -800,7 +801,7 @@ export function useAgentLoop({
   /** 提交审批决定 */
   const handlePermissionDecision = async (toolCallId, decision) => {
     try {
-      const res = await fetch('http://localhost:3001/api/agent/permission', {
+      const res = await apiFetch('/api/agent/permission', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

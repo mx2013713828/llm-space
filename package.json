@@ -7,6 +7,7 @@
     "dev:ui": "vite",
     "dev:server": "node server.js",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:ui -- --port 5174\"",
+    "test": "node --test $(rg --files -g '*test.js' | sort)",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

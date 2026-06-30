@@ -4,6 +4,7 @@ import './index.css';
 import './App.css';
 import { TrajectoryPage } from './pages/TrajectoryPage';
 import { PromptLabPage } from './pages/PromptLabPage';
+import { apiFetch } from './lib/apiClient';
 
 /* ===== 导航配置 ===== */
 const TABS = [
@@ -48,7 +49,7 @@ function AppContent() {
       clearTimeout(syncTimeoutRef.current);
     }
     syncTimeoutRef.current = setTimeout(() => {
-      fetch(`http://localhost:3001/api/sessions/${harnessId}`, {
+      apiFetch(`/api/sessions/${harnessId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, todos, backgroundTasks })
@@ -66,7 +67,7 @@ function AppContent() {
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y, harnessId }
 
   const loadHarnessList = () => {
-    fetch('http://localhost:3001/api/harnesses')
+    apiFetch('/api/harnesses')
       .then(r => r.json())
       .then(setHarnessFiles)
       .catch(err => console.error("加载文件列表失败:", err));
@@ -80,7 +81,7 @@ function AppContent() {
       return;
     }
     try {
-      const res = await fetch('http://localhost:3001/api/harnesses', {
+      const res = await apiFetch('/api/harnesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() })
@@ -103,7 +104,7 @@ function AppContent() {
   const handleDeleteHarness = async (id) => {
     if (!confirm(`Are you sure you want to delete Harness "${id}"? This action cannot be undone.`)) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/harnesses/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/harnesses/${id}`, { method: 'DELETE' });
       if (!res.ok) { alert('Failed to delete'); return; }
       await loadHarnessList();
       if (activeHarnessId === id) {
@@ -119,7 +120,7 @@ function AppContent() {
 
   const handleCopyHarness = async (id) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/harnesses/${id}/copy`, { method: 'POST' });
+      const res = await apiFetch(`/api/harnesses/${id}/copy`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Failed to copy'); return; }
       await loadHarnessList();
@@ -130,7 +131,7 @@ function AppContent() {
 
   // 加载列表
   useEffect(() => {
-    fetch('http://localhost:3001/api/harnesses')
+    apiFetch('/api/harnesses')
       .then(res => res.json())
       .then(data => {
         setHarnessFiles(data);
@@ -151,11 +152,11 @@ function AppContent() {
     setHarness(null); // Clear harness first to avoid stale state initialization in child components
     
     Promise.all([
-      fetch(`http://localhost:3001/api/harnesses/${activeHarnessId}`).then(res => {
+      apiFetch(`/api/harnesses/${activeHarnessId}`).then(res => {
         if (!res.ok) throw new Error('Harness not found');
         return res.json();
       }),
-      fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`).then(res => {
+      apiFetch(`/api/sessions/${activeHarnessId}`).then(res => {
         if (!res.ok) return null;
         return res.json();
       })
@@ -176,7 +177,7 @@ function AppContent() {
     })
     .catch(err => {
       console.error("Failed to load Harness details or Session:", err);
-      fetch('http://localhost:3001/api/harnesses')
+      apiFetch('/api/harnesses')
         .then(res => res.json())
         .then(files => {
           if (files.length > 0) {
@@ -213,7 +214,7 @@ function AppContent() {
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
-    fetch(`http://localhost:3001/api/sessions/${activeHarnessId}`, {
+    apiFetch(`/api/sessions/${activeHarnessId}`, {
       method: 'DELETE'
     }).catch(err => console.error("Failed to clear backend Session:", err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -403,7 +404,7 @@ function AppContent() {
               key={activeHarnessId} 
               harness={harness} 
               onSave={(updatedHarness) => {
-                fetch(`http://localhost:3001/api/harnesses/${updatedHarness.id}`, {
+                apiFetch(`/api/harnesses/${updatedHarness.id}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(updatedHarness)
