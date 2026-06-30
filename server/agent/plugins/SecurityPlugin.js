@@ -21,6 +21,15 @@ function commandReferencesSensitiveFile(command) {
   );
 }
 
+function markPermanentSecurityBlock(tool, reason) {
+  tool.handled = true;
+  tool.toolStatus = 'blocked';
+  tool.securityBlock = {
+    permanent: true,
+    reason,
+  };
+}
+
 // 需要用户确认的可疑规则
 const SUSPICIOUS_RULES = [
   {
@@ -121,7 +130,7 @@ export const SecurityPlugin = {
 
       if (commandReferencesSensitiveFile(command)) {
         console.warn(`⛔ [Security Blocked] 拦截到试图通过 bash 访问敏感文件: "${command}"`);
-        tool.handled = true;
+        markPermanentSecurityBlock(tool, 'Sensitive file access is blocked by policy.');
         tool.toolOutput = `⛔ [Security Blocked] Sensitive file access is blocked for bash commands.`;
         return;
       }

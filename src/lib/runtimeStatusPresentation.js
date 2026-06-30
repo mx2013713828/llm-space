@@ -2,6 +2,7 @@ const TOOL_STATUS = {
   pending: { label: 'pending', tone: 'info' },
   running: { label: 'running', tone: 'info' },
   completed: { label: 'completed', tone: 'success' },
+  blocked: { label: 'blocked', tone: 'warning' },
   invalid_args: { label: 'invalid args', tone: 'danger' },
   failed: { label: 'failed', tone: 'danger' },
 };

@@ -17,6 +17,18 @@ test('presents invalid tool args as an error state', () => {
   });
 });
 
+test('presents blocked tool calls as a warning state', () => {
+  assert.deepEqual(getToolStatusPresentation({
+    type: 'tool_call',
+    toolName: 'read_file',
+    toolStatus: 'blocked',
+    toolOutput: 'Sensitive file access is blocked.',
+  }), {
+    label: 'blocked',
+    tone: 'warning',
+  });
+});
+
 test('infers completed tool status when output exists', () => {
   assert.deepEqual(getToolStatusPresentation({
     type: 'tool_call',

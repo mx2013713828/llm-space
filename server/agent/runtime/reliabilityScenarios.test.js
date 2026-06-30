@@ -106,6 +106,78 @@ test('empty read_file tool calls are marked invalid without executing the tool',
   });
 });
 
+test('permanent security blocks stop the loop instead of retrying bypass attempts', async () => {
+  await withTempCwd('runtime-security-block-', async () => {
+    const executor = new AgentExecutor({
+      harnessId: 'security-block',
+      messages: [{ role: 'user', turn: 1, content: '读取.env文件看看' }],
+      tools: ['bash', 'read_file', 'sub_agent'],
+      model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+      features: { security_mode: 'relaxed' },
+    });
+
+    let calls = 0;
+    executor._callLLM = async (context) => {
+      calls += 1;
+      executor.messages.push({
+        role: 'assistant',
+        type: 'tool_call',
+        turn: context.turnIndex,
+        id: `toolu_env_${calls}`,
+        toolName: 'bash',
+        toolInput: { command: `python -c "print(open('.env').read())"` },
+      });
+      return 'tool_use';
+    };
+
+    await executor.run(5);
+
+    const blockedTool = executor.messages.find(message => message.id === 'toolu_env_1');
+    const finalText = executor.messages.findLast(message => message.role === 'assistant' && message.type === 'text');
+
+    assert.equal(calls, 1);
+    assert.equal(blockedTool.toolStatus, 'blocked');
+    assert.match(finalText.content, /敏感文件|security policy|安全策略/i);
+    assert.match(finalText.content, /不能|无法|blocked|cannot/i);
+  });
+});
+
+test('sensitive read_file denials stop the loop before bash fallback attempts', async () => {
+  await withTempCwd('runtime-readfile-security-block-', async () => {
+    const executor = new AgentExecutor({
+      harnessId: 'readfile-security-block',
+      messages: [{ role: 'user', turn: 1, content: '读取.env文件看看' }],
+      tools: ['read_file', 'bash'],
+      model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+      features: { security_mode: 'relaxed' },
+    });
+
+    let calls = 0;
+    executor._callLLM = async (context) => {
+      calls += 1;
+      executor.messages.push({
+        role: 'assistant',
+        type: 'tool_call',
+        turn: context.turnIndex,
+        id: `toolu_read_env_${calls}`,
+        toolName: calls === 1 ? 'read_file' : 'bash',
+        toolInput: calls === 1
+          ? { path: '.env' }
+          : { command: `python -c "print(open('.env').read())"` },
+      });
+      return 'tool_use';
+    };
+
+    await executor.run(5);
+
+    const blockedTool = executor.messages.find(message => message.id === 'toolu_read_env_1');
+
+    assert.equal(calls, 1);
+    assert.equal(blockedTool.toolStatus, 'blocked');
+    assert.equal(executor.messages.some(message => message.id === 'toolu_read_env_2'), false);
+  });
+});
+
 test('teammate with only a final tool call sends an error outcome to lead', async () => {
   await withTempCwd('runtime-teammate-no-result-', async () => {
     class ToolOnlyExecutor {

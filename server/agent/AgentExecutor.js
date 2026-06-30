@@ -39,6 +39,42 @@ export const OFFLOAD_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000;
 export const SOFT_COMPACT_CONTEXT_RATIO = 0.75;
 export const HARD_COMPACT_CONTEXT_RATIO = 0.9;
 
+function classifyPermanentSecurityBlock(tool) {
+  if (tool?.securityBlock?.permanent) {
+    return tool.securityBlock;
+  }
+
+  const output = String(tool?.toolOutput || '');
+  if (/Sensitive file access is blocked/i.test(output) || /Access denied: sensitive files cannot be accessed/i.test(output)) {
+    return {
+      permanent: true,
+      reason: 'Sensitive file access is blocked by policy.',
+    };
+  }
+
+  if (/permanently blocked by the system deny list/i.test(output)) {
+    return {
+      permanent: true,
+      reason: 'The command is permanently blocked by the system deny list.',
+    };
+  }
+
+  return null;
+}
+
+function buildPermanentSecurityBlockFinalMessage(blockedTools = []) {
+  const toolNames = [...new Set(blockedTools.map(tool => tool.toolName).filter(Boolean))];
+  const suffix = toolNames.length > 0 ? `\n\n被阻断的工具：${toolNames.join(', ')}` : '';
+
+  return [
+    '我不能读取这个敏感文件。',
+    '',
+    '安全策略已经永久阻断了本次敏感文件访问请求。为避免浪费 token 和继续尝试绕过策略，我不会再改用 bash、Python、子代理或其他间接方式读取它。',
+    '',
+    '如果你只是想确认配置结构，我可以改为查看 `.env.example`、说明需要哪些环境变量，或者指导你在本地终端自行检查。'
+  ].join('\n') + suffix;
+}
+
 function inferExecutorModelProvider(model = {}) {
   return inferModelProvider({}, {
     providerHint: model.provider || model.id || model.name,
@@ -619,6 +655,12 @@ export class AgentExecutor {
               }
             }
 
+            const permanentSecurityBlock = classifyPermanentSecurityBlock(tool);
+            if (permanentSecurityBlock) {
+              tool.toolStatus = 'blocked';
+              tool.securityBlock = permanentSecurityBlock;
+            }
+
             if (!tool.toolStatus || tool.toolStatus === 'running') {
               tool.toolStatus = 'completed';
             }
@@ -639,6 +681,21 @@ export class AgentExecutor {
             for (const tool of toolsToRun) {
               await executeToolCall(tool);
             }
+          }
+
+          const permanentSecurityBlocks = toolsToRun.filter(tool => tool.securityBlock?.permanent);
+          if (permanentSecurityBlocks.length > 0) {
+            this.messages.push({
+              role: 'assistant',
+              type: 'text',
+              turn: turnIndex,
+              content: buildPermanentSecurityBlockFinalMessage(permanentSecurityBlocks)
+            });
+            this.onEvent('messages_update', { messages: this.messages });
+            exhaustedTurns = false;
+            await this.hooks.dispatch('onLoopEnd', context);
+            await this.saveSession();
+            break;
           }
 
           turnIndex++;
