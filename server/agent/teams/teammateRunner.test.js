@@ -88,7 +88,6 @@ test('runTeammate creates a teammate child executor, marks running then complete
     name: 'Reviewer',
     role: 'Critic',
     initialPrompt: 'Review the patch.',
-    maxTurns: 4,
     ExecutorClass: FakeExecutor,
     stateStore: {
       async updateTeammate(input) {

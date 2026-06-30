@@ -45,7 +45,6 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
     name: 'reviewer',
     role: 'Critic',
     prompt: 'Review the patch.',
-    maxTurns: 4,
   });
 
   await plugin.preToolUse({
@@ -105,47 +104,6 @@ test('spawn_teammate validates name, persists teammate state, and starts runTeam
   await rm(fixture.rootDir, { recursive: true, force: true });
 });
 
-test('spawn_teammate accepts legacy maxTurns input without using it as child runtime control', async () => {
-  const fixture = await createFixture();
-  const runCalls = [];
-  const plugin = createTeamPlugin({
-    bus: fixture.bus,
-    stateStore: fixture.stateStore,
-    async runTeammateFn(input) {
-      runCalls.push(input);
-    },
-  });
-
-  const hugeTool = createTool('spawn_teammate', {
-    name: 'reviewer',
-    prompt: 'Review the patch.',
-    maxTurns: 9999,
-  });
-  await plugin.preToolUse({
-    executor: { harnessId: 'h1', teamContext: null },
-    tool: hugeTool,
-  });
-
-  const invalidTool = createTool('spawn_teammate', {
-    name: 'implementer',
-    prompt: 'Implement the patch.',
-    maxTurns: Number.NaN,
-  });
-  await plugin.preToolUse({
-    executor: {
-      harnessId: 'h1',
-      teamContext: { teamId: JSON.parse(hugeTool.toolOutput).teamId, agentId: 'lead', leadId: 'lead' },
-    },
-    tool: invalidTool,
-  });
-
-  assert.equal(runCalls.length, 2);
-  assert.equal(runCalls[0].maxTurns, undefined);
-  assert.equal(runCalls[1].maxTurns, undefined);
-
-  await rm(fixture.rootDir, { recursive: true, force: true });
-});
-
 test('spawn_teammate accepts structured brief fields and builds a standard teammate prompt', async () => {
   const fixture = await createFixture();
   const runCalls = [];
@@ -165,7 +123,6 @@ test('spawn_teammate accepts structured brief fields and builds a standard teamm
     constraints: 'Do not modify files. Focus on correctness risks.',
     expected_output: 'Return critical findings with file references.',
     success_criteria: 'Mention if no blocking issues are found.',
-    maxTurns: 5,
   });
 
   await plugin.preToolUse({
@@ -360,7 +317,7 @@ test('check_team_inbox consumes the lead inbox and formats messages', async () =
     teammates: [
       { agentId: 'teammate_reviewer', name: 'reviewer', state: 'completed' },
       { agentId: 'teammate_backend', name: 'backend', state: 'running' },
-      { agentId: 'teammate_tests', name: 'tests', state: 'no_result', error: 'legacy turn limit' },
+      { agentId: 'teammate_tests', name: 'tests', state: 'no_result', error: 'missing final report' },
     ],
   });
 
