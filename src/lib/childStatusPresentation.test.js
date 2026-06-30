@@ -45,10 +45,10 @@ test('presents terminal child states', () => {
   assert.equal(getChildStatusPresentation({ state: 'cancelled' }).label, 'cancelled');
 });
 
-test('does not present turn_limit as a canonical child state', () => {
-  const presentation = getChildStatusPresentation({ state: 'turn_limit' });
+test('presents unknown child states as raw non-terminal states', () => {
+  const presentation = getChildStatusPresentation({ state: 'unexpected_child_state' });
 
-  assert.equal(presentation.label, 'turn_limit');
+  assert.equal(presentation.label, 'unexpected_child_state');
   assert.equal(presentation.tone, 'info');
   assert.equal(presentation.isTerminal, false);
 });

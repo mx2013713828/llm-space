@@ -82,11 +82,11 @@ test('presents teammate awaiting_permission as a warning state', () => {
   });
 });
 
-test('does not present teammate turn_limit as a canonical state', () => {
+test('presents unknown teammate states as raw info states', () => {
   assert.deepEqual(getTeammateStatusPresentation({
-    state: 'turn_limit',
+    state: 'unexpected_teammate_state',
   }), {
-    label: 'turn_limit',
+    label: 'unexpected_teammate_state',
     tone: 'info',
   });
 });
