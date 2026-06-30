@@ -42,8 +42,15 @@ test('presents terminal child states', () => {
   assert.equal(getChildStatusPresentation({ status: 'completed' }).isTerminal, true);
   assert.equal(getChildStatusPresentation({ state: 'failed' }).tone, 'danger');
   assert.equal(getChildStatusPresentation({ state: 'no_result' }).label, 'no result');
-  assert.equal(getChildStatusPresentation({ state: 'turn_limit' }).label, 'turn limit');
   assert.equal(getChildStatusPresentation({ state: 'cancelled' }).label, 'cancelled');
+});
+
+test('does not present turn_limit as a canonical child state', () => {
+  const presentation = getChildStatusPresentation({ state: 'turn_limit' });
+
+  assert.equal(presentation.label, 'turn_limit');
+  assert.equal(presentation.tone, 'info');
+  assert.equal(presentation.isTerminal, false);
 });
 
 test('derives a stable child display name', () => {

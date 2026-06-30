@@ -217,48 +217,6 @@ test('runTeammate marks failed and sends an error message when execution throws'
   ]);
 });
 
-test('runTeammate maps legacy turn_limit to no_result when child exhausts max turns', async () => {
-  class TurnLimitedExecutor extends FakeExecutor {
-    async run() {
-      this.lastRunStopReason = 'turn_limit';
-    }
-  }
-
-  const updates = [];
-  const sentMessages = [];
-  const events = [];
-  const parentExecutor = createParentExecutor();
-  parentExecutor.onEvent = (type, payload) => events.push({ type, payload });
-
-  await runTeammate({
-    parentExecutor,
-    teamId: 'team_1',
-    teammateId: 'reviewer',
-    name: 'Reviewer',
-    role: 'Critic',
-    initialPrompt: 'Review the patch.',
-    ExecutorClass: TurnLimitedExecutor,
-    stateStore: {
-      async updateTeammate(input) {
-        updates.push(input);
-      },
-    },
-    bus: {
-      async sendMessage(input) {
-        sentMessages.push(input);
-      },
-    },
-  });
-
-  assert.equal(updates[1].updates.state, 'no_result');
-  assert.match(updates[1].updates.error, /legacy turn limit/i);
-  assert.doesNotMatch(updates[1].updates.error, /\(\d+\)/);
-  assert.equal(events[1].payload.teammates[0].state, 'no_result');
-  assert.equal(sentMessages[0].type, 'error');
-  assert.match(sentMessages[0].payload.error, /legacy turn limit/i);
-  assert.doesNotMatch(sentMessages[0].payload.error, /\(\d+\)/);
-});
-
 test('runTeammate marks no_result when child finishes without final assistant text', async () => {
   class NoResultExecutor extends FakeExecutor {
     constructor(args) {

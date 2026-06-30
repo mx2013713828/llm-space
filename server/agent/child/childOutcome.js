@@ -39,7 +39,6 @@ export function buildChildOutcome({
 	messages = [],
 	stopReason = '',
 	childLabel = 'Child agent',
-	legacyMaxTurns = null,
 	requireFinalText = true,
 } = {}) {
 	const entries = Array.isArray(messages) ? messages : [];
@@ -54,15 +53,6 @@ export function buildChildOutcome({
 			lastToolName: lastTool?.toolName || null,
 			messageCount: entries.length,
 		};
-	}
-
-	if (stopReason === 'turn_limit') {
-		const maxTurnHint = legacyMaxTurns ? ` (${legacyMaxTurns})` : '';
-		return buildNoResultOutcome({
-			entries,
-			lastTool,
-			error: `${childLabel} hit legacy turn limit${maxTurnHint} before producing a final text report.`,
-		});
 	}
 
 	if (!requireFinalText) {

@@ -11,7 +11,6 @@ const TEAMMATE_STATUS = {
   awaiting_permission: { label: 'awaiting permission', tone: 'warning' },
   completed: { label: 'completed', tone: 'success' },
   failed: { label: 'failed', tone: 'danger' },
-  turn_limit: { label: 'turn limit', tone: 'danger' },
   no_result: { label: 'no result', tone: 'danger' },
 };
 

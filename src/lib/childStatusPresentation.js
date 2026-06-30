@@ -29,12 +29,6 @@ const CHILD_STATUS = {
     isTerminal: true,
     isWaitingForPermission: false,
   },
-  turn_limit: {
-    label: 'turn limit',
-    tone: 'danger',
-    isTerminal: true,
-    isWaitingForPermission: false,
-  },
   cancelled: {
     label: 'cancelled',
     tone: 'warning',

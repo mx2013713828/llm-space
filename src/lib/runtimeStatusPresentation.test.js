@@ -81,3 +81,12 @@ test('presents teammate awaiting_permission as a warning state', () => {
     tone: 'warning',
   });
 });
+
+test('does not present teammate turn_limit as a canonical state', () => {
+  assert.deepEqual(getTeammateStatusPresentation({
+    state: 'turn_limit',
+  }), {
+    label: 'turn_limit',
+    tone: 'info',
+  });
+});

@@ -19,19 +19,6 @@ test('does not treat pre-tool progress text as a final child result', () => {
   assert.equal(outcome.messageCount, 2);
 });
 
-test('maps legacy turn_limit stop reasons to no_result for child runtime', () => {
-  const outcome = buildChildOutcome({
-    messages: [{ role: 'assistant', type: 'text', content: 'Partial analysis.' }],
-    stopReason: 'turn_limit',
-    legacyMaxTurns: 4,
-  });
-
-  assert.equal(outcome.status, 'no_result');
-  assert.equal(outcome.content, '');
-  assert.match(outcome.error, /legacy turn limit/i);
-  assert.equal(outcome.messageCount, 1);
-});
-
 test('accepts final text after the last child tool call', () => {
   const outcome = buildChildOutcome({
     messages: [
