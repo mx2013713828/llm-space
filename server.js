@@ -17,7 +17,8 @@ import { toolRegistry } from './server/tools/ToolRegistry.js';
 import { AgentExecutor } from './server/agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from './server/agent/messageBuilder.js';
 import { SecurityPlugin } from './server/agent/plugins/SecurityPlugin.js';
-import { normalizeUsageMetrics } from './server/agent/usageNormalizer.js';
+import { createCopiedHarnessDraft, createHarnessDraft } from './server/harnessIdentity.js';
+import { handleLegacyChatRoute } from './server/legacyChatRoute.js';
 import { parseModelsConfig, upsertModelsConfig } from './server/modelConfig.js';
 import { cronScheduler } from './server/agent/scheduler/cronScheduler.js';
 import { startCronQueueProcessor } from './server/agent/scheduler/cronRunner.js';
@@ -86,6 +87,9 @@ app.use(express.json({ limit: '4mb' }));
 function sendEvent(res, type, data) {
   res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
 }
+
+/** Legacy direct proxy endpoint. New runs must use /api/agent/run. */
+app.post('/api/chat', handleLegacyChatRoute);
 
 /** 主要代理端点：POST /api/chat */
 app.post('/api/chat', async (req, res) => {
@@ -355,6 +359,22 @@ async function findSafeHarnessPath(harnessId) {
   return null;
 }
 
+async function loadHarnessesFromDir() {
+  await fs.mkdir(HARNESS_DIR, { recursive: true });
+  const files = await fs.readdir(HARNESS_DIR);
+  const harnesses = [];
+
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    try {
+      const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
+      harnesses.push(JSON.parse(content));
+    } catch (_) {}
+  }
+
+  return harnesses;
+}
+
 // Active jobs memory registry for background running and client attachments
 const activeJobs = new Map(); // harnessId -> { executor, clients: Set<res> }
 
@@ -460,35 +480,18 @@ app.post('/api/harnesses', async (req, res) => {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: '缺少 name 字段' });
 
-    const id = name.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-    const filename = `${name}.json`;
-    const targetPath = path.join(HARNESS_DIR, filename);
+    const existingHarnesses = await loadHarnessesFromDir();
+    const harness = createHarnessDraft({ name, description, existingHarnesses });
+    const targetPath = path.join(HARNESS_DIR, harness.name);
 
     if (await fs.access(targetPath).then(() => true).catch(() => false)) {
       return res.status(409).json({ error: '同名 Harness 已存在' });
     }
 
-    const harness = {
-      id,
-      name: filename,
-      description: description || '',
-      category: 'basic',
-      model: {
-        name: '',
-        response_format: 'text',
-        temperature: 1,
-        max_tokens: 4096,
-        top_p: 1
-      },
-      tools: [],
-      systemPrompt: '',
-      skills: []
-    };
-
     await fs.writeFile(targetPath, JSON.stringify(harness, null, 2), 'utf-8');
     res.json({ success: true, harness });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
@@ -547,30 +550,15 @@ app.delete('/api/harnesses/:id', async (req, res) => {
 /** 复制 Harness 配置 */
 app.post('/api/harnesses/:id/copy', async (req, res) => {
   try {
-    const files = await fs.readdir(HARNESS_DIR);
-    let source = null;
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      const content = await fs.readFile(path.join(HARNESS_DIR, file), 'utf-8');
-      try {
-        const data = JSON.parse(content);
-        if (data.id === req.params.id) { source = data; break; }
-      } catch { }
-    }
+    const existingHarnesses = await loadHarnessesFromDir();
+    const source = existingHarnesses.find(harness => harness.id === req.params.id);
     if (!source) return res.status(404).json({ error: 'Harness not found' });
 
-    const newId = source.id + '-copy';
-    const newName = source.name.replace(/\.json$/, '-copy.json');
-    const harness = {
-      ...source,
-      id: newId,
-      name: newName,
-      description: (source.description || '') + ' (副本)',
-    };
-    await fs.writeFile(path.join(HARNESS_DIR, newName), JSON.stringify(harness, null, 2), 'utf-8');
+    const harness = createCopiedHarnessDraft({ source, existingHarnesses });
+    await fs.writeFile(path.join(HARNESS_DIR, harness.name), JSON.stringify(harness, null, 2), 'utf-8');
     res.json({ success: true, harness });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
