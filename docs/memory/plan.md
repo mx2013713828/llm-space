@@ -171,7 +171,7 @@
 - [x] **Sub-agent 优化**：修复递归/工具挂载边界，优化简单任务不过度 DAG 化，并将子代理轨迹从主消息树中拆出，支持懒加载详情与卡片状态摘要。
 - [x] **Agent Teams MVP**：实现 `spawn_teammate`、`send_team_message`、`check_team_inbox`，通过 TeamBus 和 TeamStateStore 支持有限异步 teammate、结构化 brief、状态持久化、lead inbox 汇总。
 - [x] **Teams 可观测性**：前端 `spawn_teammate` 卡片显示 teammate 当前状态、任务摘要和完成数，减少异步执行时的黑箱感。
-- [x] **Teams 最小闭环收尾**：新增 `wait_for_teammates` 作为 join 点，等待 teammate 进入 `completed`、`failed`、`turn_limit`、`no_result` 等终态后返回 team status 和 Lead inbox，降低 lead 过早总结的概率。
+- [x] **Teams 最小闭环收尾**：新增 `wait_for_teammates` 作为 join 点，等待 teammate 进入 `completed`、`failed`、`cancelled`、`no_result` 等终态后返回 team status 和 Lead inbox，降低 lead 过早总结的概率。
 
 **后续计划**：
 - [ ] **Team Dashboard 轻量增强**：展示 team 列表、teammate 状态、未读 inbox、失败/超时/无结果标识，并支持按需展开 teammate 轨迹。

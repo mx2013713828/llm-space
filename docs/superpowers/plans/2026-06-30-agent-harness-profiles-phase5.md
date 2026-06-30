@@ -1,5 +1,7 @@
 # Agent Harness Profiles Phase 5 Implementation Plan
 
+Status: Completed on 2026-06-30.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove child-agent legacy compatibility branches that kept `turn_limit`, `maxTurns`, and old orchestration prompt migrations alive.
@@ -7,6 +9,14 @@
 **Architecture:** Child/team runtime outcome and presentation now use the canonical states only: `running`, `awaiting_permission`, `completed`, `failed`, `cancelled`, and `no_result`. Public teammate tool schema no longer advertises turn budgets. Feature parsing no longer rewrites legacy prompt text; current harness configuration is expected to use the canonical schema.
 
 **Tech Stack:** Node.js ESM, `node:test`, existing FeatureSchema, ToolRegistry, child outcome, and team runtime modules.
+
+**Completed Commits:**
+
+- `ce827ff docs: plan agent harness profiles phase 5`
+- `57948d6 refactor: remove child turn limit compatibility`
+- `ec3dda0 refactor: remove teammate maxTurns schema`
+- `489dd1e refactor: remove legacy prompt migration`
+- `19b2606 test: remove legacy state literals from presentation tests`
 
 ## Global Constraints
 
@@ -68,7 +78,7 @@
 - Produces: child presentation maps without `turn_limit`
 - Consumes: existing child outcome contract for `completed`, `cancelled`, and `no_result`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Update tests so `turn_limit` is no longer a canonical state:
 
@@ -82,7 +92,7 @@ assert.notDeepEqual(getTeammateStatusPresentation({ state: 'turn_limit' }), {
 
 Delete the tests that expect `buildChildOutcome` or `buildTeammateOutcome` to map `stopReason: 'turn_limit'` to a legacy no-result message.
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -92,7 +102,7 @@ node --test server/agent/child/childOutcome.test.js server/agent/teams/teammateO
 
 Expected: FAIL because the presentation maps still contain `turn_limit`.
 
-- [ ] **Step 3: Implement cleanup**
+- [x] **Step 3: Implement cleanup**
 
 Remove:
 
@@ -102,7 +112,7 @@ Remove:
 - `turn_limit` from `TEAMMATE_STATUS`
 - fake runner test that sets `lastRunStopReason = 'turn_limit'`
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -112,7 +122,7 @@ node --test server/agent/child/childOutcome.test.js server/agent/teams/teammateO
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/agent/child/childOutcome.js server/agent/child/childOutcome.test.js server/agent/teams/teammateOutcome.test.js server/agent/teams/teammateRunner.test.js src/lib/childStatusPresentation.js src/lib/childStatusPresentation.test.js src/lib/runtimeStatusPresentation.js src/lib/runtimeStatusPresentation.test.js
@@ -133,7 +143,7 @@ git commit -m "refactor: remove child turn limit compatibility"
 - Produces: `spawn_teammate` schema without `maxTurns`
 - Consumes: existing structured brief fields: `name`, `role`, `prompt`, `objective`, `constraints`, `expected_output`, `success_criteria`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 In `ToolRegistry.test.js`, assert:
 
@@ -144,7 +154,7 @@ assert.equal(spawnSchema.input_schema.properties.maxTurns, undefined);
 
 Remove `maxTurns` from all `spawn_teammate` test inputs and from `runTeammate` test inputs.
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -154,11 +164,11 @@ node --test server/tools/ToolRegistry.test.js server/agent/plugins/TeamPlugin.te
 
 Expected: FAIL because `spawn_teammate` still advertises `maxTurns`.
 
-- [ ] **Step 3: Implement cleanup**
+- [x] **Step 3: Implement cleanup**
 
 Delete the `maxTurns` parameter from `server/tools/spawn_teammate.js`.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -168,7 +178,7 @@ node --test server/tools/ToolRegistry.test.js server/agent/plugins/TeamPlugin.te
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/tools/spawn_teammate.js server/tools/ToolRegistry.test.js server/agent/plugins/TeamPlugin.test.js server/agent/teams/teammateRunner.test.js
@@ -187,7 +197,7 @@ git commit -m "refactor: remove teammate maxTurns schema"
 - Produces: `parseFeatures(inputFeatures)` without old prompt rewrite behavior
 - Consumes: canonical `FEATURE_SCHEMA.task_orchestration.children.*_prompt.defaultValue`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Replace the legacy migration test with a preservation test:
 
@@ -207,7 +217,7 @@ assert.equal(parsed.custom_strategy_prompt, legacyPrompt);
 
 This asserts old prompt text is treated as user-provided config, not silently rewritten.
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -217,7 +227,7 @@ node --test src/lib/FeatureSchema.test.js
 
 Expected: FAIL because old prompt text is currently migrated to the canonical default.
 
-- [ ] **Step 3: Implement cleanup**
+- [x] **Step 3: Implement cleanup**
 
 Delete:
 
@@ -227,7 +237,7 @@ Delete:
 
 Text-area parsing should assign `rawValue` directly when the group is enabled or preserves disabled children.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -237,7 +247,7 @@ node --test src/lib/FeatureSchema.test.js
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/FeatureSchema.js src/lib/FeatureSchema.test.js
@@ -258,7 +268,7 @@ git commit -m "refactor: remove legacy prompt migration"
 - Consumes: completed Task 1-3 commits.
 - Produces: documented Phase 5 completion state.
 
-- [ ] **Step 1: Update docs**
+- [x] **Step 1: Update docs**
 
 Mark Phase 5 complete in the design:
 
@@ -271,7 +281,7 @@ Mark Phase 5 complete in the design:
 
 Record Task 1-3 commit hashes in this plan.
 
-- [ ] **Step 2: Run targeted source scan**
+- [x] **Step 2: Run targeted source scan**
 
 Run:
 
@@ -279,9 +289,11 @@ Run:
 rg "turn_limit|legacy turn|legacyMaxTurns|maxTurns" server src -g '!server/sessions/**'
 ```
 
-Expected: only lead `AgentExecutor.run(maxTurns)` safety-loop references and non-child tests may remain.
+Expected: only lead `AgentExecutor.run(maxTurns)` safety-loop references, schema absence assertions, and unbounded child adapter tests may remain.
 
-- [ ] **Step 3: Run full verification**
+Observed on 2026-06-30: matched only the lead executor safety loop/stream test, `spawn_teammate` schema absence assertion, and child adapter tests that assert unbounded child execution.
+
+- [x] **Step 3: Run full verification**
 
 Run:
 
@@ -292,7 +304,12 @@ npm run build
 
 Expected: all tests pass and build succeeds.
 
-- [ ] **Step 4: Commit docs**
+Observed on 2026-06-30:
+
+- `node --test $(rg --files -g '*test.js' | sort)`: 278 passed.
+- `npm run build`: passed.
+
+- [x] **Step 4: Commit docs**
 
 ```bash
 git add -f docs/superpowers/specs/2026-06-29-agent-harness-profiles-design.md docs/superpowers/plans/2026-06-30-agent-harness-profiles-phase5.md docs/memory/plan.md docs/memory/status.md

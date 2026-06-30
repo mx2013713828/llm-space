@@ -1,7 +1,7 @@
 # Agent Harness Profiles and Unbounded Child Runtime Design
 
 Date: 2026-06-29
-Status: In progress; Phases 1-4 implemented, cancellation runtime still pending
+Status: In progress; Phases 1-5 implemented, cancellation runtime still pending
 Scope: `sub_agent`, async teammates, future agent teams, and child-agent runtime foundations
 
 ## Summary
@@ -53,7 +53,7 @@ Sub-agent cards and teammate cards display different status models. Permission m
 3. Preserve safety through cancellation, approval, provider timeouts, and low-level watchdogs rather than turn count limits.
 4. Make permission requests first-class child runtime events.
 5. Reuse profile, event bridge, outcome, trace, and permission logic between sub-agents and teammates.
-6. Keep adapters for existing external behavior while moving shared behavior into foundation modules.
+6. Keep external behavior adapters only where they support current harness contracts; old harness compatibility is intentionally out of scope after Phase 5.
 7. Design for future teams-v2 and autonomous pools without overbuilding them in the first phase.
 
 ## Non-Goals
@@ -62,7 +62,7 @@ Sub-agent cards and teammate cards display different status models. Permission m
 - Do not merge TeamBus into the child runtime. TeamBus is a teammate/team adapter concern.
 - Do not make all child agents read-only. Some child agents should be allowed to request approval for controlled writes or verification.
 - Do not implement autonomous team pools in the first phase.
-- Do not preserve `turn_limit` as a new feature. It is a legacy migration concern only.
+- Do not preserve `turn_limit` as a child-agent feature or compatibility state.
 
 ## Core Concept: Agent Harness Profile
 
@@ -141,7 +141,7 @@ State meanings:
 - `cancelled`: user or parent runtime cancelled it.
 - `no_result`: child stopped without satisfying its output contract.
 
-`turn_limit` should be removed from the runtime state model. Existing traces or persisted team states may still contain `turn_limit`; adapters can map old values for display during migration, but new runs should not create it.
+`turn_limit` is removed from the runtime state model. New runs must not create it, and old persisted values are treated as unknown raw states rather than carried forward as a supported compatibility branch.
 
 ## Unbounded Execution
 
@@ -407,10 +407,10 @@ Goals:
 
 Work:
 
-1. Remove `maxTurns` from child spawn schemas or mark as ignored/deprecated.
-2. Remove final synthesis after tool-turn exhaustion for child runtimes.
-3. Migrate display of old `turn_limit` traces to a legacy badge.
-4. Delete obsolete tests that encode turn-limit behavior.
+1. Done: Remove `maxTurns` from child spawn schemas.
+2. Done: Remove child/team `turn_limit` compatibility outcome and display branches.
+3. Done: Remove old prompt migration branches.
+4. Done: Delete obsolete tests that encode turn-limit behavior.
 
 ## Testing Strategy
 
@@ -428,7 +428,7 @@ Frontend tests:
 - permission source formatting for lead/sub-agent/teammate
 - child status display for running/awaiting_permission/completed/failed/cancelled/no_result
 - trace lazy loading still works for existing sub-agent and teammate traces
-- legacy `turn_limit` state displays as legacy only
+- unknown child states fall through as raw unknown labels without canonical styling
 
 Integration tests:
 

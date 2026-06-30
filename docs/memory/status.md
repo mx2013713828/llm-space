@@ -106,7 +106,7 @@
 19. **Hook-Based 生命周期架构重构**：将原本臃肿的后端 AgentExecutor 主循环彻底解耦。引入微内核 `HookManager`，将上下文清洗、大文本物理卸载、子代理拦截、技能按需扫描加载、Todo 看板同步及催促等特性，完全剥离为独立的可插拔插件（Plugins）。框架现已演进为严格遵循 `PreLLM -> PreToolUse -> PostToolUse -> OnLoopEnd` 的标准化流水线，具备了类似 Claude Code 等工业级 Agent 引擎的极致扩展能力与代码纯洁度。
 20. **长期记忆系统（Memory System）**：实现跨会话、跨压缩的知识积累层（阶段十，commit d5128f9）。包含 memoryStore（写锁+路径校验+UTF-8安全截断）、memorySelect（LLM side-query+关键词降级）、memoryExtract（对话结束后自动提取）、memoryConsolidate（三层门控定期整理）、MemoryPlugin（preLLM 注入 + onLoopEnd fire-and-forget）。索引注入 system prompt 保护 Prompt Cache，具体内容注入 user turn 不破坏缓存前缀。FeatureSchema 新增 enable_memory group，含子级联动约束。
 21. **可恢复的任务依赖系统 (DAG Task System) 与一键式合并重构**：实现类似 Claude Code 的持久化任务图系统，内置 Kahn 算法环检测、Claim 排他文件锁、Release Path 中断回滚事务，以及静前动后前缀缓存友好拆分。更进一步，进行了任务系统一键一类合并重构，在前端 Tools 面板中彻底隐藏 6 个物理原子工具，在 FeatureSchema 中引入统一的 `task_manager` 实验特性组，支持 `todo`/`task_system` 双模式动态净化与自动搭载。
-22. **Task Orchestration 与 Agent Teams MVP 闭环**：将任务看板、DAG Task System、Sub-agent、Cron、Background Tasks、Agent Teams 统一到 Task Orchestration 下，新增可实时切换的执行策略层。Agent Teams 已实现有限异步 teammate、TeamBus、结构化 brief、前端 teammate live status、`turn_limit`/`no_result` 终态语义，以及 `wait_for_teammates` join 工具，使 lead 能等待团队收敛后再汇总，完成 MVP 最小闭环。
+22. **Task Orchestration 与 Agent Teams MVP 闭环**：将任务看板、DAG Task System、Sub-agent、Cron、Background Tasks、Agent Teams 统一到 Task Orchestration 下，新增可实时切换的执行策略层。Agent Teams 已实现有限异步 teammate、TeamBus、结构化 brief、前端 teammate live status、`completed`/`failed`/`cancelled`/`no_result` 终态语义，以及 `wait_for_teammates` join 工具，使 lead 能等待团队收敛后再汇总，完成 MVP 最小闭环。
 
 ## 6. Task Orchestration / Agent Teams 后续计划
 
