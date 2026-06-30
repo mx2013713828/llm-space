@@ -1,7 +1,7 @@
 # Agent Harness Profiles and Unbounded Child Runtime Design
 
 Date: 2026-06-29
-Status: In progress; Phases 1-3 implemented, cancellation runtime still pending
+Status: In progress; Phases 1-4 implemented, cancellation runtime still pending
 Scope: `sub_agent`, async teammates, future agent teams, and child-agent runtime foundations
 
 ## Summary
@@ -394,10 +394,10 @@ Goals:
 
 Work:
 
-1. Keep TeamBus as protocol layer.
-2. Make teammate adapter consume child runtime outcomes.
-3. Simplify `wait_for_teammates` around `running`, `awaiting_permission`, `completed`, `failed`, `cancelled`, `no_result`.
-4. Remove `turn_limit` from team state creation.
+1. Done: Keep TeamBus as protocol layer.
+2. Done: Make teammate adapter consume child runtime outcomes.
+3. Done: Simplify `wait_for_teammates` around `running`, `awaiting_permission`, `completed`, `failed`, `cancelled`, `no_result`.
+4. Done: Remove `turn_limit` from team state creation.
 
 ### Phase 5: Legacy Removal
 

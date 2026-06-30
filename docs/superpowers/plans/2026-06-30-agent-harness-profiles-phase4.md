@@ -1,5 +1,7 @@
 # Agent Harness Profiles Phase 4 Implementation Plan
 
+Status: Completed on 2026-06-30
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Clean up the team runtime so async teammates behave as adapters over the shared child runtime state and outcome model.
@@ -59,7 +61,7 @@
 - Produces: `formatTeammateStatusLine(teammate: object): string`
 - Consumes: existing persisted team state shape `{ teammates: Record<string, teammate> }`
 
-- [ ] **Step 1: Write failing helper tests**
+- [x] **Step 1: Write failing helper tests**
 
 Add tests proving:
 
@@ -90,13 +92,13 @@ assert.equal(
 );
 ```
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run: `node --test server/agent/teams/teamRuntimeState.test.js`
 
 Expected: FAIL with module-not-found or missing export errors.
 
-- [ ] **Step 3: Implement helper and wire TeamPlugin**
+- [x] **Step 3: Implement helper and wire TeamPlugin**
 
 Implement the helper with these state semantics:
 
@@ -120,7 +122,7 @@ export function formatTeammateStatusLine(teammate) {
 
 Update `TeamPlugin.js` to import these helpers and remove its local terminal-state constant and duplicated unresolved filtering.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -130,7 +132,7 @@ node --test server/agent/teams/teamRuntimeState.test.js server/agent/plugins/Tea
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/agent/teams/teamRuntimeState.js server/agent/teams/teamRuntimeState.test.js server/agent/plugins/TeamPlugin.js server/agent/plugins/TeamPlugin.test.js
@@ -151,7 +153,7 @@ git commit -m "refactor: centralize team runtime states"
 - Produces: `buildTeammateOutcome({ messages, stopReason }): ChildOutcome`
 - Consumes: `buildChildOutcome({ messages, stopReason, childLabel })`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Update teammate outcome and runner tests so legacy `turn_limit` still becomes `no_result`, but error text does not include a teammate max-turn count:
 
@@ -173,7 +175,7 @@ assert.match(updates[1].updates.error, /legacy turn limit/i);
 assert.doesNotMatch(updates[1].updates.error, /\(\d+\)/);
 ```
 
-- [ ] **Step 2: Verify red**
+- [x] **Step 2: Verify red**
 
 Run:
 
@@ -183,7 +185,7 @@ node --test server/agent/teams/teammateOutcome.test.js server/agent/teams/teamma
 
 Expected: FAIL because current teammate outcome still injects a legacy max-turn hint.
 
-- [ ] **Step 3: Implement minimal cleanup**
+- [x] **Step 3: Implement minimal cleanup**
 
 Change `buildTeammateOutcome` to:
 
@@ -199,7 +201,7 @@ export function buildTeammateOutcome({ messages = [], stopReason = '' } = {}) {
 
 Remove `maxTurns` from `runTeammate` destructuring and from the `buildTeammateOutcome` call.
 
-- [ ] **Step 4: Verify green**
+- [x] **Step 4: Verify green**
 
 Run:
 
@@ -209,7 +211,7 @@ node --test server/agent/teams/teammateOutcome.test.js server/agent/teams/teamma
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/agent/teams/teammateOutcome.js server/agent/teams/teammateOutcome.test.js server/agent/teams/teammateRunner.js server/agent/teams/teammateRunner.test.js
@@ -228,7 +230,7 @@ git commit -m "refactor: remove teammate max turn semantics"
 - Consumes: completed Task 1 and Task 2 commits.
 - Produces: documented Phase 4 completion status.
 
-- [ ] **Step 1: Update docs**
+- [x] **Step 1: Update docs**
 
 Mark Phase 4 work items as completed:
 
@@ -241,7 +243,7 @@ Mark Phase 4 work items as completed:
 
 Record the Task 1 and Task 2 commit hashes in this plan.
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run:
 
@@ -252,7 +254,7 @@ npm run build
 
 Expected: all tests pass and build succeeds.
 
-- [ ] **Step 3: Commit docs**
+- [x] **Step 3: Commit docs**
 
 ```bash
 git add -f docs/superpowers/specs/2026-06-29-agent-harness-profiles-design.md docs/superpowers/plans/2026-06-30-agent-harness-profiles-phase4.md
@@ -264,3 +266,8 @@ git commit -m "docs: mark team runtime phase complete"
 - Spec coverage: This plan covers all Phase 4 bullets and intentionally leaves public schema removal and cancellation for later phases.
 - Placeholder scan: No placeholder text remains.
 - Type consistency: State helper names match the files and imports planned above.
+
+## Commits
+
+- `a33bae8 refactor: centralize team runtime states`
+- `0f2731f refactor: remove teammate max turn semantics`
