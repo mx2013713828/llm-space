@@ -137,12 +137,12 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Write behavior-preserving route tests for harness load/save/copy/delete, model list/upsert/update, session read/write/delete, and legacy chat `410`.
-- [ ] Extract active job reservation into `activeJobs.js` with tests for reserve-before-await, attach, release, and concurrent duplicate runs.
-- [ ] Extract one route group at a time from `server.js`; do not mix behavior changes into the extraction.
-- [ ] Move app assembly into `createServerApp`, leaving `server.js` as bootstrapping, `.env` loading, scheduler startup, and `listen`.
-- [ ] Verify with `npm test` and `npm run build`.
-- [ ] Commit with `refactor: split runtime server boundaries`.
+- [x] Write behavior-preserving route tests for harness load/save/copy/delete, model list/upsert/update, session read/write/delete, and legacy chat `410`.
+- [x] Extract active job reservation into `activeJobs.js` with tests for reserve-before-await, attach, release, and concurrent duplicate runs.
+- [x] Extract one route group at a time from `server.js`; do not mix behavior changes into the extraction.
+- [x] Move app assembly into `createServerApp`, leaving `server.js` as bootstrapping, `.env` loading, scheduler startup, and `listen`.
+- [x] Verify with `npm test` and `npm run build`.
+- [x] Commit with `refactor: split runtime server boundaries`.
 
 ### Task 2: Runtime Request Contract
 
