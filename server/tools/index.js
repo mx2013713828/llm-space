@@ -1,7 +1,13 @@
 import { toolRegistry } from './ToolRegistry.js';
+import { getToolName } from '../agent/toolPool.js';
 
 export function getToolSchemas() {
   return toolRegistry.getSchemas();
+}
+
+export function getToolSchemasForTools(tools = [], registry = toolRegistry) {
+  const enabledToolNames = (Array.isArray(tools) ? tools : []).map(getToolName).filter(Boolean);
+  return registry.getSchemas(enabledToolNames);
 }
 
 export async function executeTool(toolName, toolInput, onData) {

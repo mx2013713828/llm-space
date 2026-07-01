@@ -67,3 +67,50 @@ test('harness routes list, load, create, copy, and delete harness files', async 
   await assert.rejects(access(path.join(fixture.harnessDir, 'alpha.json')));
   await assert.rejects(access(path.join(fixture.sessionsDir, 'alpha.json')));
 });
+
+test('harness dry-run returns compact tool pool summary from runtime tools', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      tools: ['bash', 'sub_agent'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'task_system',
+          enable_sub_agents: true,
+        },
+      },
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.toolPoolSummary.runtimeRole, 'lead');
+  assert.deepEqual(res.body.toolPoolSummary.names, [
+    'bash',
+    'create_task',
+    'list_tasks',
+    'get_task',
+    'claim_task',
+    'complete_task',
+    'sub_agent',
+    'get_current_time',
+  ]);
+  assert.deepEqual(
+    res.body.tools.map(tool => tool.name).sort(),
+    [...res.body.toolPoolSummary.names].sort(),
+  );
+});

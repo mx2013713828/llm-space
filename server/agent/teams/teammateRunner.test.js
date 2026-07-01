@@ -112,7 +112,7 @@ test('runTeammate creates a teammate child executor, marks running then complete
   });
   assert.deepEqual(
     FakeExecutor.lastArgs.tools,
-    ['bash', { name: 'custom_tool', description: 'kept' }, 'send_team_message'],
+    ['bash', { name: 'custom_tool', description: 'kept' }, 'send_team_message', 'get_current_time'],
   );
   assert.equal(FakeExecutor.lastArgs.features.task_orchestration.mode, 'todo');
   assert.equal(FakeExecutor.lastArgs.features.enable_memory.enabled, false);

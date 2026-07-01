@@ -131,7 +131,7 @@ test('createReviewerProfile is read-only by default and strips orchestration plu
 
 	assert.equal(profile.identity.childType, 'reviewer');
 	assert.equal(profile.identity.role, 'Code reviewer');
-	assert.deepEqual(profile.tools, ['bash', 'read_file', { name: 'custom_tool' }]);
+	assert.deepEqual(profile.tools, ['bash', 'read_file', { name: 'custom_tool' }, 'get_current_time']);
 	assert.equal(profile.features.enable_memory.enabled, false);
 	assert.match(profile.systemPrompt, /read-only by default/i);
 	assert.match(profile.systemPrompt, /structured findings/i);
@@ -153,7 +153,7 @@ test('createVerifierProfile keeps atomic verification tools and prepares verifie
 	});
 
 	assert.equal(profile.identity.childType, 'verifier');
-	assert.deepEqual(profile.tools, ['bash', 'read_file', 'write_file', { name: 'custom_tool' }]);
+	assert.deepEqual(profile.tools, ['bash', 'read_file', 'write_file', { name: 'custom_tool' }, 'get_current_time']);
 	assert.equal(profile.features.enable_memory.enabled, false);
 	assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/h1/verifier_1');
 	assert.match(profile.systemPrompt, /verification evidence/i);

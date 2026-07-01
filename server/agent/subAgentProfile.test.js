@@ -57,13 +57,15 @@ test('selectSubAgentTools removes every orchestration-managed tool by normalized
   const selectedTools = selectSubAgentTools([
     'bash',
     'sub_agent',
+    'spawn_teammate',
+    'send_team_message',
     { name: 'schedule_cron', description: 'cron scheduler' },
     { name: 'query_background_tasks' },
     { name: 'write_todos' },
     { name: 'custom_tool', description: 'kept' },
   ]);
 
-  assert.deepEqual(selectedTools, ['bash', { name: 'custom_tool', description: 'kept' }]);
+  assert.deepEqual(selectedTools, ['bash', { name: 'custom_tool', description: 'kept' }, 'get_current_time']);
 });
 
 test('createSubAgentProfile returns executor-ready child profile data', () => {
@@ -94,7 +96,8 @@ test('createSubAgentProfile returns executor-ready child profile data', () => {
   assert.match(profile.systemPrompt, /one-off sub-agent/i);
   assert.match(profile.systemPrompt, /\.agent-scratch\/h1\/tool_123/);
   assert.equal(profile.scratchWorkspace.relativePath, '.agent-scratch/h1/tool_123');
-  assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }]);
+  assert.deepEqual(profile.tools, ['bash', { name: 'custom_tool' }, 'get_current_time']);
+  assert.equal(profile.runtimeRole, 'sub_agent');
   assert.equal(profile.features.task_orchestration.enabled, false);
   assert.equal(profile.features.task_orchestration.enable_sub_agents, false);
   assert.equal(profile.features.enable_memory.enabled, false);

@@ -226,9 +226,10 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 - Create: `server/agent/toolPool.test.js`
 - Modify: `server/tools/index.js`
 - Modify: `server/agent/child/childAgentProfile.js`
-- Modify: `server/agent/subagents/subAgentProfile.js`
+- Modify: `server/agent/subAgentProfile.js`
 - Modify: `server/agent/teams/teammateProfile.js`
-- Modify: `src/lib/taskOrchestration.js` only if UI helpers need alignment.
+- Modify: `server/routes/harnessRoutes.js`
+- Modify: `src/components/ContextInspector.jsx`
 
 **Interfaces:**
 
@@ -238,11 +239,12 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Write tests for lead, sub-agent, teammate, reviewer, verifier, task-system mode, todo mode, async teams, and orchestration-disabled cases.
-- [ ] Move managed orchestration tool filtering into the server-side boundary.
-- [ ] Keep frontend feature UI as configuration, not the source of truth for runtime tools.
-- [ ] Add a compact tool-pool summary for Context Inspector.
-- [ ] Verify and commit with `refactor: centralize runtime tool pool assembly`.
+- [x] Write tests for lead, sub-agent, teammate, reviewer, verifier, task-system mode, todo mode, async teams, and orchestration-disabled cases.
+- [x] Move managed orchestration tool filtering into the server-side boundary.
+- [x] Keep frontend feature UI as configuration, not the source of truth for runtime tools.
+- [x] Add a compact tool-pool summary for Context Inspector.
+- [x] Verify with targeted tests, `npm test`, and `npm run build`.
+- [x] Commit with `refactor: centralize runtime tool pool assembly`.
 
 ### Task 5: Runtime Notification Queue
 

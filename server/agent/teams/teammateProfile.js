@@ -1,9 +1,9 @@
 import {
   createChildAgentProfile,
   createChildFeatures,
-  selectChildTools,
 } from '../child/childAgentProfile.js';
 import { createScratchWorkspacePolicy } from '../child/scratchWorkspacePolicy.js';
+import { assembleToolPool } from '../toolPool.js';
 
 export const EMPTY_TEAMMATE_RESULT = '(teammate finished without a final text result)';
 
@@ -22,10 +22,10 @@ export function createTeammateFeatures(parentFeatures) {
 }
 
 export function selectTeammateTools(parentTools) {
-  return selectChildTools(parentTools, {
-    toolFilter: 'hidden_orchestration',
-    appendTools: ['send_team_message'],
-  });
+  return assembleToolPool({
+    baseTools: parentTools,
+    runtimeRole: 'teammate',
+  }).tools;
 }
 
 export function createTeammateSystemPrompt({ name, role }) {
@@ -73,8 +73,7 @@ export function createTeammateProfile({
       memoryEnabled: false,
     },
     toolPolicy: {
-      toolFilter: 'hidden_orchestration',
-      appendTools: ['send_team_message'],
+      runtimeRole: 'teammate',
     },
     scratchWorkspace: createScratchWorkspacePolicy({
       runId: parentExecutor.harnessId || 'default',

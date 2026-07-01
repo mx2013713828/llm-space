@@ -28,7 +28,6 @@ import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js'
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
 import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
-import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 import { buildPersistedSessionState } from '../sessions/sessionState.js';
 import {
@@ -38,6 +37,7 @@ import {
   runStopStage,
   runToolStage,
 } from './agentLoopStages.js';
+import { assembleToolPool, isOrchestrationEnabled } from './toolPool.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -159,11 +159,13 @@ export class AgentExecutor {
     const orchestrationEnabled = isOrchestrationEnabled(orchestration);
     const isTaskSystem = orchestrationEnabled && orchestration?.mode === 'task_system';
     const isTodoMode = orchestrationEnabled && orchestration?.mode === 'todo';
-    this.tools = resolveOrchestrationTools(tools, orchestration, { runtimeRole });
-
-    if (!this.tools.some(tool => tool === 'get_current_time' || tool?.name === 'get_current_time')) {
-      this.tools.push('get_current_time');
-    }
+    this.toolPool = assembleToolPool({
+      baseTools: tools,
+      features: this.features,
+      runtimeRole,
+      strategyId: selectedStrategyId,
+    });
+    this.tools = this.toolPool.tools;
 
     this.model = model;
     this.compactionThresholds = getCompactionTokenThresholds(model);

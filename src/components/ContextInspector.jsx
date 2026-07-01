@@ -114,6 +114,7 @@ export function ContextInspector({
     system: alignedData.system || '(None)',
     tools: alignedData.tools || [],
     messages: alignedData.messages || [],
+    toolPoolSummary: alignedData.toolPoolSummary || null,
   };
   const totalChars = JSON.stringify(fullContext).length;
   const displayTokens = currentTokens || Math.round(totalChars / 4);
@@ -321,6 +322,48 @@ export function ContextInspector({
     );
   };
 
+  const renderToolPoolSummary = () => {
+    const summary = alignedData.toolPoolSummary;
+    if (!summary) return null;
+
+    const rows = [
+      { label: 'Runtime Role', value: summary.runtimeRole || 'lead' },
+      { label: 'Strategy', value: summary.strategyId || 'custom' },
+      { label: 'Mode', value: summary.orchestration?.mode || 'todo' },
+      { label: 'Tools', value: `${summary.count || 0}` },
+    ];
+
+    return (
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(20, 184, 166, 0.05)', border: '1px solid #14b8a6', borderRadius: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#14b8a6', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🧩</span> Runtime Tool Pool
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 10 }}>
+          {rows.map(row => (
+            <div key={row.label} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{row.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>{row.value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+          <div style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Runtime Added</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
+              {(summary.added || []).join(', ') || 'none'}
+            </div>
+          </div>
+          <div style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Runtime Removed</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
+              {(summary.removed || []).join(', ') || 'none'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowContextInspector(false)}>
       {/* 半透明遮罩 */}
@@ -385,6 +428,9 @@ export function ContextInspector({
 
               {/* Execution Strategy */}
               {renderStrategySummary()}
+
+              {/* Runtime Tool Pool */}
+              {renderToolPoolSummary()}
 
               {/* Tools */}
               {renderTools()}

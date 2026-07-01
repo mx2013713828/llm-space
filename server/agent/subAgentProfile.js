@@ -2,8 +2,8 @@ import { AgentExecutor } from './AgentExecutor.js';
 import {
   createChildAgentProfile,
   createChildFeatures,
-  selectChildTools,
 } from './child/childAgentProfile.js';
+import { assembleToolPool } from './toolPool.js';
 import { createChildEventBridge } from './child/childEventBridge.js';
 import { buildChildOutcome } from './child/childOutcome.js';
 import { createScratchWorkspacePolicy } from './child/scratchWorkspacePolicy.js';
@@ -32,9 +32,10 @@ export function createSubAgentFeatures(parentFeatures) {
 }
 
 export function selectSubAgentTools(parentTools) {
-  return selectChildTools(parentTools, {
-    toolFilter: 'managed_orchestration',
-  });
+  return assembleToolPool({
+    baseTools: parentTools,
+    runtimeRole: 'sub_agent',
+  }).tools;
 }
 
 export function createSubAgentProfile({ parentExecutor, prompt, childId }) {
@@ -54,12 +55,15 @@ export function createSubAgentProfile({ parentExecutor, prompt, childId }) {
       memoryEnabled: false,
     },
     toolPolicy: {
-      toolFilter: 'managed_orchestration',
+      runtimeRole: 'sub_agent',
     },
     scratchWorkspace: createScratchWorkspacePolicy({
       runId: parentExecutor.harnessId || 'default',
       childId,
     }),
+    extra: {
+      runtimeRole: 'sub_agent',
+    },
   });
 }
 

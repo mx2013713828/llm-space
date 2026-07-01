@@ -72,7 +72,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
     { role: 'user', content: 'Investigate the repository state.' },
   ]);
   assert.equal(spawned.constructorArgs.tools.some(entry => entry === 'sub_agent' || entry?.name === 'schedule_cron'), false);
-  assert.deepEqual(spawned.constructorArgs.tools, ['bash', { name: 'custom_tool' }]);
+  assert.deepEqual(spawned.constructorArgs.tools, ['bash', { name: 'custom_tool' }, 'get_current_time']);
   assert.equal(spawned.constructorArgs.features.task_orchestration.enabled, false);
   assert.equal(spawned.constructorArgs.features.enable_memory.enabled, false);
   assert.equal(spawned.constructorArgs.features.security_mode, 'strict');

@@ -5,7 +5,9 @@ import { AgentExecutor } from '../agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from '../agent/messageBuilder.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
+import { describeToolPool } from '../agent/toolPool.js';
 import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
+import { getToolSchemasForTools } from '../tools/index.js';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 
 const DEFAULT_HARNESS_DIR = path.join(process.cwd(), 'harnesses');
@@ -243,8 +245,7 @@ export function registerHarnessRoutes(app, {
       };
 
       await executor.hooks.dispatch('preLLM', context);
-      const enabledToolNames = context.tools.map(t => typeof t === 'string' ? t : t.name);
-      const toolSchemas = registry.getSchemas(enabledToolNames);
+      const toolSchemas = getToolSchemasForTools(context.tools, registry);
       const aligned = alignRequestPayload(
         context.systemPrompt || '',
         toolSchemas,
@@ -255,7 +256,8 @@ export function registerHarnessRoutes(app, {
       res.json({
         system: aligned.system,
         tools: aligned.tools,
-        messages: aligned.messages
+        messages: aligned.messages,
+        toolPoolSummary: describeToolPool(executor.toolPool),
       });
     } catch (err) {
       console.error('[harnessRoutes /api/harnesses/:harnessId/dry-run] Error:', err);

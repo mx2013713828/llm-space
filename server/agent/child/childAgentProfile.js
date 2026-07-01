@@ -1,16 +1,10 @@
 import {
 	ORCHESTRATION_MANAGED_TOOL_NAMES,
 	TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES,
+	assembleToolPool,
 	getToolName,
-} from '../../../src/lib/taskOrchestration.js';
+} from '../toolPool.js';
 import { createScratchWorkspacePolicy } from './scratchWorkspacePolicy.js';
-
-const WRITE_ORIENTED_TOOL_NAMES = new Set([
-	'write_file',
-	'replace_file_content',
-	'multi_replace_file_content',
-	'run_command',
-]);
 
 const REVIEWER_SYSTEM_PROMPT = [
 	'You are a focused reviewer child agent.',
@@ -84,6 +78,17 @@ export function createChildFeatures(parentFeatures, policy = {}) {
 
 export function selectChildTools(parentTools, policy = {}) {
 	const tools = Array.isArray(parentTools) ? parentTools : [];
+	if (policy.runtimeRole) {
+		return assembleToolPool({
+			baseTools: tools,
+			features: policy.features ?? {},
+			runtimeRole: policy.runtimeRole,
+			mountedResources: {
+				tools: policy.appendTools ?? [],
+			},
+		}).tools;
+	}
+
 	const filteredToolNames = getFilteredToolNames(policy.toolFilter);
 	const filtered = tools.filter(tool => !filteredToolNames.includes(getToolName(tool)));
 	const appended = [...filtered, ...(policy.appendTools ?? [])];
@@ -117,7 +122,7 @@ export function createChildAgentProfile({
 		},
 		messages: messages ?? [{ role: 'user', content: prompt }],
 		systemPrompt: appendScratchInstruction(systemPrompt, scratchWorkspace),
-		tools: selectChildTools(parentTools, toolPolicy),
+		tools: selectChildTools(parentTools, { ...toolPolicy, features: parentFeatures }),
 		features: createChildFeatures(parentFeatures, featurePolicy),
 		...(scratchWorkspace ? { scratchWorkspace } : {}),
 		...extra,
@@ -148,14 +153,11 @@ export function createReviewerProfile({
 			memoryEnabled: false,
 		},
 		toolPolicy: {
-			toolFilter: 'hidden_orchestration',
+			runtimeRole: 'reviewer',
 		},
 	});
 
-	return {
-		...baseProfile,
-		tools: baseProfile.tools.filter(tool => !WRITE_ORIENTED_TOOL_NAMES.has(getToolName(tool))),
-	};
+	return baseProfile;
 }
 
 export function createVerifierProfile({
@@ -182,7 +184,7 @@ export function createVerifierProfile({
 			memoryEnabled: false,
 		},
 		toolPolicy: {
-			toolFilter: 'hidden_orchestration',
+			runtimeRole: 'verifier',
 		},
 		scratchWorkspace: createScratchWorkspacePolicy({
 			runId: parentExecutor.harnessId || 'default',
