@@ -1,6 +1,10 @@
 import path from 'path';
 
 import { AgentExecutor } from '../agent/AgentExecutor.js';
+import {
+  buildRuntimeRequest as defaultBuildRuntimeRequest,
+  getRuntimeHarnessId,
+} from '../agent/runtimeRequest.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { resolveSelectedStrategyId as defaultResolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { resolveRunTeamContext as defaultResolveRunTeamContext } from '../sessions/sessionState.js';
@@ -111,6 +115,7 @@ export function registerAgentRunRoutes(app, {
   activeJobs,
   sessionsDir = DEFAULT_SESSIONS_DIR,
   ExecutorClass = AgentExecutor,
+  buildRuntimeRequest = defaultBuildRuntimeRequest,
   resolveRunTeamContext = defaultResolveRunTeamContext,
   resolveSelectedStrategyId = defaultResolveSelectedStrategyId,
   resolvePermission = SecurityPlugin.resolvePermission,
@@ -121,30 +126,12 @@ export function registerAgentRunRoutes(app, {
   }
 
   app.post('/api/agent/run', async (req, res) => {
-    const {
-      harnessId,
-      messages,
-      todos,
-      backgroundTasks,
-      teamContext,
-      systemPrompt,
-      tools,
-      features,
-      model,
-      temperature,
-      maxTokens,
-      thinkingEnabled,
-      selectedStrategyId,
-      interactionMode,
-      skills
-    } = req.body;
-
-    if (!harnessId) {
-      return res.status(400).json({ error: '缺少 harnessId' });
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(harnessId)) {
-      return res.status(400).json({ error: '非法的 Harness ID' });
+    const body = req.body || {};
+    let harnessId;
+    try {
+      harnessId = getRuntimeHarnessId(body);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ error: err.message });
     }
 
     const reservation = reserveJob(activeJobs, harnessId, { source: 'agent' });
@@ -154,36 +141,28 @@ export function registerAgentRunRoutes(app, {
     }
 
     const job = reservation.job;
+    let runtimeRequest;
+    try {
+      runtimeRequest = await buildRuntimeRequest({
+        body,
+        sessionsDir,
+        resolveRunTeamContext,
+        resolveSelectedStrategyId,
+      });
+    } catch (err) {
+      activeJobs.delete(harnessId);
+      return res.status(err.statusCode || 500).json({ error: err.message });
+    }
 
-    if (!model?.key) {
+    if (!runtimeRequest.model?.key) {
       activeJobs.delete(harnessId);
       return res.status(400).json({ error: '缺少 API Key' });
     }
 
     prepareSseResponse(res);
 
-    const effectiveTeamContext = await resolveRunTeamContext({
-      sessionsDir,
-      harnessId,
-      requestedTeamContext: teamContext,
-    });
-
     const executor = new ExecutorClass({
-      harnessId,
-      teamContext: effectiveTeamContext,
-      messages,
-      todos,
-      backgroundTasks,
-      systemPrompt,
-      tools,
-      features,
-      model,
-      temperature,
-      maxTokens,
-      thinkingEnabled,
-      selectedStrategyId: resolveSelectedStrategyId({ explicitStrategyId: selectedStrategyId, features }),
-      interactionMode,
-      skills,
+      ...runtimeRequest,
       onEvent: (type, data) => {
         broadcastEvent(activeJobs, harnessId, type, data);
       }

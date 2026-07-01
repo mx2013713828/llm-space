@@ -30,6 +30,7 @@ import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/inte
 import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
+import { buildPersistedSessionState } from '../sessions/sessionState.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -231,16 +232,14 @@ export class AgentExecutor {
         // Ensure that server/sessions/ directory exists
         await fs.mkdir(sessionsDir, { recursive: true });
 
-        // Auto-save agent messages and todos state to session file
-        const sessionState = {
+        const sessionState = await buildPersistedSessionState({
+          sessionsDir,
+          harnessId: this.harnessId,
           messages: this.messages,
           todos: this.todos,
           backgroundTasks: this.backgroundTasks,
-        };
-
-        if (this.teamContext) {
-          sessionState.teamContext = this.teamContext;
-        }
+          teamContext: this.teamContext ?? null,
+        });
 
         await fs.writeFile(sessionPath, JSON.stringify(sessionState, null, 2), 'utf-8');
       } catch (err) {

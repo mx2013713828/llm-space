@@ -157,7 +157,8 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 - Create: `server/agent/runtimeRequest.js`
 - Create: `server/agent/runtimeRequest.test.js`
 - Modify: `server/routes/agentRunRoutes.js`
-- Modify: `server/sessions/sessionState.js`
+- Modify: `server/agent/AgentExecutor.js`
+- Reuse: `server/sessions/sessionState.js`
 
 **Interfaces:**
 
@@ -167,11 +168,12 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Write tests for missing harness id, invalid harness id, selected model lookup, feature defaulting, strategy fallback, team context restoration, and scheduled run payloads.
-- [ ] Implement `RuntimeRequest` as a plain serializable object passed into executor construction.
-- [ ] Keep existing API response shapes unchanged.
-- [ ] Verify with targeted tests, `npm test`, and `npm run build`.
-- [ ] Commit with `refactor: add runtime request contract`.
+- [x] Write tests for missing harness id, invalid harness id, selected model lookup, feature defaulting, strategy fallback, team context restoration, and scheduled run payloads.
+- [x] Implement `RuntimeRequest` as a plain serializable object passed into executor construction.
+- [x] Keep existing API response shapes unchanged.
+- [x] Reuse `buildPersistedSessionState` from executor save path so runtime persistence follows the shared session contract.
+- [x] Verify with targeted tests, `npm test`, and `npm run build`.
+- [x] Commit with `refactor: add runtime request contract`.
 
 ---
 
