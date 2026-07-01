@@ -72,19 +72,19 @@ The following capabilities are already implemented and covered by tests:
 - Consumes: `buildBashSpawnInvocation(command, options)`.
 - Produces: a platform capability object such as `{ command, args, sandboxed, redactionOnly, reason }`.
 
-- [ ] **Step 1: Write platform capability tests**
+- [x] **Step 1: Write platform capability tests**
 
 Test that macOS returns `sandboxed: true` when `sandbox-exec` exists, and non-macOS returns an explicit `redactionOnly: true` or configured alternative instead of silently claiming sandboxing.
 
-- [ ] **Step 2: Add a user-visible degraded-sandbox marker**
+- [x] **Step 2: Add a user-visible degraded-sandbox marker**
 
 When process-level sandboxing is unavailable, tool output and logs should identify that only command preflight plus redaction are active.
 
-- [ ] **Step 3: Add environment allowlist option**
+- [x] **Step 3: Add environment allowlist option**
 
 Evaluate replacing `...process.env` passed to bash with an explicit environment allowlist, keeping only variables needed for local tooling and model-independent execution.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run:
 
@@ -94,7 +94,7 @@ npm test
 npm run build
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/tools/bashSandbox.js server/tools/bash.js server/agent/AgentExecutor.js server/tools/*test.js

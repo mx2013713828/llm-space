@@ -1,6 +1,11 @@
 import { spawn } from 'child_process';
 
-import { buildBashSpawnInvocation, createSensitiveOutputRedactor } from './bashSandbox.js';
+import {
+  buildBashEnvironment,
+  buildBashSpawnInvocation,
+  createSensitiveOutputRedactor,
+  formatBashSandboxNotice,
+} from './bashSandbox.js';
 
 export default {
   name: 'bash',
@@ -14,24 +19,21 @@ export default {
    * @param {Object} params 参数
    * @param {Function} onData 可选的流式输出回调 (chunk: string) => void
    */
-  execute: async ({ command }, onData) => {
+  execute: async ({ command, sandboxOptions }, onData) => {
     return new Promise((resolve) => {
       const redactSensitiveOutput = createSensitiveOutputRedactor();
-      const invocation = buildBashSpawnInvocation(command);
+      const invocation = buildBashSpawnInvocation(command, sandboxOptions);
+      const sandboxNotice = formatBashSandboxNotice(invocation);
 
       // 注入环境变量，诱导工具产生彩色输出和进度条
-      const env = { 
-        ...process.env, 
-        FORCE_COLOR: '1', 
-        PYTHONUNBUFFERED: '1',
-        PIP_PROGRESS_BAR: 'on',
-        TERM: 'xterm-256color' 
-      };
+      const env = buildBashEnvironment();
 
       const child = spawn(invocation.command, invocation.args, { env });
       
-      let fullOutput = '';
+      let fullOutput = sandboxNotice;
       let lastOutputTime = Date.now();
+
+      if (sandboxNotice && onData) onData(sandboxNotice);
 
       const handleData = (data) => {
         lastOutputTime = Date.now();

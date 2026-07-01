@@ -3,7 +3,12 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { spawn } from 'child_process';
 import { toolRegistry } from '../tools/ToolRegistry.js';
-import { buildBashSpawnInvocation, createSensitiveOutputRedactor } from '../tools/bashSandbox.js';
+import {
+  buildBashEnvironment,
+  buildBashSpawnInvocation,
+  createSensitiveOutputRedactor,
+  formatBashSandboxNotice,
+} from '../tools/bashSandbox.js';
 import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
 import { COMPACT_PROMPT } from './compactPrompt.js';
 import { HookManager } from './HookManager.js';
@@ -1253,13 +1258,12 @@ export class AgentExecutor {
   _runBackgroundTask(bgTask) {
     const redactSensitiveOutput = createSensitiveOutputRedactor();
     const invocation = buildBashSpawnInvocation(bgTask.command);
-    const env = { 
-      ...process.env, 
-      FORCE_COLOR: '1', 
-      PYTHONUNBUFFERED: '1',
-      PIP_PROGRESS_BAR: 'on',
-      TERM: 'xterm-256color' 
-    };
+    const env = buildBashEnvironment();
+    const sandboxNotice = formatBashSandboxNotice(invocation);
+    if (sandboxNotice) {
+      bgTask.output += sandboxNotice;
+      this.onEvent('background_tasks_update', { tasks: this.backgroundTasks });
+    }
 
     const child = spawn(invocation.command, invocation.args, { env });
     
