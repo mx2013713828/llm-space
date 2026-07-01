@@ -34,8 +34,6 @@ __pycache__/
 *.cpython-310.pyc
 server/sessions/*
 server/scheduler/*.json
-!docs/superpowers/*
-!docs/memory/*
 harnesses/*
 !harnesses/01-chat-bot.json
 !harnesses/02-bash.json
@@ -45,7 +43,5 @@ harnesses/*
 .task_outputs/
 .transcripts/
 .offloaded/
-docs/
-!docs/images/llm-space.gif
 scratch/
 .memory/
