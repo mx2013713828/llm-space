@@ -31,6 +31,13 @@ import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls
 import { isOrchestrationEnabled, resolveOrchestrationTools } from '../../src/lib/taskOrchestration.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 import { buildPersistedSessionState } from '../sessions/sessionState.js';
+import {
+  hasExecutableToolUse,
+  runModelStage,
+  runPreLlmStage,
+  runStopStage,
+  runToolStage,
+} from './agentLoopStages.js';
 
 
 // 自定义异常类以精确区分错误路径
@@ -436,13 +443,10 @@ export class AgentExecutor {
           hasUpdatedTodoThisTurn: false
         };
 
-        // 生命周期：onLoopStart
-        await this.hooks.dispatch('onLoopStart', context);
-
-        applyToolPolicyToContext(context, this.interactionMode);
-
-        // 生命周期：preLLM (在这里会发生：软硬清洗压缩、Todo 看板注入、Skills 组装等)
-        await this.hooks.dispatch('preLLM', context);
+        // 生命周期：onLoopStart + preLLM (在这里会发生：软硬清洗压缩、Todo 看板注入、Skills 组装等)
+        await runPreLlmStage(context, {
+          applyToolPolicy: (stageContext) => applyToolPolicyToContext(stageContext, this.interactionMode),
+        });
 
         if (this.pendingNotifications && this.pendingNotifications.length > 0) {
           const notificationsText = this.pendingNotifications.join('\n\n');
@@ -483,9 +487,9 @@ export class AgentExecutor {
         let stopReason = null;
         try {
           const isContinuation = recoveryState.recovery_count > 0;
-          stopReason = await this._callLLM(context, recoveryState, isContinuation);
-          context.stopReason = stopReason;
-          this.lastRunStopReason = stopReason;
+          stopReason = await runModelStage(context, {
+            callModel: (stageContext) => this._callLLM(stageContext, recoveryState, isContinuation),
+          });
           this.maxTokens = originalMaxTokens; // 恢复 tokens 限制
         } catch (err) {
           this.maxTokens = originalMaxTokens; // 异常时也恢复
@@ -578,9 +582,12 @@ export class AgentExecutor {
           }
         }
 
+        const currentTurnMessages = this.messages.filter(m => m.turn === turnIndex);
+        const shouldRunToolStage = context.stopReason === 'tool_use' || hasExecutableToolUse(currentTurnMessages);
+
         // 生命周期：拦截判定是否执行工具
-        if (context.stopReason === 'tool_use') {
-          const toolsToRun = this.messages.filter(m => m.turn === turnIndex && m.type === 'tool_call');
+        if (shouldRunToolStage) {
+          const toolsToRun = currentTurnMessages.filter(m => m.type === 'tool_call' && hasExecutableToolUse([m]));
 
           const executeToolCall = async (tool) => {
             tool.toolStatus = 'running';
@@ -679,13 +686,7 @@ export class AgentExecutor {
 
           const isParallel = this.features?.parallel_tool_execution === true;
 
-          if (isParallel) {
-            await Promise.all(toolsToRun.map(executeToolCall));
-          } else {
-            for (const tool of toolsToRun) {
-              await executeToolCall(tool);
-            }
-          }
+          await runToolStage(context, { toolsToRun, executeToolCall, isParallel });
 
           const permanentSecurityBlocks = toolsToRun.filter(tool => tool.securityBlock?.permanent);
           if (permanentSecurityBlocks.length > 0) {
@@ -721,30 +722,11 @@ export class AgentExecutor {
         }
       }
     } finally {
-      // 触发最终清理和保存
-      try {
-        await this.hooks.dispatch('onLoopEnd', { executor: this });
-      } catch (err) {
-        console.error('[AgentExecutor] final onLoopEnd cleanup failed:', err);
-      }
-
-      try {
-        await this.saveSession();
-      } catch (err) {
-        console.error('[AgentExecutor] final session save failed:', err);
-      }
-
-      try {
-        SecurityPlugin.clearExecutorPending(this);
-      } catch (err) {
-        console.error('[AgentExecutor] final security cleanup failed:', err);
-      }
-
-      try {
-        this.onEvent('done', {});
-      } catch (err) {
-        console.error('[AgentExecutor] final done event failed:', err);
-      }
+      await runStopStage({
+        executor: this,
+        clearSecurity: () => SecurityPlugin.clearExecutorPending(this),
+        emitDone: () => this.onEvent('done', {}),
+      });
     }
   }
 

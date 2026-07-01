@@ -192,7 +192,7 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 - Modify: `server/agent/AgentExecutor.js`
 - Create: `server/agent/agentLoopStages.js`
 - Create: `server/agent/agentLoopStages.test.js`
-- Modify: `server/agent/HookManager.js`
+- No change needed: `server/agent/HookManager.js`
 - Test: `server/agent/AgentExecutor.run.test.js`
 
 **Interfaces:**
@@ -205,11 +205,12 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Add tests that assert actual `tool_use` blocks drive continuation, not only provider `stop_reason`.
-- [ ] Add tests for cleanup on normal final answer, error, security block, and permission wait.
-- [ ] Extract small stage helpers only where tests already cover behavior.
-- [ ] Keep public stream events and persisted message shapes unchanged.
-- [ ] Verify and commit with `refactor: define agent loop stage contract`.
+- [x] Add tests that assert actual `tool_use` blocks drive continuation, not only provider `stop_reason`.
+- [x] Add tests for cleanup on normal final answer, error, security block, and permission wait.
+- [x] Extract small stage helpers only where tests already cover behavior.
+- [x] Keep public stream events and persisted message shapes unchanged.
+- [x] Verify with targeted tests, `npm test`, and `npm run build`.
+- [x] Commit with `refactor: define agent loop stage contract`.
 
 ### Task 4: Tool Pool Assembly Boundary
 
