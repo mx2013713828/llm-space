@@ -91,6 +91,61 @@ test('emits stable ids for streamed assistant content blocks', async (t) => {
   assert.deepEqual(executor.messages.map(({ id }) => id), ['msg_1_0_thinking', 'msg_1_1_text']);
 });
 
+test('tracks interleaved streamed content blocks by provider index', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => sseResponse([
+    { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+    { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_weather', name: 'weather_report' } },
+    { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"city"' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Checking weather.' } },
+    { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: ':"Linyi"}' } },
+    { type: 'content_block_stop', index: 1 },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 8 } }
+  ]);
+  const emittedEvents = [];
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    thinkingEnabled: true,
+    onEvent: (type, payload) => emittedEvents.push({ type, payload }),
+  });
+
+  const stopReason = await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'weather' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: ['weather_report']
+  }, { continuation_tokens: [] });
+
+  assert.equal(stopReason, 'tool_use');
+  assert.deepEqual(executor.messages.map(({ type, content, toolName, toolInput }) => ({
+    type,
+    content,
+    toolName,
+    toolInput,
+  })), [
+    {
+      type: 'text',
+      content: 'Checking weather.',
+      toolName: undefined,
+      toolInput: undefined,
+    },
+    {
+      type: 'tool_call',
+      content: undefined,
+      toolName: 'weather_report',
+      toolInput: { city: 'Linyi' },
+    },
+  ]);
+  assert.equal(emittedEvents.filter(event => event.type === 'text_start').length, 1);
+  assert.equal(emittedEvents.filter(event => event.type === 'tool_start').length, 1);
+  assert.equal(emittedEvents.find(event => event.type === 'tool_end')?.payload.id, 'toolu_weather');
+});
+
 test('recovers when a provider sends text_delta without starting a text block', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

@@ -288,9 +288,9 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 ### Task 6: Shared Streaming Parser
 
-**Goal:** Remove duplicated Anthropic-compatible SSE parsing and normalize model stream events in one place.
+**Goal:** Remove Anthropic-compatible SSE parsing from `AgentExecutor` and normalize provider stream chunks into provider-neutral runtime events.
 
-**Why:** DeepSeek/Anthropic-compatible behavior, thinking blocks, text deltas, tool calls, usage, and stop reasons should be fixtures in parser tests, not hidden inside `AgentExecutor`.
+**Why:** DeepSeek/Anthropic-compatible behavior, thinking blocks, text deltas, tool calls, usage, and stop reasons should be fixtures in parser tests, not hidden inside `AgentExecutor`. Pi-style stream normalization also gives the future model gateway one stable event contract before adding OpenAI-compatible or native adapters.
 
 **Loop stage:** Stream normalization.
 
@@ -303,21 +303,33 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Interfaces:**
 
-- `parseProviderSseLines(lines): ModelRuntimeEvent[]`
-- `normalizeAnthropicCompatibleEvent(event): ModelRuntimeEvent`
+- `parseProviderSseLines(lines): RawProviderEvent[]`
+- `normalizeAnthropicCompatibleEvent(event): ModelRuntimeEvent[]`
+- `createAnthropicCompatibleStreamState(): { blocksByIndex: Map<number, StreamBlockState> }`
+
+**Runtime event contract:**
+
+- `message_start`: normalized model and raw usage.
+- `thinking_start`, `thinking_delta`, `thinking_end`: addressed by `index` and stable assistant message id.
+- `text_start`, `text_delta`, `text_end`: addressed by `index` and stable assistant message id.
+- `tool_start`, `tool_input_delta`, `tool_end`: addressed by `index` and provider tool id.
+- `message_delta`: normalized stop reason and raw usage.
+- `provider_error`: normalized provider-side stream errors.
+
+**Boundary:** Task 6 does not choose protocols, build request bodies, move model config, or add OpenAI-compatible calls. It only prepares the stream event contract that Task 7 will consume.
 
 **Steps:**
 
-- [ ] Write parser fixture tests for thinking, text, tool_use, malformed JSON lines, message_delta stop reasons, and usage.
-- [ ] Implement parser without changing public stream events.
-- [ ] Rewire `AgentExecutor._callLLM` to consume normalized runtime events.
-- [ ] Verify and commit with `refactor: extract model stream parser`.
+- [x] Write parser fixture tests for thinking, text, tool_use, malformed JSON lines, message_delta stop reasons, usage, and interleaved content indexes.
+- [x] Implement parser and Anthropic-compatible normalizer without changing public UI stream events.
+- [x] Rewire `AgentExecutor._callLLM` to consume normalized runtime events through a per-index block state map.
+- [x] Verify and commit with `refactor: extract model stream parser`.
 
 ### Task 7: Unified Model Gateway And Model Library
 
 **Goal:** Extract model management and provider/protocol calling into an upper runtime library while keeping the current Anthropic-compatible execution contract stable.
 
-**Why:** The project only supports Anthropic-style messages today, but model providers are already diverse. Provider identity and wire protocol must be independent.
+**Why:** The project only supports Anthropic-style messages today, but model providers are already diverse. Provider identity and wire protocol must be independent: the same provider can expose one model connection through `protocol: "anthropic"` and another through `protocol: "openai"`.
 
 **Loop stage:** Model gateway.
 
@@ -337,15 +349,25 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 **Interfaces:**
 
 - `loadModelRegistry(): ModelRegistry`
-- `resolveModelProfile(modelId): { id, provider, protocol, endpoint, contextWindow, cacheSemantics, capabilities }`
+- `resolveModelProfile(modelId): { id, provider, protocol, baseUrl, modelId, contextWindow, cacheSemantics, capabilities }`
 - `callModelGateway({ modelProfile, request, stream, signal }): AsyncIterable<ModelRuntimeEvent>`
+
+**Model connection contract:**
+
+- `provider`: supplier identity for display, defaults, and provider-specific compatibility hints.
+- `protocol`: wire adapter selector, initially `anthropic` and later `openai` or native adapters.
+- `baseUrl`: concrete endpoint root for the selected protocol.
+- `modelId`: provider API model name.
+- `contextWindow`: explicit model context window, defaulting to `128000` for legacy configs.
+- `capabilities`: model-level feature hints such as tools, thinking, prompt cache, and cache write support.
 
 **Steps:**
 
 - [ ] Write registry compatibility tests for legacy `MODELS_CONFIG`, pretty JSON config, default `contextWindow: 128000`, DeepSeek provider inference, and existing fields.
 - [ ] Implement model registry and keep `server/modelConfig.js` as a compatibility wrapper until route extraction is complete.
-- [ ] Write gateway tests for Anthropic-compatible request alignment, DeepSeek thinking rules, cache usage normalization, and stream normalization.
+- [ ] Write gateway tests for `protocol: "anthropic"` request alignment, DeepSeek thinking rules, cache usage normalization, and stream normalization.
 - [ ] Move request-body alignment, headers, endpoint construction, and protocol details into `anthropicMessages.js`.
+- [ ] Add an OpenAI-compatible adapter only after Anthropic-compatible behavior is stable behind the gateway.
 - [ ] Rewire `AgentExecutor` to request normalized events from the gateway.
 - [ ] Update model UI so provider, protocol, context window, and cache semantics are visible but not heavy.
 - [ ] Verify and commit with `refactor: add unified model gateway`.

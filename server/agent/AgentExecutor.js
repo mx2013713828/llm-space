@@ -33,6 +33,11 @@ import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js'
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
 import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
+import {
+  createAnthropicCompatibleStreamState,
+  normalizeAnthropicCompatibleEvent,
+  parseProviderSseLines,
+} from '../model/streamParser.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 import { buildPersistedSessionState } from '../sessions/sessionState.js';
 import {
@@ -746,7 +751,6 @@ export class AgentExecutor {
 
     let upstream = null;
     let lastErr = null;
-    let newCharsGenerated = 0;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const baseUrl = this.model.url || 'https://api.anthropic.com';
@@ -918,10 +922,14 @@ export class AgentExecutor {
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-
-    let currentBlockType = null;
-    let currentMsg = null;
-    let stopReason = null;
+    const providerStreamState = createAnthropicCompatibleStreamState();
+    const runtimeStreamState = {
+      turnIndex,
+      isContinuation,
+      blockMessagesByIndex: new Map(),
+      generatedChars: 0,
+      stopReason: null,
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -931,223 +939,323 @@ export class AgentExecutor {
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6).trim();
-        if (raw === '[DONE]') continue;
-        let evt;
-        try { evt = JSON.parse(raw); } catch { continue; }
-
-        switch (evt.type) {
-          case 'message_start': {
-            if (evt.message?.usage) {
-              const usageMetrics = normalizeUsageMetrics(evt.message.usage, {
-                baseUrl: this.model.url,
-                modelId: this.model.modelId || this.model.name,
-              });
-              this._lastInputTokens = usageMetrics.inputTokens;
-              this.contextTokens = usageMetrics.totalInputTokens;
-              this.onEvent('message_start', {
-                model: evt.message?.model,
-                inputTokens: usageMetrics.inputTokens,
-                totalInputTokens: usageMetrics.totalInputTokens,
-                cacheReadTokens: usageMetrics.cacheHitTokens,
-                cacheCreationTokens: usageMetrics.cacheWriteTokens,
-                cacheHitTokens: usageMetrics.cacheHitTokens,
-                cacheMissTokens: usageMetrics.cacheMissTokens,
-                cacheWriteTokens: usageMetrics.cacheWriteTokens,
-                cacheSupportsWriteTokens: usageMetrics.cacheSupportsWriteTokens,
-                cacheProvider: usageMetrics.cacheProvider,
-              });
-            } else {
-              this.onEvent('message_start', {
-                model: evt.message?.model,
-                inputTokens: 0,
-                totalInputTokens: 0,
-                cacheReadTokens: 0,
-                cacheCreationTokens: 0,
-                cacheHitTokens: 0,
-                cacheMissTokens: 0,
-                cacheWriteTokens: 0,
-                cacheSupportsWriteTokens: false,
-                cacheProvider: 'generic',
-              });
-            }
-            break;
-          }
-
-          case 'content_block_start': {
-            const blk = evt.content_block;
-            currentBlockType = blk.type;
-            const streamMessageId = `msg_${turnIndex}_${evt.index}_${blk.type}`;
-
-            if (blk.type === 'thinking') {
-              currentMsg = {
-                id: streamMessageId,
-                role: 'assistant',
-                type: 'thinking',
-                turn: turnIndex,
-                content: '',
-                tokens: { input: this._lastInputTokens || 0, output: 0 },
-                signature: blk.signature
-              };
-              this.messages.push(currentMsg);
-              this.onEvent('thinking_start', { id: currentMsg.id, index: evt.index, signature: blk.signature, turn: turnIndex });
-            } else if (blk.type === 'text') {
-              if (isContinuation) {
-                currentMsg = this.messages.findLast(m => m.role === 'assistant' && m.type === 'text');
-              } else {
-                currentMsg = {
-                  id: streamMessageId,
-                  role: 'assistant',
-                  type: 'text',
-                  turn: turnIndex,
-                  content: '',
-                  tokens: { input: this._lastInputTokens || 0, output: 0 }
-                };
-                this.messages.push(currentMsg);
-              }
-              this.onEvent('text_start', { id: currentMsg?.id, index: evt.index, turn: turnIndex, isContinuation });
-            } else if (blk.type === 'tool_use') {
-              currentMsg = {
-                role: 'assistant',
-                type: 'tool_call',
-                turn: turnIndex,
-                id: blk.id,
-                toolName: blk.name,
-                toolInputRaw: '',
-                toolInput: {},
-                toolStatus: 'pending'
-              };
-              this.messages.push(currentMsg);
-              this.onEvent('tool_start', { index: evt.index, name: blk.name, id: blk.id, turn: turnIndex });
-            }
-            break;
-          }
-
-          case 'content_block_delta': {
-            const delta = evt.delta;
-            if (delta.type === 'thinking_delta') {
-              if (currentMsg?.type !== 'thinking') {
-                currentMsg = {
-                  id: `msg_${turnIndex}_${evt.index}_thinking`,
-                  role: 'assistant',
-                  type: 'thinking',
-                  turn: turnIndex,
-                  content: '',
-                  tokens: { input: this._lastInputTokens || 0, output: 0 },
-                  signature: ''
-                };
-                currentBlockType = 'thinking';
-                this.messages.push(currentMsg);
-                this.onEvent('thinking_start', { id: currentMsg.id, index: evt.index, signature: '', turn: turnIndex });
-              }
-              if (currentMsg) currentMsg.content += delta.thinking;
-              this.onEvent('thinking_delta', { id: currentMsg?.id, text: delta.thinking });
-            } else if (delta.type === 'text_delta') {
-              if (currentMsg?.type !== 'text') {
-                if (currentMsg?.type === 'thinking') {
-                  this.onEvent('thinking_end', { id: currentMsg.id, text: currentMsg.content || '' });
-                }
-                currentMsg = isContinuation
-                  ? this.messages.findLast(m => m.role === 'assistant' && m.type === 'text')
-                  : null;
-                if (!currentMsg) {
-                  currentMsg = {
-                    id: `msg_${turnIndex}_${evt.index}_text`,
-                    role: 'assistant',
-                    type: 'text',
-                    turn: turnIndex,
-                    content: '',
-                    tokens: { input: this._lastInputTokens || 0, output: 0 }
-                  };
-                  this.messages.push(currentMsg);
-                }
-                currentBlockType = 'text';
-                this.onEvent('text_start', { id: currentMsg?.id, index: evt.index, turn: turnIndex, isContinuation });
-              }
-              if (currentMsg) currentMsg.content += delta.text;
-              if (isContinuation) {
-                newCharsGenerated += delta.text.length;
-              }
-              this.onEvent('text_delta', { id: currentMsg?.id, text: delta.text });
-            } else if (delta.type === 'input_json_delta') {
-              if (currentMsg && currentMsg.type === 'tool_call') {
-                currentMsg.toolInputRaw += delta.partial_json;
-                try { currentMsg.toolInput = JSON.parse(currentMsg.toolInputRaw); } catch { }
-              }
-              this.onEvent('tool_input_delta', { id: currentMsg?.id, partial: delta.partial_json });
-            }
-            break;
-          }
-
-          case 'content_block_stop':
-            if (currentBlockType === 'thinking') {
-              this.onEvent('thinking_end', { id: currentMsg?.id, text: currentMsg?.content || '' });
-            } else if (currentBlockType === 'text') {
-              this.onEvent('text_end', { id: currentMsg?.id, text: currentMsg?.content || '' });
-            } else if (currentBlockType === 'tool_use') {
-              this.onEvent('tool_end', { id: currentMsg?.id, name: currentMsg?.toolName || '', input: currentMsg?.toolInput || {} });
-            }
-            currentBlockType = null;
-            break;
-
-          case 'message_delta':
-            if (evt.delta?.stop_reason === 'end_turn' && currentMsg?.type === 'thinking') {
-              const foldedResponse = /^\[Thinking folded\]\s*(?:response)?\s*([\s\S]+)$/i.exec(currentMsg.content || '');
-              const answer = foldedResponse?.[1]?.trim();
-              if (answer) {
-                currentMsg.content = '[Thinking folded]';
-                currentMsg = {
-                  id: `msg_${turnIndex}_folded_text`,
-                  role: 'assistant',
-                  type: 'text',
-                  turn: turnIndex,
-                  content: answer,
-                  tokens: { input: this._lastInputTokens || 0, output: 0 }
-                };
-                currentBlockType = 'text';
-                this.messages.push(currentMsg);
-                this.onEvent('messages_update', { messages: this.messages });
-              }
-            }
-            if (currentMsg && evt.usage?.output_tokens) {
-              currentMsg.tokens = { ...currentMsg.tokens, output: evt.usage.output_tokens };
-            }
-            this.onEvent('message_delta', {
-              inputTokens: evt.usage?.input_tokens,
-              outputTokens: evt.usage?.output_tokens,
-              cacheReadTokens: evt.usage?.cache_read_input_tokens ?? 0,
-              cacheCreationTokens: evt.usage?.cache_creation_input_tokens ?? 0,
-              stopReason: evt.delta?.stop_reason,
-            });
-            if (evt.delta?.stop_reason) {
-              stopReason = evt.delta.stop_reason;
-              this.onEvent('stop', {
-                stopReason: evt.delta.stop_reason,
-                outputTokens: evt.usage?.output_tokens,
-              });
-            }
-            break;
-
-          case 'error':
-            this.onEvent('error', { message: evt.error?.message || '未知错误' });
-            break;
+      for (const providerEvent of parseProviderSseLines(lines)) {
+        const modelEvents = normalizeAnthropicCompatibleEvent(providerEvent, providerStreamState);
+        for (const modelEvent of modelEvents) {
+          this._applyModelRuntimeEvent(modelEvent, runtimeStreamState);
         }
       }
     }
 
     const recoveredStopReason = this._recoverTextEncodedToolCalls({ turnIndex, tools });
     if (recoveredStopReason) {
-      stopReason = recoveredStopReason;
+      runtimeStreamState.stopReason = recoveredStopReason;
     }
 
     if (isContinuation) {
-      const generatedTokens = Math.round(newCharsGenerated / 3);
+      const generatedTokens = Math.round(runtimeStreamState.generatedChars / 3);
       recoveryState.continuation_tokens.push(generatedTokens);
     }
 
-    return stopReason;
+    return runtimeStreamState.stopReason;
+  }
+
+  _applyModelRuntimeEvent(event, streamState) {
+    switch (event.type) {
+      case 'message_start':
+        this._handleRuntimeMessageStart(event);
+        break;
+
+      case 'thinking_start':
+        this._startRuntimeThinkingBlock(event, streamState);
+        break;
+
+      case 'thinking_delta':
+        this._appendRuntimeThinkingDelta(event, streamState);
+        break;
+
+      case 'thinking_end':
+        this._endRuntimeThinkingBlock(event, streamState);
+        break;
+
+      case 'text_start':
+        this._startRuntimeTextBlock(event, streamState);
+        break;
+
+      case 'text_delta':
+        this._appendRuntimeTextDelta(event, streamState);
+        break;
+
+      case 'text_end':
+        this._endRuntimeTextBlock(event, streamState);
+        break;
+
+      case 'tool_start':
+        this._startRuntimeToolBlock(event, streamState);
+        break;
+
+      case 'tool_input_delta':
+        this._appendRuntimeToolInputDelta(event, streamState);
+        break;
+
+      case 'tool_end':
+        this._endRuntimeToolBlock(event, streamState);
+        break;
+
+      case 'message_delta':
+        this._handleRuntimeMessageDelta(event, streamState);
+        break;
+
+      case 'provider_error':
+        this.onEvent('error', { message: event.message || '未知错误' });
+        break;
+    }
+  }
+
+  _handleRuntimeMessageStart(event) {
+    if (event.usage) {
+      const usageMetrics = normalizeUsageMetrics(event.usage, {
+        baseUrl: this.model.url,
+        modelId: this.model.modelId || this.model.name,
+      });
+      this._lastInputTokens = usageMetrics.inputTokens;
+      this.contextTokens = usageMetrics.totalInputTokens;
+      this.onEvent('message_start', {
+        model: event.model,
+        inputTokens: usageMetrics.inputTokens,
+        totalInputTokens: usageMetrics.totalInputTokens,
+        cacheReadTokens: usageMetrics.cacheHitTokens,
+        cacheCreationTokens: usageMetrics.cacheWriteTokens,
+        cacheHitTokens: usageMetrics.cacheHitTokens,
+        cacheMissTokens: usageMetrics.cacheMissTokens,
+        cacheWriteTokens: usageMetrics.cacheWriteTokens,
+        cacheSupportsWriteTokens: usageMetrics.cacheSupportsWriteTokens,
+        cacheProvider: usageMetrics.cacheProvider,
+      });
+      return;
+    }
+
+    this.onEvent('message_start', {
+      model: event.model,
+      inputTokens: 0,
+      totalInputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      cacheHitTokens: 0,
+      cacheMissTokens: 0,
+      cacheWriteTokens: 0,
+      cacheSupportsWriteTokens: false,
+      cacheProvider: 'generic',
+    });
+  }
+
+  _startRuntimeThinkingBlock(event, streamState) {
+    const msg = {
+      id: `msg_${streamState.turnIndex}_${event.index}_thinking`,
+      role: 'assistant',
+      type: 'thinking',
+      turn: streamState.turnIndex,
+      content: '',
+      tokens: { input: this._lastInputTokens || 0, output: 0 },
+      signature: event.signature || '',
+    };
+    streamState.blockMessagesByIndex.set(event.index, msg);
+    this.messages.push(msg);
+    this.onEvent('thinking_start', {
+      id: msg.id,
+      index: event.index,
+      signature: event.signature || '',
+      turn: streamState.turnIndex,
+    });
+  }
+
+  _appendRuntimeThinkingDelta(event, streamState) {
+    let msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type !== 'thinking') {
+      this._startRuntimeThinkingBlock({ index: event.index, signature: '' }, streamState);
+      msg = streamState.blockMessagesByIndex.get(event.index);
+    }
+
+    if (msg) msg.content += event.text || '';
+    this.onEvent('thinking_delta', { id: msg?.id, text: event.text || '' });
+  }
+
+  _endRuntimeThinkingBlock(event, streamState) {
+    const msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type === 'thinking') {
+      this.onEvent('thinking_end', { id: msg.id, text: msg.content || '' });
+      streamState.blockMessagesByIndex.delete(event.index);
+    }
+  }
+
+  _startRuntimeTextBlock(event, streamState) {
+    let msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type !== 'text') {
+      msg = streamState.isContinuation
+        ? this.messages.findLast(m => m.role === 'assistant' && m.type === 'text')
+        : null;
+
+      if (!msg) {
+        msg = {
+          id: `msg_${streamState.turnIndex}_${event.index}_text`,
+          role: 'assistant',
+          type: 'text',
+          turn: streamState.turnIndex,
+          content: '',
+          tokens: { input: this._lastInputTokens || 0, output: 0 },
+        };
+        this.messages.push(msg);
+      }
+      streamState.blockMessagesByIndex.set(event.index, msg);
+    }
+
+    this.onEvent('text_start', {
+      id: msg?.id,
+      index: event.index,
+      turn: streamState.turnIndex,
+      isContinuation: streamState.isContinuation,
+    });
+  }
+
+  _appendRuntimeTextDelta(event, streamState) {
+    let msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type !== 'text') {
+      this._startRuntimeTextBlock({ index: event.index }, streamState);
+      msg = streamState.blockMessagesByIndex.get(event.index);
+    }
+
+    if (msg) msg.content += event.text || '';
+    if (streamState.isContinuation) {
+      streamState.generatedChars += (event.text || '').length;
+    }
+    this.onEvent('text_delta', { id: msg?.id, text: event.text || '' });
+  }
+
+  _endRuntimeTextBlock(event, streamState) {
+    const msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type === 'text') {
+      this.onEvent('text_end', { id: msg.id, text: msg.content || '' });
+      streamState.blockMessagesByIndex.delete(event.index);
+    }
+  }
+
+  _startRuntimeToolBlock(event, streamState) {
+    const msg = {
+      role: 'assistant',
+      type: 'tool_call',
+      turn: streamState.turnIndex,
+      id: event.id,
+      toolName: event.name,
+      toolInputRaw: '',
+      toolInput: {},
+      toolStatus: 'pending',
+    };
+    streamState.blockMessagesByIndex.set(event.index, msg);
+    this.messages.push(msg);
+    this.onEvent('tool_start', {
+      index: event.index,
+      name: event.name,
+      id: event.id,
+      turn: streamState.turnIndex,
+    });
+  }
+
+  _appendRuntimeToolInputDelta(event, streamState) {
+    let msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type !== 'tool_call') {
+      msg = {
+        role: 'assistant',
+        type: 'tool_call',
+        turn: streamState.turnIndex,
+        id: `toolu_${streamState.turnIndex}_${event.index}`,
+        toolName: '',
+        toolInputRaw: '',
+        toolInput: {},
+        toolStatus: 'pending',
+      };
+      streamState.blockMessagesByIndex.set(event.index, msg);
+      this.messages.push(msg);
+    }
+
+    msg.toolInputRaw += event.partialJson || '';
+    try { msg.toolInput = JSON.parse(msg.toolInputRaw); } catch {
+      // Partial JSON is expected while streaming tool input.
+    }
+    this.onEvent('tool_input_delta', { id: msg.id, partial: event.partialJson || '' });
+  }
+
+  _endRuntimeToolBlock(event, streamState) {
+    const msg = streamState.blockMessagesByIndex.get(event.index);
+    if (msg?.type === 'tool_call') {
+      this.onEvent('tool_end', { id: msg.id, name: msg.toolName || '', input: msg.toolInput || {} });
+      streamState.blockMessagesByIndex.delete(event.index);
+    }
+  }
+
+  _handleRuntimeMessageDelta(event, streamState) {
+    if (event.stopReason === 'end_turn') {
+      this._promoteFoldedThinkingResponse(streamState.turnIndex);
+    }
+
+    const lastAssistantMessage = this._findLastAssistantMessageForTurn(streamState.turnIndex);
+    if (lastAssistantMessage && event.usage?.output_tokens) {
+      lastAssistantMessage.tokens = { ...lastAssistantMessage.tokens, output: event.usage.output_tokens };
+    }
+
+    this.onEvent('message_delta', {
+      inputTokens: event.usage?.input_tokens,
+      outputTokens: event.usage?.output_tokens,
+      cacheReadTokens: event.usage?.cache_read_input_tokens ?? 0,
+      cacheCreationTokens: event.usage?.cache_creation_input_tokens ?? 0,
+      stopReason: event.stopReason,
+    });
+
+    if (event.stopReason) {
+      streamState.stopReason = event.stopReason;
+      this.onEvent('stop', {
+        stopReason: event.stopReason,
+        outputTokens: event.usage?.output_tokens,
+      });
+    }
+  }
+
+  _promoteFoldedThinkingResponse(turnIndex) {
+    const thinkingIndex = this.messages.findLastIndex(message =>
+      message?.turn === turnIndex
+      && message.role === 'assistant'
+      && message.type === 'thinking'
+      && typeof message.content === 'string'
+    );
+    if (thinkingIndex === -1) return;
+
+    const hasTextAfterThinking = this.messages
+      .slice(thinkingIndex + 1)
+      .some(message => message?.turn === turnIndex && message.role === 'assistant' && message.type === 'text');
+    if (hasTextAfterThinking) return;
+
+    const thinkingMessage = this.messages[thinkingIndex];
+    const foldedResponse = /^\[Thinking folded\]\s*(?:response)?\s*([\s\S]+)$/i.exec(thinkingMessage.content || '');
+    const answer = foldedResponse?.[1]?.trim();
+    if (!answer) return;
+
+    thinkingMessage.content = '[Thinking folded]';
+    this.messages.push({
+      id: `msg_${turnIndex}_folded_text`,
+      role: 'assistant',
+      type: 'text',
+      turn: turnIndex,
+      content: answer,
+      tokens: { input: this._lastInputTokens || 0, output: 0 },
+    });
+    this.onEvent('messages_update', { messages: this.messages });
+  }
+
+  _findLastAssistantMessageForTurn(turnIndex) {
+    return this.messages.findLast(message =>
+      message?.turn === turnIndex
+      && message.role === 'assistant'
+      && ['thinking', 'text', 'tool_call'].includes(message.type)
+    );
   }
 
   _recoverTextEncodedToolCalls({ turnIndex, tools }) {
