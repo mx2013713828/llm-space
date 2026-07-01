@@ -115,6 +115,7 @@ export function ContextInspector({
     tools: alignedData.tools || [],
     messages: alignedData.messages || [],
     toolPoolSummary: alignedData.toolPoolSummary || null,
+    runtimeNotificationSummary: alignedData.runtimeNotificationSummary || null,
   };
   const totalChars = JSON.stringify(fullContext).length;
   const displayTokens = currentTokens || Math.round(totalChars / 4);
@@ -364,6 +365,49 @@ export function ContextInspector({
     );
   };
 
+  const renderRuntimeNotificationSummary = () => {
+    const summary = alignedData.runtimeNotificationSummary;
+    if (!summary) return null;
+
+    const sourceRows = Object.entries(summary.bySource || {});
+    const typeRows = Object.entries(summary.byType || {});
+
+    return (
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid var(--orange)', borderRadius: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--orange)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>📬</span> Runtime Notifications
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({summary.unreadCount || 0} drained in dry run)</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 10 }}>
+          <div style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Sources</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
+              {sourceRows.length ? sourceRows.map(([source, count]) => `${source}: ${count}`).join(', ') : 'none'}
+            </div>
+          </div>
+          <div style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>Types</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
+              {typeRows.length ? typeRows.map(([type, count]) => `${type}: ${count}`).join(', ') : 'none'}
+            </div>
+          </div>
+        </div>
+        {(summary.previews || []).length > 0 && (
+          <div style={{ display: 'grid', gap: 6 }}>
+            {(summary.previews || []).slice(0, 4).map(item => (
+              <div key={item.id || `${item.label}-${item.text}`} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 90, overflow: 'auto' }}>
+                  {item.text || '(empty)'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowContextInspector(false)}>
       {/* 半透明遮罩 */}
@@ -431,6 +475,9 @@ export function ContextInspector({
 
               {/* Runtime Tool Pool */}
               {renderToolPoolSummary()}
+
+              {/* Runtime Notifications */}
+              {renderRuntimeNotificationSummary()}
 
               {/* Tools */}
               {renderTools()}

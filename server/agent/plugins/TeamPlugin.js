@@ -8,6 +8,10 @@ import { createTeamId, createTeammateId, validateAgentName } from '../teams/team
 import { formatTeammateStatusLine, getUnresolvedTeammates } from '../teams/teamRuntimeState.js';
 import { runTeammate } from '../teams/teammateRunner.js';
 import { emitTeamUpdate, summarizeTeamState } from '../teams/teamUpdates.js';
+import {
+  defaultRuntimeNotificationQueue,
+  enqueueRuntimeNotification,
+} from '../runtimeNotifications.js';
 
 const TEAM_TOOLS = new Set(['spawn_teammate', 'send_team_message', 'wait_for_teammates', 'check_team_inbox']);
 const DEFAULT_WAIT_TIMEOUT_MS = 15000;
@@ -147,27 +151,6 @@ async function buildWaitForTeammatesOutput({ bus, stateStore, harnessId, teamId,
     ? '\nCall check_team_inbox to read teammate results before making final decisions.'
     : '';
   return `${heading}${status}${inboxHint}${nextStep}`;
-}
-
-function injectInboxBlock(apiMessages, block) {
-  const lastApiMsg = apiMessages[apiMessages.length - 1];
-  const hasToolResult = lastApiMsg
-    && lastApiMsg.role === 'user'
-    && Array.isArray(lastApiMsg.content)
-    && lastApiMsg.content.some(entry => entry.type === 'tool_result');
-
-  if (lastApiMsg && lastApiMsg.role === 'user' && !hasToolResult && Array.isArray(lastApiMsg.content)) {
-    const textBlock = lastApiMsg.content.find(entry => entry.type === 'text');
-    if (textBlock) {
-      textBlock.text = `${block}\n\n${textBlock.text}`;
-      return;
-    }
-  }
-
-  apiMessages.push({
-    role: 'user',
-    content: [{ type: 'text', text: block }],
-  });
 }
 
 function hasInjectedTeamBlock(apiMessages, tagName) {
@@ -310,6 +293,7 @@ export function createTeamPlugin({
   stateStore = defaultTeamStateStore,
   runTeammateFn = runTeammate,
   outputRootDir = defaultTeamOutputRootDir,
+  notificationQueue = defaultRuntimeNotificationQueue,
 } = {}) {
   return {
     name: 'TeamPlugin',
@@ -334,10 +318,19 @@ export function createTeamPlugin({
         if (inboxMessages.length === 0) return;
         if (hasInjectedTeamBlock(apiMessages, 'team_protocol_guard')) return;
 
-        injectInboxBlock(
-          apiMessages,
-          buildTeamProtocolGuard({ teamId, unreadCount: inboxMessages.length }),
-        );
+        enqueueRuntimeNotification({
+          harnessId,
+          source: 'team',
+          type: 'team_protocol_guard',
+          priority: 20,
+          dedupeKey: `team:${harnessId}:${teamId}:${agentId}:protocol_guard`,
+          payload: {
+            teamId,
+            agentId,
+            unreadCount: inboxMessages.length,
+            text: buildTeamProtocolGuard({ teamId, unreadCount: inboxMessages.length }),
+          },
+        }, notificationQueue);
         return;
       }
 
@@ -349,10 +342,19 @@ export function createTeamPlugin({
 
       if (inboxMessages.length === 0) return;
 
-      injectInboxBlock(
-        apiMessages,
-        `<team_inbox>\n${formatInboxEntries(inboxMessages)}\n</team_inbox>`,
-      );
+      enqueueRuntimeNotification({
+        harnessId,
+        source: 'team',
+        type: 'team_inbox',
+        priority: 10,
+        dedupeKey: `team:${harnessId}:${teamId}:${agentId}:inbox:${inboxMessages.map(message => message.id).join(',')}`,
+        payload: {
+          teamId,
+          agentId,
+          messageCount: inboxMessages.length,
+          text: `<team_inbox>\n${formatInboxEntries(inboxMessages)}\n</team_inbox>`,
+        },
+      }, notificationQueue);
       emitAutoInjectedEvent({ executor, teamId, agentId, inboxMessages });
     },
 

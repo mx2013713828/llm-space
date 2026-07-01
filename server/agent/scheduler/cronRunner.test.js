@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isScheduledExecutionEnabled, processScheduledEvents, runScheduledEvent } from './cronRunner.js';
+import {
+  createRuntimeNotificationQueue,
+  peekRuntimeNotifications,
+} from '../runtimeNotifications.js';
 
 test('requeues scheduled events while the target harness is active', async () => {
   const requeued = [];
@@ -196,6 +200,43 @@ test('passes the scheduled thinking setting to the executor', async () => {
   });
 
   assert.equal(executorOptions.thinkingEnabled, true);
+});
+
+test('queues scheduled prompts as runtime notifications while preserving scheduled history', async () => {
+  let executorOptions;
+  class FakeExecutor {
+    constructor(options) {
+      executorOptions = options;
+    }
+
+    async run() {}
+  }
+  const runtimeNotificationQueue = createRuntimeNotificationQueue();
+
+  await runScheduledEvent({
+    id: 'evt_1',
+    jobId: 'cron_1',
+    harnessId: '01-chat-bot',
+    prompt: 'check weather',
+    modelRef: 'deepseek',
+  }, {
+    activeJobs: new Map(),
+    runtimeNotificationQueue,
+    loadHarness: async () => ({ id: '01-chat-bot' }),
+    loadSession: async () => ({ messages: [] }),
+    resolveModel: async () => ({ id: 'deepseek' }),
+    ExecutorClass: FakeExecutor,
+  });
+
+  assert.equal(executorOptions.messages[0].type, 'scheduled');
+  assert.equal(executorOptions.messages[0].content, '[Scheduled] check weather');
+  assert.equal(executorOptions.messages[0].runtimeNotificationOnly, true);
+  const notifications = peekRuntimeNotifications({ harnessId: '01-chat-bot', queue: runtimeNotificationQueue });
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].source, 'cron');
+  assert.equal(notifications[0].type, 'scheduled_prompt');
+  assert.match(notifications[0].payload.text, /check weather/);
+  assert.equal(executorOptions.runtimeNotificationQueue, runtimeNotificationQueue);
 });
 
 test('closes attached clients when scheduled execution finishes', async () => {

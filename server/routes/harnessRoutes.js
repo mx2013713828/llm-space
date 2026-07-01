@@ -4,6 +4,7 @@ import path from 'path';
 import { AgentExecutor } from '../agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from '../agent/messageBuilder.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
+import { createRuntimeNotificationQueue, summarizeNotificationsForUi } from '../agent/runtimeNotifications.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
 import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
@@ -215,6 +216,7 @@ export function registerHarnessRoutes(app, {
       } = req.body || {};
 
       const safeSkills = Array.isArray(skills) ? skills : [];
+      const dryRunNotificationQueue = createRuntimeNotificationQueue();
       executor = new ExecutorClass({
         harnessId,
         messages: messages || [],
@@ -228,6 +230,7 @@ export function registerHarnessRoutes(app, {
         thinkingEnabled: !!thinkingEnabled,
         selectedStrategyId: resolveStrategy({ explicitStrategyId: selectedStrategyId, features }),
         skills: safeSkills,
+        runtimeNotificationQueue: dryRunNotificationQueue,
         onEvent: () => {}
       });
 
@@ -258,6 +261,7 @@ export function registerHarnessRoutes(app, {
         tools: aligned.tools,
         messages: aligned.messages,
         toolPoolSummary: describeToolPool(executor.toolPool),
+        runtimeNotificationSummary: context.runtimeNotificationSummary || summarizeNotificationsForUi([]),
       });
     } catch (err) {
       console.error('[harnessRoutes /api/harnesses/:harnessId/dry-run] Error:', err);

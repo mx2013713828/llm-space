@@ -100,6 +100,39 @@ test('run emits done cleanup after a normal final answer', async () => {
   });
 });
 
+test('run routes legacy background pending notifications through runtime notifications before model call', async () => {
+  await withTempCwd('agent-loop-runtime-notifications-', async () => {
+    let capturedApiMessages = null;
+    const executor = new AgentExecutor({
+      harnessId: 'runtime-notification-loop',
+      messages: [{ role: 'user', turn: 1, content: 'Continue.' }],
+      tools: [],
+      model: { id: 'test', modelId: 'test-model', key: 'test', url: 'https://api.example.test' },
+      onEvent() {},
+    });
+    executor.pendingNotifications.push('<task_notification><status>completed</status></task_notification>');
+
+    executor._callLLM = async (context) => {
+      capturedApiMessages = context.apiMessages;
+      executor.messages.push({
+        role: 'assistant',
+        type: 'text',
+        turn: context.turnIndex,
+        content: 'Saw the notification.',
+      });
+      return 'end_turn';
+    };
+
+    await executor.run(1);
+
+    assert.match(capturedApiMessages[0].content[0].text, /<runtime_notifications>/);
+    assert.match(capturedApiMessages[0].content[0].text, /<task_notification>/);
+    const persistedNotification = executor.messages.find(message => message.type === 'bg_notification');
+    assert.equal(persistedNotification.runtimeNotificationOnly, true);
+    assert.match(persistedNotification.content, /<task_notification>/);
+  });
+});
+
 test('run emits error and done cleanup when the model stage throws', async () => {
   await withTempCwd('agent-loop-stage-error-cleanup-', async () => {
     const originalConsoleError = console.error;

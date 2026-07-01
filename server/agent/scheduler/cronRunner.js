@@ -2,6 +2,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { AgentExecutor } from '../AgentExecutor.js';
 import { parseFeatures } from '../FeatureParser.js';
+import {
+  defaultRuntimeNotificationQueue,
+  enqueueRuntimeNotification,
+} from '../runtimeNotifications.js';
 import { resolveModelConfig } from './modelResolver.js';
 
 const cwd = globalThis.process?.cwd?.() || '.';
@@ -59,6 +63,7 @@ export async function runScheduledEvent(event, {
   resolveModel = resolveModelConfig,
   reservation,
   ExecutorClass = AgentExecutor,
+  runtimeNotificationQueue = defaultRuntimeNotificationQueue,
 } = {}) {
   const harness = await loadHarnessFn(event.harnessId, harnessDir);
   const session = await loadSessionFn(event.harnessId, sessionsDir);
@@ -70,10 +75,26 @@ export async function runScheduledEvent(event, {
     role: 'user',
     type: 'scheduled',
     content: `[Scheduled] ${event.prompt}`,
+    runtimeNotificationOnly: true,
     scheduledEventId: event.id,
     scheduledJobId: event.jobId,
     turn
   });
+
+  enqueueRuntimeNotification({
+    harnessId: event.harnessId,
+    source: 'cron',
+    type: 'scheduled_prompt',
+    priority: 30,
+    dedupeKey: `cron:${event.harnessId}:${event.id}`,
+    payload: {
+      eventId: event.id,
+      jobId: event.jobId,
+      prompt: event.prompt,
+      firedAt: event.firedAt ?? null,
+      text: `<scheduled_trigger>\n[Scheduled] ${event.prompt}\n</scheduled_trigger>`,
+    },
+  }, runtimeNotificationQueue);
 
   const executor = new ExecutorClass({
     harnessId: event.harnessId,
@@ -88,6 +109,7 @@ export async function runScheduledEvent(event, {
     maxTokens: harness.model?.max_tokens ?? 8192,
     thinkingEnabled: event.thinkingEnabled === true,
     skills: harness.skills || [],
+    runtimeNotificationQueue,
     onEvent: (type, data) => broadcastEvent(event.harnessId, type, data)
   });
 

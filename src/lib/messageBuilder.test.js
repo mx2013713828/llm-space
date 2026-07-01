@@ -32,3 +32,26 @@ test('folds thinking content when thinking compaction child toggle is enabled', 
 
   assert.equal(apiMessages[1].content[0].thinking, '[Thinking folded]');
 });
+
+test('skips runtime-notification-only scheduled messages when building API context', () => {
+  const apiMessages = buildApiMessages([
+    {
+      role: 'user',
+      type: 'scheduled',
+      content: '[Scheduled] check weather',
+      runtimeNotificationOnly: true,
+    },
+    {
+      role: 'assistant',
+      type: 'text',
+      content: 'done',
+    },
+  ]);
+
+  assert.deepEqual(apiMessages, [
+    {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'done' }],
+    },
+  ]);
+});

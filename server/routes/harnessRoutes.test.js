@@ -6,6 +6,12 @@ import { tmpdir } from 'node:os';
 
 import { registerHarnessRoutes } from './harnessRoutes.js';
 import { createRouteApp, dispatchJson } from './routeTestUtils.js';
+import {
+  defaultRuntimeNotificationQueue,
+  drainRuntimeNotifications,
+  enqueueRuntimeNotification,
+  peekRuntimeNotifications,
+} from '../agent/runtimeNotifications.js';
 
 async function createFixture(t) {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'harness-routes-'));
@@ -113,4 +119,41 @@ test('harness dry-run returns compact tool pool summary from runtime tools', asy
     res.body.tools.map(tool => tool.name).sort(),
     [...res.body.toolPoolSummary.names].sort(),
   );
+});
+
+test('harness dry-run reports notification summary without consuming the live queue', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+  drainRuntimeNotifications({ harnessId: 'alpha', limit: 100, queue: defaultRuntimeNotificationQueue });
+  enqueueRuntimeNotification({
+    harnessId: 'alpha',
+    source: 'team',
+    type: 'team_inbox',
+    payload: { text: 'Live teammate result.' },
+  }, defaultRuntimeNotificationQueue);
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      tools: ['bash'],
+      features: {},
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.runtimeNotificationSummary.unreadCount, 0);
+  assert.equal(JSON.stringify(res.body.messages).includes('Live teammate result.'), false);
+  assert.equal(peekRuntimeNotifications({ harnessId: 'alpha', queue: defaultRuntimeNotificationQueue }).length, 1);
+  drainRuntimeNotifications({ harnessId: 'alpha', limit: 100, queue: defaultRuntimeNotificationQueue });
 });

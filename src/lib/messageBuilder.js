@@ -43,6 +43,9 @@ export function buildApiMessages(sourceMessages, thinkingEnabled, compactionEnab
 
   for (let idx = 0; idx < sourceMessages.length; idx++) {
     const msg = sourceMessages[idx];
+    if (msg.runtimeNotificationOnly === true) {
+      continue;
+    }
     if (msg.role === 'user') {
       // Flush any pending assistant content and tool results first
       if (currentAssistantContent.length > 0) {

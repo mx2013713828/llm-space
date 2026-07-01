@@ -258,9 +258,11 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 - Create: `server/agent/runtimeNotifications.js`
 - Create: `server/agent/runtimeNotifications.test.js`
+- Modify: `server/agent/AgentExecutor.js`
 - Modify: `server/agent/plugins/TeamPlugin.js`
 - Modify: `server/agent/scheduler/cronRunner.js`
 - Modify: background task integration points if present.
+- Modify: `server/routes/harnessRoutes.js`
 - Modify: `src/components/ContextInspector.jsx`
 
 **Interfaces:**
@@ -272,11 +274,13 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Write tests for bounded injection, dedupe, source labels, unread counts, and non-consuming previews.
-- [ ] Move team inbox auto-injection behind the notification queue.
-- [ ] Move scheduled prompt injection behind the same queue without changing scheduler behavior.
-- [ ] Expose notification summaries to Context Inspector.
-- [ ] Verify and commit with `feat: add runtime notification queue`.
+- [x] Write tests for bounded injection, dedupe, source labels, unread counts, and non-consuming previews.
+- [x] Move team inbox auto-injection behind the notification queue.
+- [x] Move scheduled prompt injection behind the same queue without changing scheduler behavior.
+- [x] Route legacy background pending notifications through the runtime queue while preserving UI history.
+- [x] Expose notification summaries to Context Inspector.
+- [x] Verify with targeted tests, `npm test`, and `npm run build`.
+- [x] Commit with `feat: add runtime notification queue`.
 
 ---
 

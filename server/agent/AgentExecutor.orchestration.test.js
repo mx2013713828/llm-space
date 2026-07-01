@@ -320,6 +320,35 @@ test('TeamPlugin mounts for teammate runtime even when lead team orchestration i
   assert.equal(registeredPluginNames.includes('TeamPlugin'), true);
 });
 
+test('RuntimeNotificationPlugin mounts after team producers in the preLLM chain', () => {
+  const originalRegister = HookManager.prototype.register;
+  const registeredPluginNames = [];
+
+  HookManager.prototype.register = function register(plugin) {
+    registeredPluginNames.push(plugin?.name ?? '(anonymous)');
+    return originalRegister.call(this, plugin);
+  };
+
+  try {
+    createExecutor({
+      runtimeRole: 'lead',
+      tools: ['bash'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          enable_agent_teams: true,
+        },
+      },
+    });
+  } finally {
+    HookManager.prototype.register = originalRegister;
+  }
+
+  assert.ok(registeredPluginNames.includes('RuntimeNotificationPlugin'));
+  assert.ok(registeredPluginNames.indexOf('TeamPlugin') < registeredPluginNames.indexOf('RuntimeNotificationPlugin'));
+});
+
 test('saveSession persists lightweight teamContext only when present', async (t) => {
   const originalCwd = process.cwd();
   const rootDir = await mkdtemp(path.join(tmpdir(), 'agent-executor-session-'));

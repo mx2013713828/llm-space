@@ -22,8 +22,13 @@ import { MemoryPlugin } from './plugins/MemoryPlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
-import { TeamPlugin } from './plugins/TeamPlugin.js';
+import { createTeamPlugin } from './plugins/TeamPlugin.js';
 import { ExecutionStrategyPlugin } from './plugins/ExecutionStrategyPlugin.js';
+import {
+  createRuntimeNotificationPlugin,
+  defaultRuntimeNotificationQueue,
+  enqueueRuntimeNotification,
+} from './runtimeNotifications.js';
 import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
@@ -143,6 +148,7 @@ export class AgentExecutor {
     selectedStrategyId = '',
     interactionMode = null,
     skills = [],
+    runtimeNotificationQueue = defaultRuntimeNotificationQueue,
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
@@ -175,6 +181,7 @@ export class AgentExecutor {
     this.selectedStrategyId = String(selectedStrategyId || '').trim();
     this.interactionMode = interactionMode || resolveInteractionMode({ messages: this.messages });
     this.skills = [...skills];
+    this.runtimeNotificationQueue = runtimeNotificationQueue;
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
@@ -213,8 +220,9 @@ export class AgentExecutor {
     this.hooks.register(CronSchedulerPlugin);
     this.hooks.register(SubAgentPlugin);
     if (this.runtimeRole === 'teammate' || isOrchestrationEnabled(orchestration, 'enable_agent_teams')) {
-      this.hooks.register(TeamPlugin);
+      this.hooks.register(createTeamPlugin({ notificationQueue: this.runtimeNotificationQueue }));
     }
+    this.hooks.register(createRuntimeNotificationPlugin({ queue: this.runtimeNotificationQueue }));
 
   }
 
@@ -405,6 +413,33 @@ export class AgentExecutor {
     return stopReason;
   }
 
+  flushPendingNotificationsToRuntimeQueue(turnIndex) {
+    if (!this.pendingNotifications || this.pendingNotifications.length === 0) return;
+
+    const notificationsText = this.pendingNotifications.join('\n\n');
+    this.pendingNotifications = [];
+
+    enqueueRuntimeNotification({
+      harnessId: this.harnessId,
+      source: 'background',
+      type: 'task_result',
+      priority: 15,
+      dedupeKey: `background:${this.harnessId}:${turnIndex}:${notificationsText}`,
+      payload: {
+        text: notificationsText,
+      },
+    }, this.runtimeNotificationQueue);
+
+    this.messages.push({
+      role: 'user',
+      type: 'bg_notification',
+      turn: turnIndex,
+      content: notificationsText,
+      runtimeNotificationOnly: true,
+    });
+    this.onEvent('messages_update', { messages: this.messages });
+  }
+
   /**
    * 启动 ReAct 决策循环并自主运行直到最终文字回复或被强行终止
    */
@@ -433,6 +468,8 @@ export class AgentExecutor {
       this.lastRunStopReason = null;
       let exhaustedTurns = true;
       for (let cycle = 0; cycle < maxTurns; cycle++) {
+        this.flushPendingNotificationsToRuntimeQueue(turnIndex);
+
         // 构建流水线 Context
         const context = {
           executor: this,
@@ -449,42 +486,6 @@ export class AgentExecutor {
         await runPreLlmStage(context, {
           applyToolPolicy: (stageContext) => applyToolPolicyToContext(stageContext, this.interactionMode),
         });
-
-        if (this.pendingNotifications && this.pendingNotifications.length > 0) {
-          const notificationsText = this.pendingNotifications.join('\n\n');
-          this.pendingNotifications = []; // 消费清空
-
-          // 1. 注入到即将发送给大模型的 context.apiMessages 列表中。
-          // 规则：如果最新的一条是 user 消息且不含 tool_result 块，则安全地 unshift 注入头部；
-          // 否则（是 assistant，或虽然是 user 但包含了 tool_result），为避免 API 协议报错，必须作为一条独立的 user 消息 push 到末尾。
-          const lastApiMsg = context.apiMessages[context.apiMessages.length - 1];
-          const isLastMsgToolResult = lastApiMsg && lastApiMsg.role === 'user' && 
-                                     Array.isArray(lastApiMsg.content) && 
-                                     lastApiMsg.content.some(c => c.type === 'tool_result');
-
-          if (lastApiMsg && lastApiMsg.role === 'user' && !isLastMsgToolResult) {
-            if (Array.isArray(lastApiMsg.content)) {
-              lastApiMsg.content.unshift({ type: 'text', text: notificationsText });
-            }
-          } else {
-            context.apiMessages.push({
-              role: 'user',
-              content: [{ type: 'text', text: notificationsText }]
-            });
-          }
-
-          // 2. 持久化，追加到 messages 历史中（标记为 bg_notification，前端据此做差异化渲染，
-          //    不再与普通 user 消息合并，避免裸露 XML 污染对话流）
-          this.messages.push({
-            role: 'user',
-            type: 'bg_notification',
-            turn: turnIndex,
-            content: notificationsText
-          });
-
-          // 3. 广播更新事件
-          this.onEvent('messages_update', { messages: this.messages });
-        }
 
         let stopReason = null;
         try {
