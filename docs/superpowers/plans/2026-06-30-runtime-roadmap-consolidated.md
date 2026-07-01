@@ -114,19 +114,19 @@ git commit -m "fix: make bash sandbox capability explicit"
 - Produces: Express middleware for local-only or token-guarded API access.
 - Produces: lightweight per-route or global rate limiter suitable for local experimental use.
 
-- [ ] **Step 1: Write request-level guard tests**
+- [x] **Step 1: Write request-level guard tests**
 
 Cover allowed localhost requests, rejected non-localhost requests when no token is configured, and accepted token-authenticated requests.
 
-- [ ] **Step 2: Implement access guard middleware**
+- [x] **Step 2: Implement access guard middleware**
 
 Keep default local-dev behavior frictionless, but make non-local exposure require explicit configuration.
 
-- [ ] **Step 3: Add minimal rate limiting**
+- [x] **Step 3: Add minimal rate limiting**
 
 Start with in-memory token buckets for `/api/agent/run`, `/api/models`, and file-mutating endpoints.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run:
 
@@ -136,7 +136,7 @@ npm test
 npm run build
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server.js server/http/accessGuard.js server/http/accessGuard.test.js

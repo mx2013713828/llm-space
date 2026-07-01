@@ -27,6 +27,7 @@ import { buildPersistedSessionState, readSessionState, resolveRunTeamContext } f
 import { listExecutionStrategies, resolveSelectedStrategyId } from './server/agent/strategies/strategyRegistry.js';
 import { loadSubAgentTrace } from './server/agent/subagents/subAgentTraceStore.js';
 import { loadTeammateTrace } from './server/agent/teams/teammateTraceStore.js';
+import { createAccessGuard, createRateLimiter } from './server/http/accessGuard.js';
 
 // 加载 .env 文件到 process.env
 const dotEnvPath = path.join(process.cwd(), '.env');
@@ -79,8 +80,11 @@ await ensureOffloadedGitignored();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '127.0.0.1';
 
-app.use(cors({ origin: 'http://localhost:5174' }));
+app.use(cors({ origin: ['http://localhost:5174', 'http://127.0.0.1:5174'] }));
+app.use(createAccessGuard());
+app.use(createRateLimiter());
 app.use(express.json({ limit: '4mb' }));
 
 /** 发送 SSE 事件 */
@@ -895,7 +899,11 @@ app.delete('/api/sessions/:harnessId', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 LLM Space 代理服务器运行在 http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
+  console.log(`\n🚀 LLM Space 代理服务器运行在 http://${displayHost}:${PORT}`);
+  if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !process.env.LLM_SPACE_API_TOKEN) {
+    console.log('   ⚠️  当前 HOST 允许非本机访问，建议设置 LLM_SPACE_API_TOKEN');
+  }
   console.log(`   前端访问：http://localhost:5174\n`);
 });

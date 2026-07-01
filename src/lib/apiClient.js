@@ -13,6 +13,30 @@ export function apiUrl(path, options = {}) {
   return `${getApiBase(options)}${normalizedPath}`;
 }
 
+export function getApiToken(options = {}) {
+  return options.apiToken || import.meta.env?.VITE_LLM_SPACE_API_TOKEN || '';
+}
+
+function buildFetchOptions(options = {}) {
+  const {
+    apiToken,
+    baseUrl,
+    headers,
+    ...fetchOptions
+  } = options;
+  const token = getApiToken({ apiToken });
+
+  if (!token) {
+    return headers ? { ...fetchOptions, headers } : fetchOptions;
+  }
+
+  const nextHeaders = new Headers(headers || {});
+  if (!nextHeaders.has('authorization') && !nextHeaders.has('x-llm-space-token')) {
+    nextHeaders.set('x-llm-space-token', token);
+  }
+  return { ...fetchOptions, headers: nextHeaders };
+}
+
 export function apiFetch(path, options = {}, fetchImpl = fetch) {
-  return fetchImpl(apiUrl(path), options);
+  return fetchImpl(apiUrl(path, options), buildFetchOptions(options));
 }
