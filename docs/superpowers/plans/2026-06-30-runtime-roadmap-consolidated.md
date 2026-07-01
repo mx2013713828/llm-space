@@ -1,348 +1,319 @@
 # Runtime Roadmap Consolidated Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` when implementing a concrete task from this roadmap. Every implementation batch must add regression tests before code changes and end in a small commit.
 
-**Goal:** Keep the active plan folder focused on the current runtime roadmap after the reliability, child-agent profile, and security hardening workstreams have converged.
+**Goal:** Move LLM Space from a collection of useful experimental features into a coherent runtime harness. The central design principle is:
 
-**Architecture:** Completed historical plans are archived as implementation records. This plan is the single active roadmap for remaining runtime reliability, security, teams-v2, memory governance, model/API abstraction, knowledge mounting, and maintainability work. Each future task should either update this file or split into a new active plan only when it becomes a concrete implementation batch.
+> **Many mechanisms, one loop.**
 
-**Tech Stack:** Node.js ES modules, Express SSE, `AgentExecutor`/HookManager plugins, React 19, Vite, Node test runner, macOS `sandbox-exec` for current local bash sandboxing, local filesystem-backed stores for experimental memory and knowledge artifacts.
+Tools, permissions, memory, skills, compaction, cron, background work, teams, model gateways, and knowledge bases should all attach to explicit stages of the same agent loop instead of growing as separate side paths.
 
-## Global Constraints
-
-- Keep the project experimental and modular; avoid opaque product-style orchestration that hides primitives.
-- Do not solve runtime correctness by only changing prompts, increasing max turns, or hiding UI output.
-- Preserve Anthropic-compatible protocol behavior and DeepSeek model compatibility.
-- Keep child-agent and teammate traces lazy-loaded and bounded in primary trajectory UI.
-- Prefer shared child-agent primitives over one-off `sub_agent` / `teammate` forks.
-- Treat memory, model provider access, and knowledge bases as mountable runtime resources, not hard-coded prompt text.
-- Every implementation batch must add regression tests before code changes.
-- Every implementation batch should end in a small commit.
+**Current tech stack:** Node.js ES modules, Express SSE, `AgentExecutor` / `HookManager` plugins, React 19, Vite, Node test runner, Anthropic-compatible model calls with DeepSeek compatibility, local filesystem-backed stores for sessions, teams, memory, scheduler data, and future knowledge packs.
 
 ---
 
-## Archived Plans
+## Architecture Spine
 
-The following plans have been moved to `docs/superpowers/plans/archive/`:
+The target runtime is not a new agent brain. It is a clearer harness around the same ReAct loop:
 
-- `2026-06-28-agent-runtime-reliability-contracts.md`
-- `2026-06-29-agent-harness-profiles-phase1.md`
-- `2026-06-29-agent-harness-profiles-phase2.md`
-- `2026-06-29-agent-harness-profiles-phase3.md`
-- `2026-06-30-agent-harness-profiles-phase4.md`
-- `2026-06-30-agent-harness-profiles-phase5.md`
-- `2026-06-30-security-runtime-hardening.md`
+```text
+user input
+  -> inbound request / session envelope
+  -> runtime notifications
+  -> pre-LLM context assembly
+  -> model gateway
+  -> normalized model events
+  -> tool-use detection
+      no tool_use -> stop hooks -> persist -> return
+      tool_use    -> pre-tool hooks + permission
+                -> tool pool dispatch
+                -> post-tool hooks
+                -> tool_result messages
+                -> next loop
+```
 
-They are no longer active execution plans. They remain useful as implementation history and design context.
+Each runtime mechanism must declare which stage it belongs to:
 
-## Current Completed Baseline
+| Loop Stage | Runtime Boundary | Examples |
+| --- | --- | --- |
+| Inbound request | HTTP routes, access guard, active job reservation | `/api/agent/run`, local API guard, session lookup |
+| Runtime notifications | bounded queue injected before LLM | cron fired, teammate inbox, background result, permission state |
+| Pre-LLM assembly | context builders and resource mounts | system metadata, memory, skills catalog, knowledge retrieval, strategy guideline |
+| Model gateway | provider and protocol adapters | DeepSeek Anthropic-compatible, future Kimi, Minimax, OpenAI-compatible |
+| Stream normalization | provider event parser | thinking, text, tool_use, usage, stop reason |
+| Tool-use detection | normalized assistant blocks | actual `tool_use` blocks, text-encoded fallback handling |
+| Permission and policy | pre-tool hooks | sensitive files, bash sandbox, external writes, approval bridge |
+| Tool pool dispatch | assembled runtime tools | built-in tools, task tools, team tools, MCP tools |
+| Post-tool processing | output shaping and persistence | redaction, offloading, child trace preview, large output metadata |
+| Stop / cleanup | lifecycle hooks | memory candidate extraction, task release, session persistence |
 
-The following capabilities are already implemented and covered by tests:
+---
+
+## Design Rules
+
+- Keep the project experimental and modular. Presets may exist, but primitives must remain independently toggleable.
+- Do not fix runtime correctness only by prompt edits, hidden retries, max-turn increases, or UI suppression.
+- Separate provider identity from wire protocol. A DeepSeek model can use the Anthropic-compatible protocol.
+- Treat skills, memory, knowledge bases, MCP tools, and model access as mountable runtime resources.
+- Keep main trajectory rendering bounded. Full child traces, teammate reports, and large tool outputs must be lazy-loaded.
+- Prefer shared child-agent primitives over one-off `sub_agent` and `teammate` forks.
+- Prefer explicit runtime contracts over implicit convention. If a component mutates messages, injects context, consumes inbox, or persists state, that boundary needs tests.
+- Any task split out of this roadmap must explain why it cannot be tracked here.
+
+---
+
+## Current Baseline
+
+Completed and tested capabilities:
 
 - Runtime trace-inspection mode can disable tools for questions about previous tool calls.
 - Tool invocation validation marks malformed calls as typed `invalid_args` before execution.
-- Teammate/sub-agent final outcome handling rejects tool-only output as `no_result` instead of pretending it is a valid report.
-- Frontend run view model separates live stream state from persisted session snapshots to avoid phantom overwrites.
-- Memory injection/extraction is disabled for trace-inspection turns.
+- Teammate/sub-agent final outcome handling rejects tool-only output as `no_result`.
+- Frontend run view model separates live stream state from persisted session snapshots.
+- Memory injection and extraction are disabled for trace-inspection turns.
 - Sub-agent and teammate cards share child status presentation, permission-wait visibility, and lazy trace loading.
 - Child-agent profiles share feature/tool filtering, scratch workspace policy, and unbounded child run semantics.
-- `read_file` / `write_file` enforce workspace path policy and sensitive-file denial.
+- `read_file` and `write_file` enforce workspace path policy and sensitive-file denial.
 - Bash foreground and background execution share a macOS sandbox boundary plus sensitive-output redaction.
-- Permanent sensitive-file security blocks stop the agent loop after one blocked attempt instead of triggering repeated bypass attempts.
+- Permanent sensitive-file security blocks stop the agent loop after one blocked attempt.
 - Harness creation has collision checks.
 - Legacy `/api/chat` is disabled with `410`.
 - Frontend API calls go through a central API boundary.
 - React Error Boundary protects the app from full white-screen crashes.
-- `npm test` and `npm run build` currently pass.
+- Local runtime APIs have a localhost/token access guard and lightweight rate limits.
+- `npm test` and `npm run build` passed for the latest completed runtime batch.
 
-## Active Roadmap
+Completed implementation records remain archived under `docs/superpowers/plans/archive/`.
 
-### Task 1: Cross-Platform Runtime Sandbox Boundary
+---
 
-**Goal:** Make the bash execution boundary explicit across platforms instead of relying only on macOS `sandbox-exec`.
+## Roadmap Overview
 
-**Files:**
-- Modify: `server/tools/bashSandbox.js`
-- Modify: `server/tools/bash.js`
-- Modify: `server/agent/AgentExecutor.js`
-- Test: `server/tools/toolValidation.test.js`
-- Create if needed: `server/tools/bashSandbox.test.js`
+The remaining work is organized by architecture layer, not by isolated feature.
 
-**Interfaces:**
-- Consumes: `buildBashSpawnInvocation(command, options)`.
-- Produces: a platform capability object such as `{ command, args, sandboxed, redactionOnly, reason }`.
-
-- [x] **Step 1: Write platform capability tests**
-
-Test that macOS returns `sandboxed: true` when `sandbox-exec` exists, and non-macOS returns an explicit `redactionOnly: true` or configured alternative instead of silently claiming sandboxing.
-
-- [x] **Step 2: Add a user-visible degraded-sandbox marker**
-
-When process-level sandboxing is unavailable, tool output and logs should identify that only command preflight plus redaction are active.
-
-- [x] **Step 3: Add environment allowlist option**
-
-Evaluate replacing `...process.env` passed to bash with an explicit environment allowlist, keeping only variables needed for local tooling and model-independent execution.
-
-- [x] **Step 4: Verify**
-
-Run:
-
-```bash
-node --test server/tools/toolValidation.test.js server/tools/bashSandbox.test.js
-npm test
-npm run build
+```text
+Stage 1: Runtime shell and server boundaries
+Stage 2: Agent loop kernel, tool pool, and notifications
+Stage 3: Model gateway and stream normalization
+Stage 4: Collaboration runtime: teams, protocols, worktrees
+Stage 5: Mountable resources: memory, skills, knowledge, MCP
+Stage 6: Runtime quality: tests, observability, E2E, maintainability
 ```
 
-- [x] **Step 5: Commit**
+The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**. It creates the seams needed by later kernel work without changing user-visible behavior.
 
-```bash
-git add server/tools/bashSandbox.js server/tools/bash.js server/agent/AgentExecutor.js server/tools/*test.js
-git commit -m "fix: make bash sandbox capability explicit"
-```
+---
 
-### Task 2: Local API Access Guard and Rate Limits
+## Stage 1: Runtime Shell And Server Boundaries
 
-**Goal:** Prevent accidental exposure of local runtime APIs and reduce runaway API cost or DoS risk.
+### Task 1: Runtime Shell And Server Boundary Split
+
+**Goal:** Reduce `server.js` blast radius and make runtime entry points testable without changing behavior.
+
+**Why now:** The server currently owns HTTP routing, model config, active jobs, session persistence, scheduler APIs, and agent startup in one file. Future kernel work needs a clean request boundary first.
+
+**Loop stage:** Inbound request.
 
 **Files:**
+
 - Modify: `server.js`
-- Create if needed: `server/http/accessGuard.js`
-- Create if needed: `server/http/accessGuard.test.js`
+- Create: `server/app/createServerApp.js`
+- Create: `server/routes/harnessRoutes.js`
+- Create: `server/routes/modelRoutes.js`
+- Create: `server/routes/sessionRoutes.js`
+- Create: `server/routes/agentRunRoutes.js`
+- Create: `server/agent/activeJobs.js`
+- Test: `server/routes/*test.js`
+- Test: `server/agent/activeJobs.test.js`
 
 **Interfaces:**
-- Produces: Express middleware for local-only or token-guarded API access.
-- Produces: lightweight per-route or global rate limiter suitable for local experimental use.
 
-- [x] **Step 1: Write request-level guard tests**
+- `createServerApp(dependencies): express.Application`
+- `registerHarnessRoutes(app, dependencies)`
+- `registerModelRoutes(app, dependencies)`
+- `registerSessionRoutes(app, dependencies)`
+- `registerAgentRunRoutes(app, dependencies)`
+- `createActiveJobRegistry(): { reserve, attach, release, get, list }`
 
-Cover allowed localhost requests, rejected non-localhost requests when no token is configured, and accepted token-authenticated requests.
+**Steps:**
 
-- [x] **Step 2: Implement access guard middleware**
+- [ ] Write behavior-preserving route tests for harness load/save/copy/delete, model list/upsert/update, session read/write/delete, and legacy chat `410`.
+- [ ] Extract active job reservation into `activeJobs.js` with tests for reserve-before-await, attach, release, and concurrent duplicate runs.
+- [ ] Extract one route group at a time from `server.js`; do not mix behavior changes into the extraction.
+- [ ] Move app assembly into `createServerApp`, leaving `server.js` as bootstrapping, `.env` loading, scheduler startup, and `listen`.
+- [ ] Verify with `npm test` and `npm run build`.
+- [ ] Commit with `refactor: split runtime server boundaries`.
 
-Keep default local-dev behavior frictionless, but make non-local exposure require explicit configuration.
+### Task 2: Runtime Request Contract
 
-- [x] **Step 3: Add minimal rate limiting**
+**Goal:** Make `/api/agent/run` input validation, feature normalization, selected strategy resolution, and session persistence explicit before the executor is created.
 
-Start with in-memory token buckets for `/api/agent/run`, `/api/models`, and file-mutating endpoints.
+**Why:** We currently rebuild an executor per user turn. That can remain true, but the request contract must be clear so model gateway, notifications, memory, teams, and tool pool assembly do not each reinterpret the request.
 
-- [x] **Step 4: Verify**
-
-Run:
-
-```bash
-node --test server/http/accessGuard.test.js
-npm test
-npm run build
-```
-
-- [x] **Step 5: Commit**
-
-```bash
-git add server.js server/http/accessGuard.js server/http/accessGuard.test.js
-git commit -m "fix: guard local runtime api access"
-```
-
-### Task 3: Server Boundary Split
-
-**Goal:** Reduce `server.js` blast radius by extracting route and lifecycle boundaries without changing behavior.
+**Loop stage:** Inbound request.
 
 **Files:**
-- Modify: `server.js`
-- Create if needed: `server/routes/harnessRoutes.js`
-- Create if needed: `server/routes/modelRoutes.js`
-- Create if needed: `server/routes/agentRunRoutes.js`
-- Create if needed: `server/agent/activeJobs.js`
+
+- Create: `server/agent/runtimeRequest.js`
+- Create: `server/agent/runtimeRequest.test.js`
+- Modify: `server/routes/agentRunRoutes.js`
+- Modify: `server/sessions/sessionState.js`
 
 **Interfaces:**
-- Produces: route registration functions that accept `{ app, dependencies }`.
-- Produces: an `activeJobs` helper with explicit reserve, attach, release, and list semantics.
 
-- [ ] **Step 1: Write behavior-preserving route tests**
+- `buildRuntimeRequest({ body, harness, persistedSession, models }): RuntimeRequest`
+- `resolveRuntimeFeatures(rawFeatures): RuntimeFeatures`
+- `resolveRuntimeStrategy({ explicitStrategyId, features }): string`
 
-Cover harness loading/saving, model config parsing/upsert, and active job reservation.
+**Steps:**
 
-- [ ] **Step 2: Extract one route group at a time**
+- [ ] Write tests for missing harness id, invalid harness id, selected model lookup, feature defaulting, strategy fallback, team context restoration, and scheduled run payloads.
+- [ ] Implement `RuntimeRequest` as a plain serializable object passed into executor construction.
+- [ ] Keep existing API response shapes unchanged.
+- [ ] Verify with targeted tests, `npm test`, and `npm run build`.
+- [ ] Commit with `refactor: add runtime request contract`.
 
-Move harness routes first, then model routes, then agent run routes. Do not mix behavior changes into this task.
+---
 
-- [ ] **Step 3: Extract active job lifecycle helper**
+## Stage 2: Agent Loop Kernel, Tool Pool, And Notifications
 
-Keep the existing concurrency semantics, but make reservation and release paths testable.
+### Task 3: Agent Loop Stage Contract
 
-- [ ] **Step 4: Verify**
+**Goal:** Make `AgentExecutor` easier to reason about by naming and testing the loop stages without rewriting the whole executor at once.
 
-Run:
+**Why:** S20's key lesson is that the loop stays simple, while mechanisms attach around it. We need tests that prove where hooks, compaction, model calls, tool execution, and stop cleanup happen.
 
-```bash
-npm test
-npm run build
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add server.js server/routes server/agent/activeJobs.js
-git commit -m "refactor: split server route boundaries"
-```
-
-### Task 4: Shared Streaming Parser
-
-**Goal:** Remove duplicated Anthropic-compatible SSE parsing and make DeepSeek/Anthropic deltas easier to test in one place.
+**Loop stage:** Whole loop.
 
 **Files:**
+
 - Modify: `server/agent/AgentExecutor.js`
-- Create if needed: `server/agent/llmStreamParser.js`
-- Create if needed: `server/agent/llmStreamParser.test.js`
+- Create: `server/agent/agentLoopStages.js`
+- Create: `server/agent/agentLoopStages.test.js`
+- Modify: `server/agent/HookManager.js`
+- Test: `server/agent/AgentExecutor.run.test.js`
 
 **Interfaces:**
-- Produces: parser that converts provider SSE events into normalized runtime events.
-- Consumes: existing `_callLLM` event handling and any remaining legacy stream path.
 
-- [ ] **Step 1: Write parser fixture tests**
+- `runPreLlmStage(context)`
+- `runModelStage(context)`
+- `runToolStage(context)`
+- `runStopStage(context)`
+- `hasExecutableToolUse(blocks)`
 
-Cover thinking, text, tool_use, malformed JSON lines, and message_delta stop reasons.
+**Steps:**
 
-- [ ] **Step 2: Implement parser without changing public events**
+- [ ] Add tests that assert actual `tool_use` blocks drive continuation, not only provider `stop_reason`.
+- [ ] Add tests for cleanup on normal final answer, error, security block, and permission wait.
+- [ ] Extract small stage helpers only where tests already cover behavior.
+- [ ] Keep public stream events and persisted message shapes unchanged.
+- [ ] Verify and commit with `refactor: define agent loop stage contract`.
 
-The first implementation should preserve existing message shapes and SSE events.
+### Task 4: Tool Pool Assembly Boundary
 
-- [ ] **Step 3: Rewire `AgentExecutor._callLLM`**
+**Goal:** Centralize tool selection for lead agents, sub-agents, teammates, task modes, strategy presets, future MCP tools, and future knowledge tools.
 
-Replace inline switch parsing with the shared parser.
+**Why:** Tool availability is currently spread across feature schema, orchestration helpers, child profiles, and plugins. That makes teams and sub-agents hard to reason about.
 
-- [ ] **Step 4: Verify**
-
-Run:
-
-```bash
-node --test server/agent/llmStreamParser.test.js server/agent/AgentExecutor.stream.test.js
-npm test
-npm run build
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add server/agent/AgentExecutor.js server/agent/llmStreamParser.js server/agent/llmStreamParser.test.js
-git commit -m "refactor: extract llm stream parser"
-```
-
-### Task 5: Teams v2 Minimal Closure
-
-**Goal:** Preserve the experimental primitive model while making Async Teams more observable, reliable, and easy to test.
+**Loop stage:** Tool pool dispatch.
 
 **Files:**
+
+- Create: `server/agent/toolPool.js`
+- Create: `server/agent/toolPool.test.js`
+- Modify: `server/tools/index.js`
+- Modify: `server/agent/child/childAgentProfile.js`
+- Modify: `server/agent/subagents/subAgentProfile.js`
+- Modify: `server/agent/teams/teammateProfile.js`
+- Modify: `src/lib/taskOrchestration.js` only if UI helpers need alignment.
+
+**Interfaces:**
+
+- `assembleToolPool({ baseTools, features, runtimeRole, strategyId, mountedResources }): ToolPool`
+- `filterToolsForRuntimeRole(toolPool, runtimeRole)`
+- `describeToolPool(toolPool): ToolPoolSummary`
+
+**Steps:**
+
+- [ ] Write tests for lead, sub-agent, teammate, reviewer, verifier, task-system mode, todo mode, async teams, and orchestration-disabled cases.
+- [ ] Move managed orchestration tool filtering into the server-side boundary.
+- [ ] Keep frontend feature UI as configuration, not the source of truth for runtime tools.
+- [ ] Add a compact tool-pool summary for Context Inspector.
+- [ ] Verify and commit with `refactor: centralize runtime tool pool assembly`.
+
+### Task 5: Runtime Notification Queue
+
+**Goal:** Unify asynchronous signals before they reach the model: cron triggers, background task results, teammate inbox messages, permission state, memory candidates, and future knowledge ingest results.
+
+**Why:** We have repeatedly seen message-tree pollution, duplicated injection, and confusing UI around asynchronous outputs. A bounded notification queue gives each source one path into the loop.
+
+**Loop stage:** Runtime notifications before LLM.
+
+**Files:**
+
+- Create: `server/agent/runtimeNotifications.js`
+- Create: `server/agent/runtimeNotifications.test.js`
 - Modify: `server/agent/plugins/TeamPlugin.js`
-- Modify: `server/agent/teams/teammateRunner.js`
-- Modify: `src/components/MessageBubbles.jsx`
-- Modify: `src/lib/childStatusPresentation.js`
-- Test: `server/agent/plugins/TeamPlugin.test.js`
-- Test: `server/agent/teams/teammateRunner.test.js`
-- Test: `src/lib/childStatusPresentation.test.js`
+- Modify: `server/agent/scheduler/cronRunner.js`
+- Modify: background task integration points if present.
+- Modify: `src/components/ContextInspector.jsx`
 
 **Interfaces:**
-- Consumes: current team bus, teammate trace store, child event bridge, and shared child presentation helpers.
-- Produces: clearer teammate lifecycle states and safer lead-facing summaries.
 
-- [ ] **Step 1: Define Teams v2 lifecycle states**
+- `enqueueRuntimeNotification({ harnessId, source, type, payload, priority })`
+- `drainRuntimeNotifications({ harnessId, limit }): RuntimeNotification[]`
+- `formatNotificationsForLlm(notifications): MessageBlock[]`
+- `summarizeNotificationsForUi(notifications): NotificationSummary`
 
-Keep states finite: `running`, `awaiting_permission`, `completed`, `failed`, `no_result`, and future `cancelled`.
+**Steps:**
 
-- [ ] **Step 2: Add observability tests**
+- [ ] Write tests for bounded injection, dedupe, source labels, unread counts, and non-consuming previews.
+- [ ] Move team inbox auto-injection behind the notification queue.
+- [ ] Move scheduled prompt injection behind the same queue without changing scheduler behavior.
+- [ ] Expose notification summaries to Context Inspector.
+- [ ] Verify and commit with `feat: add runtime notification queue`.
 
-Cover spawn cards, wait cards, no-result inbox, permission waits, and lazy trace availability.
+---
 
-- [ ] **Step 3: Improve lead-facing status text**
+## Stage 3: Model Gateway And Stream Normalization
 
-Make wait output always tell the lead whether to call `check_team_inbox`, wait longer, or report partial results.
+### Task 6: Shared Streaming Parser
 
-- [ ] **Step 4: Verify**
+**Goal:** Remove duplicated Anthropic-compatible SSE parsing and normalize model stream events in one place.
 
-Run:
+**Why:** DeepSeek/Anthropic-compatible behavior, thinking blocks, text deltas, tool calls, usage, and stop reasons should be fixtures in parser tests, not hidden inside `AgentExecutor`.
 
-```bash
-node --test server/agent/plugins/TeamPlugin.test.js server/agent/teams/teammateRunner.test.js src/lib/childStatusPresentation.test.js
-npm test
-npm run build
-```
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add server/agent/plugins/TeamPlugin.js server/agent/teams/teammateRunner.js src/components/MessageBubbles.jsx src/lib/childStatusPresentation.js
-git commit -m "feat: improve teams v2 observability"
-```
-
-### Task 6: Candidate Memory Queue
-
-**Goal:** Stop writing extracted memories directly into long-term memory; instead stage memory candidates for review, approval, rejection, and later consolidation.
-
-**MVP Shape:** Memory extraction creates candidate records with source run metadata and confidence. The UI exposes a small review queue where users can approve, edit, reject, or bulk clear candidates. Approved candidates become ordinary memories using the existing memory store.
+**Loop stage:** Stream normalization.
 
 **Files:**
-- Modify: `server/agent/plugins/MemoryPlugin.js`
-- Modify: `server/agent/memory/memoryExtract.js`
-- Modify: `server/agent/memory/memoryStore.js`
-- Create: `server/agent/memory/memoryCandidateStore.js`
-- Create: `server/agent/memory/memoryCandidateStore.test.js`
-- Create: `server/agent/memory/memoryCandidateApi.test.js`
-- Modify: `server.js` or future extracted memory routes
-- Modify: `src/pages/PromptLabPage.jsx` or create a focused memory queue panel
-- Create: `src/lib/memoryCandidates.test.js`
+
+- Modify: `server/agent/AgentExecutor.js`
+- Create: `server/model/streamParser.js`
+- Create: `server/model/streamParser.test.js`
+- Test: `server/agent/AgentExecutor.stream.test.js`
 
 **Interfaces:**
-- Produces: `createMemoryCandidate({ harnessId, scope, source, content, reason, confidence })`.
-- Produces: `listMemoryCandidates({ harnessId, status })`.
-- Produces: `approveMemoryCandidate(candidateId, patch)` and `rejectMemoryCandidate(candidateId, reason)`.
-- Consumes: existing `memoryStore` write path for approved candidates.
 
-- [ ] **Step 1: Write candidate store tests**
+- `parseProviderSseLines(lines): ModelRuntimeEvent[]`
+- `normalizeAnthropicCompatibleEvent(event): ModelRuntimeEvent`
 
-Cover candidate creation, per-harness listing, approval status transition, rejection status transition, and stable persistence across reloads.
+**Steps:**
 
-- [ ] **Step 2: Implement candidate store**
+- [ ] Write parser fixture tests for thinking, text, tool_use, malformed JSON lines, message_delta stop reasons, and usage.
+- [ ] Implement parser without changing public stream events.
+- [ ] Rewire `AgentExecutor._callLLM` to consume normalized runtime events.
+- [ ] Verify and commit with `refactor: extract model stream parser`.
 
-Use a filesystem-backed JSONL or JSON store under `server/sessions/<harnessId>_memory_candidates.json` with append-safe writes. Candidate records must include `id`, `harnessId`, `status`, `content`, `source`, `confidence`, `createdAt`, and `updatedAt`.
+### Task 7: Unified Model Gateway And Model Library
 
-- [ ] **Step 3: Rewire memory extraction to candidate mode**
+**Goal:** Extract model management and provider/protocol calling into an upper runtime library while keeping the current Anthropic-compatible execution contract stable.
 
-Change extraction so new memories are staged as `pending` candidates by default. Keep a feature flag such as `enable_memory.auto_approve_candidates` for experimental direct-write behavior, defaulting to false.
+**Why:** The project only supports Anthropic-style messages today, but model providers are already diverse. Provider identity and wire protocol must be independent.
 
-- [ ] **Step 4: Add review API**
-
-Expose endpoints for list, approve, reject, and clear rejected candidates. Approval should write through to the existing memory store and mark the candidate `approved`.
-
-- [ ] **Step 5: Add lightweight queue UI**
-
-Add a compact queue panel showing pending candidates, source run, confidence, approve/edit/reject actions, and an empty state. Avoid embedding long source traces; link to existing trajectory context when available.
-
-- [ ] **Step 6: Verify**
-
-Run:
-
-```bash
-node --test server/agent/memory/memoryCandidateStore.test.js server/agent/memory/memoryCandidateApi.test.js
-node --test server/agent/plugins/MemoryPlugin.test.js
-node --test src/lib/memoryCandidates.test.js
-npm test
-npm run build
-```
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add server/agent/memory server/agent/plugins/MemoryPlugin.js server.js src
-git commit -m "feat: add memory candidate review queue"
-```
-
-### Task 7: Unified API Gateway and Model Library
-
-**Goal:** Extract model management and provider/protocol calling into an upper runtime library so the app can support many model providers while keeping the current Anthropic-compatible execution contract stable.
-
-**MVP Shape:** Introduce a model registry and gateway adapter boundary without changing the frontend model configuration UX drastically. DeepSeek Anthropic-compatible models continue to work. Future Kimi, Minimax, Anthropic, OpenAI-compatible, and local providers can be added by adapter rather than patching `AgentExecutor`.
+**Loop stage:** Model gateway.
 
 **Files:**
+
 - Modify: `server/modelConfig.js`
 - Modify: `server/agent/AgentExecutor.js`
 - Modify: `server/agent/messageBuilder.js`
@@ -352,143 +323,309 @@ git commit -m "feat: add memory candidate review queue"
 - Create: `server/model/providerGateway.test.js`
 - Create: `server/model/protocols/anthropicMessages.js`
 - Create: `server/model/protocols/anthropicMessages.test.js`
-- Modify: `src/lib/modelContext.js`
-- Modify: model-management UI files under `src/pages/PromptLabPage.jsx` or a new focused component
+- Modify: model UI files under `src`.
 
 **Interfaces:**
-- Produces: `loadModelRegistry(): ModelRegistry`.
-- Produces: `resolveModelProfile(modelId): { id, provider, protocol, endpoint, contextWindow, cacheSemantics, capabilities }`.
-- Produces: `callModelGateway({ modelProfile, request, stream, signal }): AsyncIterable<ModelRuntimeEvent>`.
-- Consumes: current `MODELS_CONFIG` and model records with `contextWindow`.
 
-- [ ] **Step 1: Write registry compatibility tests**
+- `loadModelRegistry(): ModelRegistry`
+- `resolveModelProfile(modelId): { id, provider, protocol, endpoint, contextWindow, cacheSemantics, capabilities }`
+- `callModelGateway({ modelProfile, request, stream, signal }): AsyncIterable<ModelRuntimeEvent>`
 
-Cover legacy `MODELS_CONFIG` parsing, pretty JSON config parsing, default `contextWindow: 128000`, DeepSeek provider inference, and preserving existing fields.
+**Steps:**
 
-- [ ] **Step 2: Implement model registry module**
+- [ ] Write registry compatibility tests for legacy `MODELS_CONFIG`, pretty JSON config, default `contextWindow: 128000`, DeepSeek provider inference, and existing fields.
+- [ ] Implement model registry and keep `server/modelConfig.js` as a compatibility wrapper until route extraction is complete.
+- [ ] Write gateway tests for Anthropic-compatible request alignment, DeepSeek thinking rules, cache usage normalization, and stream normalization.
+- [ ] Move request-body alignment, headers, endpoint construction, and protocol details into `anthropicMessages.js`.
+- [ ] Rewire `AgentExecutor` to request normalized events from the gateway.
+- [ ] Update model UI so provider, protocol, context window, and cache semantics are visible but not heavy.
+- [ ] Verify and commit with `refactor: add unified model gateway`.
 
-Move model config parsing and normalization into `server/model/modelRegistry.js`. Keep `server/modelConfig.js` as a thin compatibility wrapper until routes are extracted.
+---
 
-- [ ] **Step 3: Write gateway adapter tests**
+## Stage 4: Collaboration Runtime
 
-Cover Anthropic-compatible request alignment, DeepSeek thinking parameter rules, provider-specific cache usage normalization, and stream event normalization.
+### Task 8: Teams v2 Observability And Result Reliability
 
-- [ ] **Step 4: Implement Anthropic Messages protocol adapter**
+**Goal:** Make Async Teams reliable enough for everyday experiments without hiding the underlying primitives.
 
-Move request-body alignment, headers, endpoint construction, and stream parsing boundary out of `AgentExecutor` into `server/model/protocols/anthropicMessages.js`.
+**Why:** We fixed several teammate output and frontend rendering problems, but teams still need stronger lifecycle semantics and clearer lead-facing instructions.
 
-- [ ] **Step 5: Rewire `AgentExecutor` to gateway**
-
-`AgentExecutor` should request a normalized stream of runtime events from the gateway and keep its ReAct loop responsibilities: message mutation, hooks, tool execution, and persistence.
-
-- [ ] **Step 6: Update model UI labels and validation**
-
-Keep add/edit model flow simple, but show protocol/provider/context-window as first-class fields. Avoid forcing protocol choice when provider inference is enough; let advanced users override.
-
-- [ ] **Step 7: Verify**
-
-Run:
-
-```bash
-node --test server/model/modelRegistry.test.js server/model/providerGateway.test.js server/model/protocols/anthropicMessages.test.js
-node --test server/agent/AgentExecutor.stream.test.js server/agent/usageNormalizer.test.js
-npm test
-npm run build
-```
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add server/model server/modelConfig.js server/agent/AgentExecutor.js server/agent/messageBuilder.js src
-git commit -m "refactor: add unified model gateway"
-```
-
-### Task 8: Mountable External Knowledge Bases
-
-**Goal:** Let users upload files, generate reusable knowledge bases, and mount selected knowledge bases into a conversation as external context without hard-wiring them into every prompt.
-
-**MVP Shape:** Start with local “knowledge packs”: uploaded files are extracted to clean text/markdown chunks, stored with metadata, and exposed as a mountable resource similar to a skill/reference bundle. Retrieval can begin as keyword/metadata search before adding vector RAG.
+**Loop stages:** Tool pool dispatch, runtime notifications, post-tool processing.
 
 **Files:**
+
+- Modify: `server/agent/plugins/TeamPlugin.js`
+- Modify: `server/agent/teams/teammateRunner.js`
+- Modify: `src/components/MessageBubbles.jsx`
+- Modify: `src/lib/childStatusPresentation.js`
+- Test: `server/agent/plugins/TeamPlugin.test.js`
+- Test: `server/agent/teams/teammateRunner.test.js`
+- Test: `src/lib/childStatusPresentation.test.js`
+
+**Interfaces:**
+
+- Lifecycle states: `running`, `awaiting_permission`, `completed`, `failed`, `no_result`, `cancelled`.
+- Lead actions: wait, check inbox, request resend, summarize partial results, cancel.
+
+**Steps:**
+
+- [ ] Add observability tests for spawn cards, wait cards, no-result inbox, permission waits, and lazy trace references.
+- [ ] Ensure `wait_for_teammates` returns state and unread counts, never large reports.
+- [ ] Ensure final report data flows through inbox or trace store, not wait output.
+- [ ] Improve lead-facing text so the model knows when to call `check_team_inbox`.
+- [ ] Verify and commit with `feat: improve teams v2 observability`.
+
+### Task 9: Team Protocols MVP
+
+**Goal:** Add an optional plan/review/approval protocol for teammate work before code-changing tasks begin.
+
+**Why:** Teams become safer when teammates can submit a plan, pause for approval, and only then claim work. This is especially important once worktree isolation and write tools are enabled.
+
+**Loop stages:** Tool pool dispatch, runtime notifications, permission and policy.
+
+**Files:**
+
+- Modify: `server/agent/plugins/TeamPlugin.js`
+- Create: `server/agent/teams/teamProtocol.js`
+- Create: `server/agent/teams/teamProtocol.test.js`
+- Modify: `server/agent/teams/teamStore.js`
+- Modify: UI child/team status components.
+
+**Interfaces:**
+
+- `submit_team_plan({ summary, steps, risks })`
+- `approve_team_plan({ teammate, planId })`
+- `reject_team_plan({ teammate, planId, reason })`
+- Future: `request_team_review`, `cancel_teammate`
+
+**Steps:**
+
+- [ ] Write protocol state tests for submitted, approved, rejected, and stale plans.
+- [ ] Add protocol tools only when team protocol is enabled.
+- [ ] Represent plan approval as a permission-like state in the parent UI.
+- [ ] Keep protocol optional so simple teams can still run directly.
+- [ ] Verify and commit with `feat: add team plan protocol`.
+
+### Task 10: Worktree-Isolated Team Execution
+
+**Goal:** Let teammates and complex sub-agents work in isolated git worktrees for code-changing tasks.
+
+**Why:** For real multi-agent coding, isolation is more important than more prompting. Worktree isolation lets the lead review and merge child work instead of letting multiple agents mutate one workspace.
+
+**Loop stages:** Tool pool dispatch, permission and policy, post-tool processing.
+
+**Files:**
+
+- Create: `server/agent/worktrees/worktreeStore.js`
+- Create: `server/agent/worktrees/worktreeStore.test.js`
+- Create: `server/tools/worktreeTools.js`
+- Create: `server/tools/worktreeTools.test.js`
+- Modify: child-agent profile creation.
+- Modify: team protocol and task claim flow.
+
+**Interfaces:**
+
+- `createWorktree({ harnessId, taskId, name })`
+- `assignWorktreeToChild({ childId, worktreeId })`
+- `summarizeWorktreeDiff({ worktreeId })`
+- `keepWorktree` / `removeWorktree`
+
+**Steps:**
+
+- [ ] Write storage and path-safety tests.
+- [ ] Add create/list/remove worktree primitives behind an experimental feature flag.
+- [ ] Route child bash/read/write default cwd through assigned worktree.
+- [ ] Add lead-facing diff summary before merge or cleanup.
+- [ ] Verify and commit with `feat: add worktree-isolated child execution`.
+
+---
+
+## Stage 5: Mountable Resources
+
+### Task 11: Candidate Memory Queue
+
+**Goal:** Stop writing extracted memories directly into long-term memory. Stage memory candidates for review, approval, rejection, and later consolidation.
+
+**Why:** Memory is a runtime resource. It should be inspectable and governed, not silently durable.
+
+**Loop stages:** Stop / cleanup, pre-LLM assembly.
+
+**Files:**
+
+- Modify: `server/agent/plugins/MemoryPlugin.js`
+- Modify: `server/agent/memory/memoryExtract.js`
+- Modify: `server/agent/memory/memoryStore.js`
+- Create: `server/agent/memory/memoryCandidateStore.js`
+- Create: `server/agent/memory/memoryCandidateStore.test.js`
+- Create: `server/agent/memory/memoryCandidateApi.test.js`
+- Modify: memory routes.
+- Add or modify a focused memory queue UI.
+- Create: `src/lib/memoryCandidates.test.js`
+
+**Interfaces:**
+
+- `createMemoryCandidate({ harnessId, scope, source, content, reason, confidence })`
+- `listMemoryCandidates({ harnessId, status })`
+- `approveMemoryCandidate(candidateId, patch)`
+- `rejectMemoryCandidate(candidateId, reason)`
+
+**Steps:**
+
+- [ ] Write candidate store tests for creation, listing, approval, rejection, persistence, and path safety.
+- [ ] Implement filesystem-backed candidate storage with `pending`, `approved`, and `rejected` states.
+- [ ] Rewire extraction so candidates are pending by default.
+- [ ] Add review API and lightweight queue UI.
+- [ ] Keep direct auto-write as an advanced experimental feature, default off.
+- [ ] Verify and commit with `feat: add memory candidate review queue`.
+
+### Task 12: Mountable Knowledge Bases
+
+**Goal:** Let users upload files, generate reusable local knowledge bases, and mount selected bases into a conversation as external context.
+
+**Why:** Knowledge should behave like a mounted resource, similar to a skill/reference bundle, not as hard-coded prompt text.
+
+**Loop stages:** Pre-LLM assembly, mountable resource management.
+
+**Files:**
+
 - Create: `server/knowledge/knowledgeStore.js`
 - Create: `server/knowledge/knowledgeStore.test.js`
 - Create: `server/knowledge/knowledgeIngest.js`
 - Create: `server/knowledge/knowledgeIngest.test.js`
 - Create: `server/knowledge/knowledgeRetrieve.js`
 - Create: `server/knowledge/knowledgeRetrieve.test.js`
-- Modify: `server/agent/plugins/SkillsPlugin.js` or add `server/agent/plugins/KnowledgePlugin.js`
-- Modify: `server.js` or future extracted knowledge routes
+- Add: `server/agent/plugins/KnowledgePlugin.js`
+- Modify: knowledge routes.
 - Create: `src/lib/knowledgeMounts.js`
 - Create: `src/lib/knowledgeMounts.test.js`
-- Modify: Prompt Lab or trajectory configuration UI to upload/select mounted knowledge bases
+- Modify: configuration UI to upload, list, mount, and unmount knowledge bases.
 
 **Interfaces:**
-- Produces: `createKnowledgeBase({ name, description, files })`.
-- Produces: `ingestKnowledgeFile({ knowledgeBaseId, filename, mimeType, content })`.
-- Produces: `retrieveKnowledge({ knowledgeBaseIds, query, limit }): KnowledgeChunk[]`.
-- Produces: `mountKnowledgeBases({ harnessId, knowledgeBaseIds })`.
-- Consumes: selected harness/session configuration and runtime pre-LLM injection.
 
-- [ ] **Step 1: Write knowledge store tests**
+- `createKnowledgeBase({ name, description, files })`
+- `ingestKnowledgeFile({ knowledgeBaseId, filename, mimeType, content })`
+- `retrieveKnowledge({ knowledgeBaseIds, query, limit }): KnowledgeChunk[]`
+- `mountKnowledgeBases({ harnessId, knowledgeBaseIds })`
 
-Cover creating a knowledge base, listing bases, deleting a base, adding file metadata, and path-safe storage under a dedicated workspace directory.
+**Steps:**
 
-- [ ] **Step 2: Implement local knowledge store**
+- [ ] Write knowledge store tests for create/list/delete, file metadata, and path-safe storage.
+- [ ] Implement local metadata and chunk storage under a gitignored runtime directory.
+- [ ] Write ingestion tests for plain text, markdown, JSON, and unsupported file rejection.
+- [ ] Implement bounded chunking and source metadata.
+- [ ] Write retrieval tests for keyword retrieval, mounted-base filtering, limits, and citations.
+- [ ] Add bounded `<mounted_knowledge>` injection with source labels.
+- [ ] Add lightweight upload/select UI without embedding large file contents into the trajectory.
+- [ ] Verify and commit with `feat: add mountable knowledge bases`.
 
-Persist metadata and chunks under `server/knowledge-data/` or an equivalent gitignored runtime directory. IDs must be slug-safe and collision checked.
+### Task 13: Runtime Resource Mount Registry
 
-- [ ] **Step 3: Write ingestion tests**
+**Goal:** Create one registry for mountable runtime resources: skills, memories, knowledge bases, MCP tool servers, and future provider capabilities.
 
-Cover plain text, markdown, JSON, and unsupported file type rejection. The MVP should not parse PDFs unless a dedicated parser is added in a later batch.
+**Why:** S20's MCP and skill catalog pattern points to the same abstraction as knowledge and memory: resources should be visible, mountable, disabled independently, and assembled at the correct loop stage.
 
-- [ ] **Step 4: Implement text/markdown ingestion**
+**Loop stages:** Pre-LLM assembly, tool pool dispatch.
 
-Normalize uploaded content to markdown-ish text, split into bounded chunks, store chunk metadata, and keep original file metadata for traceability.
+**Files:**
 
-- [ ] **Step 5: Write retrieval tests**
+- Create: `server/agent/resources/resourceMountRegistry.js`
+- Create: `server/agent/resources/resourceMountRegistry.test.js`
+- Modify: skills plugin / future knowledge plugin.
+- Modify: tool pool assembly.
+- Modify: Context Inspector.
 
-Cover keyword retrieval, mounted-base filtering, result limits, and stable source citations.
+**Interfaces:**
 
-- [ ] **Step 6: Implement retrieval and runtime mount**
+- `listMountableResources({ harnessId })`
+- `resolveMountedResources({ harnessId, features }): MountedResource[]`
+- `assembleResourceContext(mountedResources, userTurn): MessageBlock[]`
+- `assembleResourceTools(mountedResources): ToolDefinition[]`
 
-Add a plugin that retrieves top chunks for the current user turn and injects a bounded `<mounted_knowledge>` block. Include source labels and avoid injecting entire files.
+**Steps:**
 
-- [ ] **Step 7: Add upload/select UI**
+- [ ] Write registry tests for skills, memory scope, knowledge base, and MCP-style tool resources.
+- [ ] Move skill catalog and knowledge mount metadata behind the registry.
+- [ ] Keep resource context bounded and source-labeled.
+- [ ] Show mounted resources in Context Inspector.
+- [ ] Verify and commit with `refactor: add runtime resource mount registry`.
 
-Add a lightweight knowledge panel with upload, list, mount/unmount, and current mounted knowledge indicators. Keep large file contents out of the main trajectory.
+---
 
-- [ ] **Step 8: Verify**
+## Stage 6: Runtime Quality And Maintainability
 
-Run:
+### Task 14: Runtime Test Harness And E2E Smoke Tests
 
-```bash
-node --test server/knowledge/knowledgeStore.test.js server/knowledge/knowledgeIngest.test.js server/knowledge/knowledgeRetrieve.test.js
-node --test src/lib/knowledgeMounts.test.js
-npm test
-npm run build
-```
+**Goal:** Add test coverage for the full agent run lifecycle without depending on real model calls.
 
-- [ ] **Step 9: Commit**
+**Why:** Unit tests cover many pieces, but the full loop needs fake-model integration tests for stream events, tool calls, permissions, notifications, and final persistence.
 
-```bash
-git add server/knowledge server/agent/plugins server.js src
-git commit -m "feat: add mountable knowledge bases"
-```
+**Files:**
+
+- Create: `server/test/fakeModelServer.js`
+- Create: `server/agent/runtimeHarness.test.js`
+- Create: `src/test/trajectorySmoke.test.js` if frontend test tooling is added.
+- Modify: `package.json` scripts if needed.
+
+**Interfaces:**
+
+- `createFakeModel({ script }): ModelGateway`
+- `runRuntimeScenario({ messages, tools, modelScript }): RuntimeScenarioResult`
+
+**Steps:**
+
+- [ ] Write scenarios for final answer, one tool call, invalid tool args, permission wait, security block, teammate notification, and cron notification.
+- [ ] Add a coverage script only after tests are stable.
+- [ ] Keep fake model scripts small and readable.
+- [ ] Verify and commit with `test: add runtime harness smoke tests`.
+
+### Task 15: Observability And Debug Surfaces
+
+**Goal:** Make runtime state understandable without dumping huge raw traces into the main UI.
+
+**Why:** The frontend has already paid for unbounded output. Observability must be structured and lazy.
+
+**Files:**
+
+- Modify: `src/components/ContextInspector.jsx`
+- Modify: `src/components/TrajectoryView.jsx`
+- Modify: child trace components.
+- Add server-side summary endpoints as needed.
+
+**Surfaces:**
+
+- Runtime request summary.
+- Active loop stage.
+- Tool pool summary.
+- Mounted resources summary.
+- Runtime notifications summary.
+- Child-agent/team status with lazy trace links.
+- Model gateway profile and context window.
+
+**Steps:**
+
+- [ ] Add summary builders on the server where raw data is too large.
+- [ ] Add UI tests for bounded rendering and lazy trace loading.
+- [ ] Avoid rendering full child trajectories in the main message tree.
+- [ ] Verify and commit with `feat: improve runtime observability surfaces`.
+
+---
 
 ## Active Acceptance Criteria
 
-- `docs/superpowers/plans/` contains only this active roadmap unless a new concrete implementation batch is intentionally split out.
+- `docs/superpowers/plans/` contains only this active roadmap unless a concrete implementation batch intentionally splits out.
 - Completed historical plans live under `docs/superpowers/plans/archive/`.
-- `npm test` passes before merging a runtime-roadmap batch.
-- `npm run build` passes before merging a frontend-impacting batch.
-- Any future plan split must state why it cannot be tracked as a task in this consolidated roadmap.
-- Memory writes, model provider calls, and knowledge mounts each have a visible runtime boundary and can be independently disabled for experiments.
+- Every future feature declares its loop stage before implementation.
+- Every runtime boundary has tests before code changes.
+- `npm test` passes before merging any runtime batch.
+- `npm run build` passes before merging any frontend-impacting batch.
+- Large outputs, child traces, teammate reports, and knowledge contents are never eagerly rendered in the main trajectory.
+- Memory writes, model provider calls, knowledge mounts, MCP tools, and team protocols have visible runtime boundaries and can be independently disabled.
 
 ## Notes
 
-- This roadmap intentionally does not reintroduce child-agent turn limits. The current direction is to remove arbitrary child turn caps and rely on runtime contracts, observability, permission flow, and cancellation semantics.
-- This roadmap treats `sub_agent` and `agent_teams` as harness-profile compositions over shared child-agent primitives.
-- Commercial-style strategy presets can be added later, but the experimental platform must keep primitives independently toggleable.
-- Candidate memories should be reviewed before becoming durable memory by default; direct auto-write is an advanced experimental mode.
-- The unified model gateway should separate provider identity from wire protocol. A DeepSeek model can still use the Anthropic-compatible protocol.
-- Knowledge bases should first behave like mountable skill/reference resources; vector RAG is an optimization layer, not the initial architecture requirement.
+- This roadmap intentionally does not reintroduce child-agent turn limits. The direction is to rely on runtime contracts, observability, permission flow, cancellation semantics, and isolation.
+- `sub_agent` and `agent_teams` are harness-profile compositions over shared child-agent primitives.
+- Commercial-style one-click strategies can be added later, but the experimental platform must keep primitives independently toggleable.
+- Vector RAG is a later optimization for knowledge bases. The MVP starts with source-labeled local chunks and keyword retrieval.
+- MCP support should enter through the resource mount registry and tool pool, not as a separate parallel tool path.
