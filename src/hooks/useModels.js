@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
+import { sanitizeModelConfigForSave } from '../lib/modelConfigExtras.js';
 import { apiFetch } from '../lib/apiClient.js';
 
 /**
@@ -53,6 +54,10 @@ export function useModels() {
   const handleAddModel = async () => {
     const baseUrl = newModelConfig.baseUrl || newModelConfig.url;
     const apiKey = newModelConfig.apiKey || newModelConfig.key;
+    if (newModelConfig._extraBodyError) {
+      alert(newModelConfig._extraBodyError);
+      return;
+    }
     if (!newModelConfig.name || !newModelConfig.modelId || !baseUrl || !apiKey) {
       alert('Please fill in all model information.');
       return;
@@ -61,7 +66,7 @@ export function useModels() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...newModelConfig,
+        ...sanitizeModelConfigForSave(newModelConfig),
         baseUrl,
         url: baseUrl,
         apiKey,
@@ -88,6 +93,10 @@ export function useModels() {
   const handleUpdateModel = async () => {
     const baseUrl = editModelConfig?.baseUrl || editModelConfig?.url;
     const apiKey = editModelConfig?.apiKey || editModelConfig?.key;
+    if (editModelConfig?._extraBodyError) {
+      alert(editModelConfig._extraBodyError);
+      return;
+    }
     if (!editModelConfig?.id || !editModelConfig.name || !editModelConfig.modelId || !baseUrl || !apiKey) {
       alert('Please fill in all model information.');
       return;
@@ -97,7 +106,7 @@ export function useModels() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...editModelConfig,
+        ...sanitizeModelConfigForSave(editModelConfig),
         baseUrl,
         url: baseUrl,
         apiKey,

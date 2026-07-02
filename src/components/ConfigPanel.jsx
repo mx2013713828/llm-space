@@ -1,6 +1,7 @@
 
 
 import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
+import { formatExtraBodyForEditor, updateExtraBodyDraft } from '../lib/modelConfigExtras.js';
 
 export function ConfigPanel({
   models,
@@ -68,6 +69,27 @@ export function ConfigPanel({
         value={modelConfig.apiKey || modelConfig.key || ''}
         onChange={e => setModelConfig({ ...modelConfig, apiKey: e.target.value, key: e.target.value })}
       />
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', paddingLeft: 2 }}>Extra Body JSON</span>
+        <textarea
+          className="input"
+          spellCheck={false}
+          style={{
+            fontSize: 11,
+            padding: '6px 8px',
+            minHeight: 82,
+            resize: 'vertical',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            borderColor: modelConfig._extraBodyError ? 'var(--red)' : undefined,
+          }}
+          placeholder={'{\n  "enable_thinking": true\n}'}
+          value={formatExtraBodyForEditor(modelConfig)}
+          onChange={e => setModelConfig(updateExtraBodyDraft(modelConfig, e.target.value))}
+        />
+        {modelConfig._extraBodyError && (
+          <span style={{ fontSize: 10, color: 'var(--red)' }}>{modelConfig._extraBodyError}</span>
+        )}
+      </label>
     </div>
   );
 
