@@ -9,6 +9,7 @@ export function buildAnthropicMessagesRequest({
   temperature,
   thinkingEnabled = false,
   isContinuation = false,
+  stream = true,
 } = {}) {
   const baseUrl = cleanBaseUrl(modelProfile?.baseUrl || modelProfile?.url || 'https://api.anthropic.com');
   const endpoint = `${baseUrl}/v1/messages`;
@@ -28,7 +29,7 @@ export function buildAnthropicMessagesRequest({
     max_tokens: maxTokens || 8192,
     system: aligned.system || '',
     messages: messagesToSend,
-    stream: true,
+    stream,
   };
 
   if (aligned.tools && aligned.tools.length > 0) {

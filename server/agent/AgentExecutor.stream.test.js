@@ -284,6 +284,123 @@ test('DeepSeek model hints use DeepSeek request semantics even through a proxy U
   assert.equal('anthropic-beta' in requests[0].headers, false);
 });
 
+test('OpenAI-compatible models use chat completions request and stream tool calls', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async (url, options) => {
+    requests.push({
+      url,
+      headers: options.headers,
+      body: JSON.parse(options.body),
+    });
+    return sseResponse([
+      { id: 'chatcmpl_1', model: 'kimi-k2', choices: [{ delta: { role: 'assistant' } }], usage: { prompt_tokens: 10 } },
+      { choices: [{ delta: { content: 'Checking.' } }] },
+      {
+        choices: [{
+          delta: {
+            tool_calls: [{
+              index: 0,
+              id: 'call_weather',
+              type: 'function',
+              function: { name: 'weather_report', arguments: '{"city"' },
+            }],
+          },
+        }],
+      },
+      {
+        choices: [{
+          delta: {
+            tool_calls: [{
+              index: 0,
+              function: { arguments: ':"Linyi"}' },
+            }],
+          },
+        }],
+      },
+      { choices: [{ finish_reason: 'tool_calls' }], usage: { completion_tokens: 8 } },
+    ]);
+  };
+
+  const executor = new AgentExecutor({
+    model: {
+      id: 'kimi-k2',
+      provider: 'kimi',
+      protocol: 'openai',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k2',
+      apiKey: 'kimi-key',
+    },
+    tools: ['weather_report'],
+  });
+
+  const stopReason = await executor._callLLM({
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'weather' }] }],
+    turnIndex: 1,
+    systemPrompt: 'system',
+    tools: ['weather_report'],
+  }, { continuation_tokens: [] });
+
+  assert.equal(requests[0].url, 'https://api.moonshot.ai/v1/chat/completions');
+  assert.equal(requests[0].headers.Authorization, 'Bearer kimi-key');
+  assert.equal(requests[0].body.messages[0].role, 'system');
+  assert.equal(requests[0].body.tools[0].type, 'function');
+  assert.equal(stopReason, 'tool_use');
+  assert.deepEqual(executor.messages.map(({ type, content, toolName, toolInput }) => ({
+    type,
+    content,
+    toolName,
+    toolInput,
+  })), [
+    { type: 'text', content: 'Checking.', toolName: undefined, toolInput: undefined },
+    { type: 'tool_call', content: undefined, toolName: 'weather_report', toolInput: { city: 'Linyi' } },
+  ]);
+});
+
+test('OpenAI-compatible non-stream summary calls use chat completions', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async (url, options) => {
+    requests.push({
+      url,
+      headers: options.headers,
+      body: JSON.parse(options.body),
+    });
+    return {
+      ok: true,
+      async json() {
+        return { choices: [{ message: { content: '<summary>done</summary>' } }] };
+      },
+    };
+  };
+
+  const executor = new AgentExecutor({
+    model: {
+      id: 'kimi-k2',
+      provider: 'kimi',
+      protocol: 'openai',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k2',
+      apiKey: 'kimi-key',
+    },
+  });
+
+  const summary = await executor._callLLMNonStream(
+    [{ role: 'user', content: [{ type: 'text', text: 'Summarize.' }] }],
+    'summary prompt',
+  );
+
+  assert.equal(summary, '<summary>done</summary>');
+  assert.equal(requests[0].url, 'https://api.moonshot.ai/v1/chat/completions');
+  assert.equal(requests[0].body.stream, false);
+});
+
 test('recovers full-text DSML tool calls into executable tool_call messages', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

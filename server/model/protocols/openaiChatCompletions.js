@@ -5,12 +5,13 @@ export function buildOpenAIChatCompletionsRequest({
   toolSchemas = [],
   maxTokens = 8192,
   temperature,
+  stream = true,
 } = {}) {
   const baseUrl = cleanBaseUrl(modelProfile?.baseUrl || modelProfile?.url || 'https://api.openai.com/v1');
   const body = {
     model: modelProfile?.modelId || modelProfile?.id || '',
     messages: convertMessagesForOpenAI({ systemPrompt, apiMessages }),
-    stream: true,
+    stream,
     max_tokens: maxTokens || 8192,
   };
 

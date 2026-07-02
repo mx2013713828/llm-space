@@ -76,6 +76,25 @@ test('buildOpenAIChatCompletionsRequest converts internal tools and tool results
   ]);
 });
 
+test('buildOpenAIChatCompletionsRequest can build non-stream summary requests', () => {
+  const request = buildOpenAIChatCompletionsRequest({
+    modelProfile: {
+      provider: 'kimi',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k2',
+      apiKey: 'kimi-key',
+    },
+    systemPrompt: 'Summarize.',
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'long history' }] }],
+    maxTokens: 2048,
+    stream: false,
+  });
+
+  assert.equal(request.body.stream, false);
+  assert.equal(request.body.messages[0].role, 'system');
+  assert.equal(request.body.messages[1].content, 'long history');
+});
+
 test('normalizeOpenAIChatCompletionsEvent emits text and tool runtime events', () => {
   const state = createOpenAIChatCompletionsStreamState();
   const normalized = [

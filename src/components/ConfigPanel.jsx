@@ -32,8 +32,24 @@ export function ConfigPanel({
   const renderModelFields = (modelConfig, setModelConfig) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Display Name (e.g. Local DeepSeek)" value={modelConfig.name} onChange={e => setModelConfig({ ...modelConfig, name: e.target.value })} />
+      <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Provider (e.g. kimi, glm, minimax, deepseek)" value={modelConfig.provider || ''} onChange={e => setModelConfig({ ...modelConfig, provider: e.target.value })} />
+      <select
+        className="input"
+        style={{ fontSize: 11, padding: '6px 8px' }}
+        value={modelConfig.protocol || 'openai'}
+        onChange={e => setModelConfig({ ...modelConfig, protocol: e.target.value })}
+      >
+        <option value="openai">OpenAI-compatible</option>
+        <option value="anthropic">Anthropic-compatible</option>
+      </select>
       <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Model ID (e.g. deepseek-chat)" value={modelConfig.modelId} onChange={e => setModelConfig({ ...modelConfig, modelId: e.target.value })} />
-      <input className="input" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="Base URL (e.g. https://api.deepseek.com/anthropic)" value={modelConfig.url} onChange={e => setModelConfig({ ...modelConfig, url: e.target.value })} />
+      <input
+        className="input"
+        style={{ fontSize: 11, padding: '6px 8px' }}
+        placeholder="Base URL (e.g. https://api.moonshot.ai/v1)"
+        value={modelConfig.baseUrl || modelConfig.url || ''}
+        onChange={e => setModelConfig({ ...modelConfig, baseUrl: e.target.value, url: e.target.value })}
+      />
       <input
         className="input"
         type="number"
@@ -44,7 +60,14 @@ export function ConfigPanel({
         value={modelConfig.contextWindow}
         onChange={e => setModelConfig({ ...modelConfig, contextWindow: parseInt(e.target.value, 10) || '' })}
       />
-      <input className="input" type="password" style={{ fontSize: 11, padding: '6px 8px' }} placeholder="API Key" value={modelConfig.key} onChange={e => setModelConfig({ ...modelConfig, key: e.target.value })} />
+      <input
+        className="input"
+        type="password"
+        style={{ fontSize: 11, padding: '6px 8px' }}
+        placeholder="API Key"
+        value={modelConfig.apiKey || modelConfig.key || ''}
+        onChange={e => setModelConfig({ ...modelConfig, apiKey: e.target.value, key: e.target.value })}
+      />
     </div>
   );
 

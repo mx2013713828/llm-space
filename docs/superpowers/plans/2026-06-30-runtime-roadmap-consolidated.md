@@ -363,14 +363,14 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 **Steps:**
 
-- [ ] Write registry compatibility tests for legacy `MODELS_CONFIG`, pretty JSON config, default `contextWindow: 128000`, DeepSeek provider inference, and existing fields.
-- [ ] Implement model registry and keep `server/modelConfig.js` as a compatibility wrapper until route extraction is complete.
-- [ ] Write gateway tests for `protocol: "anthropic"` request alignment, DeepSeek thinking rules, cache usage normalization, and stream normalization.
-- [ ] Move request-body alignment, headers, endpoint construction, and protocol details into `anthropicMessages.js`.
-- [ ] Add an OpenAI-compatible adapter only after Anthropic-compatible behavior is stable behind the gateway.
-- [ ] Rewire `AgentExecutor` to request normalized events from the gateway.
-- [ ] Update model UI so provider, protocol, context window, and cache semantics are visible but not heavy.
-- [ ] Verify and commit with `refactor: add unified model gateway`.
+- [x] Write registry compatibility tests for legacy `MODELS_CONFIG`, pretty JSON config, default `contextWindow: 128000`, DeepSeek provider inference, and existing fields.
+- [x] Implement model registry and keep `server/modelConfig.js` as a compatibility wrapper until route extraction is complete.
+- [x] Write gateway tests for `protocol: "anthropic"` request alignment, DeepSeek thinking rules, cache usage normalization, and stream normalization.
+- [x] Move request-body alignment, headers, endpoint construction, and protocol details into `anthropicMessages.js`.
+- [x] Add an OpenAI-compatible adapter only after Anthropic-compatible behavior is stable behind the gateway.
+- [x] Rewire `AgentExecutor` to request normalized events from the gateway.
+- [x] Update model UI so provider, protocol, context window, and cache semantics are visible but not heavy.
+- [x] Verify and commit with `refactor: add unified model gateway`.
 
 ---
 

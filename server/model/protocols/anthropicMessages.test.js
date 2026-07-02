@@ -49,3 +49,23 @@ test('buildAnthropicMessagesRequest disables DeepSeek thinking explicitly when o
   assert.deepEqual(request.body.thinking, { type: 'disabled' });
   assert.equal(request.body.temperature, 0.2);
 });
+
+test('buildAnthropicMessagesRequest can build non-stream summary requests', () => {
+  const request = buildAnthropicMessagesRequest({
+    modelProfile: {
+      provider: 'anthropic',
+      baseUrl: 'https://api.anthropic.com',
+      modelId: 'claude-sonnet-4-5',
+      apiKey: 'a-key',
+    },
+    systemPrompt: 'Summarize.',
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'long history' }] }],
+    toolSchemas: [],
+    maxTokens: 2048,
+    thinkingEnabled: false,
+    stream: false,
+  });
+
+  assert.equal(request.body.stream, false);
+  assert.equal(request.url, 'https://api.anthropic.com/v1/messages');
+});

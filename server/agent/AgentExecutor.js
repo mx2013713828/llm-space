@@ -9,7 +9,7 @@ import {
   createSensitiveOutputRedactor,
   formatBashSandboxNotice,
 } from '../tools/bashSandbox.js';
-import { buildApiMessages, compactMessages, estimateTokens, injectTodoState, alignRequestPayload } from './messageBuilder.js';
+import { buildApiMessages, compactMessages, estimateTokens, injectTodoState } from './messageBuilder.js';
 import { COMPACT_PROMPT } from './compactPrompt.js';
 import { HookManager } from './HookManager.js';
 import { CompactionPlugin } from './plugins/CompactionPlugin.js';
@@ -29,15 +29,16 @@ import {
   defaultRuntimeNotificationQueue,
   enqueueRuntimeNotification,
 } from './runtimeNotifications.js';
-import { inferModelProvider, normalizeUsageMetrics } from './usageNormalizer.js';
+import { normalizeUsageMetrics } from './usageNormalizer.js';
 import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
 import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
+import { parseProviderSseLines } from '../model/streamParser.js';
+import { normalizeModelProfile } from '../model/modelRegistry.js';
 import {
-  createAnthropicCompatibleStreamState,
-  normalizeAnthropicCompatibleEvent,
-  parseProviderSseLines,
-} from '../model/streamParser.js';
+  buildModelGatewayRequest,
+  createModelGatewayStreamNormalizer,
+} from '../model/providerGateway.js';
 import { getModelContextWindow } from '../../src/lib/modelContext.js';
 import { buildPersistedSessionState } from '../sessions/sessionState.js';
 import {
@@ -96,14 +97,6 @@ function buildPermanentSecurityBlockFinalMessage(blockedTools = []) {
     '',
     '如果你只是想确认配置结构，我可以改为查看 `.env.example`、说明需要哪些环境变量，或者指导你在本地终端自行检查。'
   ].join('\n') + suffix;
-}
-
-function inferExecutorModelProvider(model = {}) {
-  return inferModelProvider({}, {
-    providerHint: model.provider || model.id || model.name,
-    baseUrl: model.url,
-    modelId: model.modelId,
-  });
 }
 
 export function getCompactionTokenThresholds(model = {}) {
@@ -295,32 +288,22 @@ export class AgentExecutor {
    * @returns {Promise<string>}
    */
   async _callLLMNonStream(apiMessages, systemPrompt) {
-    const endpoint = `${(this.model.url || 'https://api.anthropic.com').replace(/\/$/, '')}/v1/messages`;
-    const modelProvider = inferExecutorModelProvider(this.model);
-    const isDeepSeek = modelProvider === 'deepseek';
-
-    const requestBody = {
-      model: this.model.modelId || 'claude-sonnet-4-5',
-      max_tokens: 2048,
-      system: systemPrompt,
+    const modelProfile = normalizeModelProfile(this.model);
+    const request = buildModelGatewayRequest({
+      modelProfile,
+      systemPrompt,
       messages: apiMessages,
-      stream: false
-    };
+      apiMessages,
+      toolSchemas: [],
+      maxTokens: 2048,
+      thinkingEnabled: false,
+      stream: false,
+    });
 
-    const reqHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': this.model.key || '',
-      'anthropic-version': '2023-06-01',
-    };
-
-    if (isDeepSeek) {
-      requestBody.thinking = { type: 'disabled' };
-    }
-
-    const res = await fetch(endpoint, {
+    const res = await fetch(request.url, {
       method: 'POST',
-      headers: reqHeaders,
-      body: JSON.stringify(requestBody),
+      headers: request.headers,
+      body: JSON.stringify(request.body),
       signal: AbortSignal.timeout(60000),
     });
 
@@ -330,6 +313,10 @@ export class AgentExecutor {
     }
 
     const data = await res.json();
+    if (Array.isArray(data.choices)) {
+      return String(data.choices[0]?.message?.content || '').trim();
+    }
+
     let text = '';
     if (data.content && Array.isArray(data.content)) {
       for (const block of data.content) {
@@ -751,81 +738,32 @@ export class AgentExecutor {
 
     let upstream = null;
     let lastErr = null;
+    let normalizeProviderEvent = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const baseUrl = this.model.url || 'https://api.anthropic.com';
-      const cleanedUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-      const endpoint = `${cleanedUrl}/v1/messages`;
-      const modelProvider = inferExecutorModelProvider(this.model);
-      const isDeepSeek = modelProvider === 'deepseek';
+      const modelProfile = normalizeModelProfile(this.model);
 
       // 提取目前启用的工具清单并生成后端统一定义的 Schema
       const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
       const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
 
-      // 使用 alignRequestPayload 进行对齐 and 重排
-      const aligned = alignRequestPayload(
-        systemPrompt || '',
-        toolSchemas,
+      const request = buildModelGatewayRequest({
+        modelProfile,
+        systemPrompt: systemPrompt || '',
         apiMessages,
-        this.model
-      );
-
-      const messagesToSend = [...(aligned.messages || [])];
-      if (isContinuation) {
-        const isAnthropic = endpoint.includes('anthropic.com');
-        if (!isAnthropic) {
-          messagesToSend.push({
-            role: 'user',
-            content: 'Output token limit hit. Resume directly — no apology, no recap of what you were doing. Pick up mid-thought if that is where the cut happened. Break remaining work into smaller pieces.'
-          });
-        }
-      }
-
-      // 准备大模型 API 请求体
-      const requestBody = {
-        model: this.model.modelId || 'claude-sonnet-4-5',
-        max_tokens: this.maxTokens || 8192,
-        system: aligned.system || '',
-        messages: messagesToSend,
+        toolSchemas,
+        maxTokens: this.maxTokens || 8192,
+        temperature: this.temperature,
+        thinkingEnabled: this.thinkingEnabled,
+        isContinuation,
         stream: true,
-      };
-
-      if (aligned.tools && aligned.tools.length > 0) {
-        requestBody.tools = aligned.tools;
-      }
-
-      // 处理大模型推理的扩展思考 (Extended Thinking) 特性
-      if (this.thinkingEnabled) {
-        requestBody.thinking = { 
-          type: 'enabled', 
-          budget_tokens: Math.floor(Math.min(this.maxTokens * 0.6 || 5000, 10000)) 
-        };
-        if (!isDeepSeek) {
-          requestBody.temperature = 1;
-          requestBody.betas = ['interleaved-thinking-2025-05-07'];
-        }
-      } else if (isDeepSeek) {
-        requestBody.thinking = { type: 'disabled' };
-        if (this.temperature !== undefined) requestBody.temperature = this.temperature;
-      } else if (this.temperature !== undefined) {
-        requestBody.temperature = this.temperature;
-      }
-
-      const reqHeaders = {
-        'Content-Type': 'application/json',
-        'x-api-key': this.model.key || '',
-        'anthropic-version': '2023-06-01',
-      };
-      if (this.thinkingEnabled && !isDeepSeek) {
-        reqHeaders['anthropic-beta'] = 'interleaved-thinking-2025-05-07';
-      }
+      });
 
       try {
-        upstream = await fetch(endpoint, {
+        upstream = await fetch(request.url, {
           method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify(requestBody),
+          headers: request.headers,
+          body: JSON.stringify(request.body),
           signal: AbortSignal.timeout(120000),
         });
 
@@ -862,6 +800,7 @@ export class AgentExecutor {
         // 成功获取响应，跳出重试循环并清零 529 计数
         recoveryState.consecutive_529 = 0;
         lastErr = null;
+        normalizeProviderEvent = createModelGatewayStreamNormalizer(modelProfile);
         break;
       } catch (err) {
         lastErr = err;
@@ -883,12 +822,7 @@ export class AgentExecutor {
                 }
                 const fallbackModel = models.find(m => m.id === fallbackModelId);
                 if (fallbackModel) {
-                  this.model = {
-                    name: fallbackModel.name,
-                    modelId: fallbackModel.modelId,
-                    key: fallbackModel.key,
-                    url: fallbackModel.url || 'https://api.anthropic.com'
-                  };
+                  this.model = normalizeModelProfile(fallbackModel);
                   this.onEvent('error_recovery_fallback', {
                     message: `⚡ 由于大模型连续过载 (529 Overloaded)，系统已自动故障转移切换至备用模型 [${fallbackModel.name}] 继续运行`
                   });
@@ -922,7 +856,6 @@ export class AgentExecutor {
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    const providerStreamState = createAnthropicCompatibleStreamState();
     const runtimeStreamState = {
       turnIndex,
       isContinuation,
@@ -940,7 +873,7 @@ export class AgentExecutor {
       buffer = lines.pop() || '';
 
       for (const providerEvent of parseProviderSseLines(lines)) {
-        const modelEvents = normalizeAnthropicCompatibleEvent(providerEvent, providerStreamState);
+        const modelEvents = normalizeProviderEvent(providerEvent);
         for (const modelEvent of modelEvents) {
           this._applyModelRuntimeEvent(modelEvent, runtimeStreamState);
         }

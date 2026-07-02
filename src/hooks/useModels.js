@@ -16,8 +16,12 @@ export function useModels() {
   const [editModelConfig, setEditModelConfig] = useState(null);
   const [newModelConfig, setNewModelConfig] = useState({
     name: '',
+    provider: '',
+    protocol: 'openai',
     modelId: '',
+    baseUrl: '',
     url: '',
+    apiKey: '',
     key: '',
     contextWindow: DEFAULT_CONTEXT_WINDOW
   });
@@ -47,14 +51,22 @@ export function useModels() {
    * 添加新模型配置并持久化到 .env
    */
   const handleAddModel = async () => {
-    if (!newModelConfig.name || !newModelConfig.modelId || !newModelConfig.url || !newModelConfig.key) {
+    const baseUrl = newModelConfig.baseUrl || newModelConfig.url;
+    const apiKey = newModelConfig.apiKey || newModelConfig.key;
+    if (!newModelConfig.name || !newModelConfig.modelId || !baseUrl || !apiKey) {
       alert('Please fill in all model information.');
       return;
     }
     const res = await apiFetch('/api/models', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newModelConfig)
+      body: JSON.stringify({
+        ...newModelConfig,
+        baseUrl,
+        url: baseUrl,
+        apiKey,
+        key: apiKey,
+      })
     });
     const updated = await res.json();
     setModels(updated);
@@ -62,15 +74,21 @@ export function useModels() {
     setShowAddModel(false);
     setNewModelConfig({
       name: '',
+      provider: '',
+      protocol: 'openai',
       modelId: '',
+      baseUrl: '',
       url: '',
+      apiKey: '',
       key: '',
       contextWindow: DEFAULT_CONTEXT_WINDOW
     });
   };
 
   const handleUpdateModel = async () => {
-    if (!editModelConfig?.id || !editModelConfig.name || !editModelConfig.modelId || !editModelConfig.url || !editModelConfig.key) {
+    const baseUrl = editModelConfig?.baseUrl || editModelConfig?.url;
+    const apiKey = editModelConfig?.apiKey || editModelConfig?.key;
+    if (!editModelConfig?.id || !editModelConfig.name || !editModelConfig.modelId || !baseUrl || !apiKey) {
       alert('Please fill in all model information.');
       return;
     }
@@ -78,7 +96,13 @@ export function useModels() {
     const res = await apiFetch(`/api/models/${editModelConfig.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editModelConfig)
+      body: JSON.stringify({
+        ...editModelConfig,
+        baseUrl,
+        url: baseUrl,
+        apiKey,
+        key: apiKey,
+      })
     });
     const updated = await res.json();
     if (!res.ok) {
