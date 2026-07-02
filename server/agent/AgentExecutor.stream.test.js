@@ -360,6 +360,43 @@ test('OpenAI-compatible models use chat completions request and stream tool call
   ]);
 });
 
+test('OpenAI-compatible reasoning_content streams as a thinking block', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => sseResponse([
+    { id: 'chatcmpl_1', model: 'deepseek-reasoner', choices: [{ delta: { role: 'assistant' } }], usage: { prompt_tokens: 10 } },
+    { choices: [{ delta: { reasoning_content: 'Need to reason through this.' } }] },
+    { choices: [{ delta: { content: 'Here is the answer.' } }] },
+    { choices: [{ finish_reason: 'stop' }], usage: { completion_tokens: 12 } },
+  ]);
+
+  const executor = new AgentExecutor({
+    model: {
+      id: 'deepseek-reasoner',
+      provider: 'deepseek',
+      protocol: 'openai',
+      baseUrl: 'https://api.deepseek.com/v1',
+      modelId: 'deepseek-reasoner',
+      apiKey: 'deepseek-key',
+    },
+    thinkingEnabled: true,
+  });
+
+  await executor._callLLM({
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'think' }] }],
+    turnIndex: 1,
+    systemPrompt: 'system',
+    tools: [],
+  }, { continuation_tokens: [] });
+
+  assert.deepEqual(executor.messages.map(({ type, content }) => ({ type, content })), [
+    { type: 'thinking', content: 'Need to reason through this.' },
+    { type: 'text', content: 'Here is the answer.' },
+  ]);
+});
+
 test('OpenAI-compatible non-stream summary calls use chat completions', async (t) => {
   const originalFetch = globalThis.fetch;
   const requests = [];

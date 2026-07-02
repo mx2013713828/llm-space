@@ -95,6 +95,63 @@ test('buildOpenAIChatCompletionsRequest can build non-stream summary requests', 
   assert.equal(request.body.messages[1].content, 'long history');
 });
 
+test('buildOpenAIChatCompletionsRequest merges provider-specific extra body fields without replacing core fields', () => {
+  const request = buildOpenAIChatCompletionsRequest({
+    modelProfile: {
+      provider: 'kimi',
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k2',
+      apiKey: 'kimi-key',
+      extraBody: {
+        enable_thinking: true,
+        reasoning_effort: 'medium',
+        model: 'should-not-replace',
+        messages: [],
+        stream: false,
+      },
+    },
+    apiMessages: [{ role: 'user', content: [{ type: 'text', text: 'think' }] }],
+  });
+
+  assert.equal(request.body.enable_thinking, true);
+  assert.equal(request.body.reasoning_effort, 'medium');
+  assert.equal(request.body.model, 'kimi-k2');
+  assert.equal(request.body.stream, true);
+  assert.equal(request.body.messages[0].content, 'think');
+});
+
+test('normalizeOpenAIChatCompletionsEvent maps reasoning_content into thinking runtime events', () => {
+  const state = createOpenAIChatCompletionsStreamState();
+  const normalized = [
+    ...normalizeOpenAIChatCompletionsEvent({
+      id: 'chatcmpl_1',
+      model: 'deepseek-reasoner',
+      choices: [{ delta: { role: 'assistant' } }],
+    }, state),
+    ...normalizeOpenAIChatCompletionsEvent({
+      choices: [{ delta: { reasoning_content: 'I should reason first.' } }],
+    }, state),
+    ...normalizeOpenAIChatCompletionsEvent({
+      choices: [{ delta: { content: 'Final answer.' } }],
+    }, state),
+    ...normalizeOpenAIChatCompletionsEvent({
+      choices: [{ finish_reason: 'stop' }],
+      usage: { completion_tokens: 12 },
+    }, state),
+  ];
+
+  assert.deepEqual(normalized, [
+    { type: 'message_start', model: 'deepseek-reasoner', usage: undefined },
+    { type: 'thinking_start', index: -1, signature: '' },
+    { type: 'thinking_delta', index: -1, text: 'I should reason first.' },
+    { type: 'thinking_end', index: -1 },
+    { type: 'text_start', index: 0 },
+    { type: 'text_delta', index: 0, text: 'Final answer.' },
+    { type: 'text_end', index: 0 },
+    { type: 'message_delta', stopReason: 'end_turn', usage: { completion_tokens: 12 } },
+  ]);
+});
+
 test('normalizeOpenAIChatCompletionsEvent emits text and tool runtime events', () => {
   const state = createOpenAIChatCompletionsStreamState();
   const normalized = [

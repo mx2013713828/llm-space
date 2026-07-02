@@ -24,6 +24,8 @@ export function buildOpenAIChatCompletionsRequest({
     body.tools = tools;
   }
 
+  mergeExtraBody(body, modelProfile?.extraBody || modelProfile?.protocolOptions?.body);
+
   return {
     url: baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`,
     headers: {
@@ -37,6 +39,8 @@ export function buildOpenAIChatCompletionsRequest({
 export function createOpenAIChatCompletionsStreamState() {
   return {
     hasStartedMessage: false,
+    thinkingStarted: false,
+    thinkingEnded: false,
     textStarted: false,
     activeToolsByOpenAIIndex: new Map(),
   };
@@ -56,8 +60,19 @@ export function normalizeOpenAIChatCompletionsEvent(event = {}, state = createOp
 
   for (const choice of event.choices || []) {
     const delta = choice.delta || {};
+    const reasoningText = readReasoningDelta(delta);
+
+    if (reasoningText.length > 0) {
+      if (!state.thinkingStarted) {
+        state.thinkingStarted = true;
+        state.thinkingEnded = false;
+        output.push({ type: 'thinking_start', index: -1, signature: '' });
+      }
+      output.push({ type: 'thinking_delta', index: -1, text: reasoningText });
+    }
 
     if (typeof delta.content === 'string' && delta.content.length > 0) {
+      closeThinkingBlock(output, state);
       if (!state.textStarted) {
         state.textStarted = true;
         output.push({ type: 'text_start', index: 0 });
@@ -93,6 +108,7 @@ export function normalizeOpenAIChatCompletionsEvent(event = {}, state = createOp
     }
 
     if (choice.finish_reason) {
+      closeThinkingBlock(output, state);
       if (state.textStarted) {
         output.push({ type: 'text_end', index: 0 });
         state.textStarted = false;
@@ -116,6 +132,33 @@ export function normalizeOpenAIChatCompletionsEvent(event = {}, state = createOp
   }
 
   return output;
+}
+
+function readReasoningDelta(delta = {}) {
+  for (const field of ['reasoning_content', 'reasoning', 'thinking', 'reasoning_text']) {
+    if (typeof delta[field] === 'string' && delta[field].length > 0) {
+      return delta[field];
+    }
+  }
+  return '';
+}
+
+function closeThinkingBlock(output, state) {
+  if (state.thinkingStarted && !state.thinkingEnded) {
+    output.push({ type: 'thinking_end', index: -1 });
+    state.thinkingEnded = true;
+  }
+}
+
+function mergeExtraBody(body, extraBody) {
+  if (!extraBody || typeof extraBody !== 'object' || Array.isArray(extraBody)) return;
+
+  const reservedFields = new Set(['model', 'messages', 'tools', 'stream']);
+  for (const [key, value] of Object.entries(extraBody)) {
+    if (!reservedFields.has(key)) {
+      body[key] = value;
+    }
+  }
 }
 
 function convertToolsForOpenAI(toolSchemas = []) {
