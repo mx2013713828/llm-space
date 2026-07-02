@@ -4,6 +4,7 @@ export const PROTOCOL_OPENAI_CHAT_COMPLETIONS = 'openai_chat_completions';
 
 export function normalizeProtocol(protocol, model = {}) {
   const value = String(protocol || '').trim().toLowerCase();
+  if (!value) return inferProtocol(model);
   if (['anthropic', 'anthropic_messages', 'anthropic-messages'].includes(value)) {
     return PROTOCOL_ANTHROPIC_MESSAGES;
   }
@@ -11,7 +12,7 @@ export function normalizeProtocol(protocol, model = {}) {
     return PROTOCOL_OPENAI_CHAT_COMPLETIONS;
   }
 
-  return inferProtocol(model);
+  return value;
 }
 
 export function normalizeModelProfile(model = {}) {
