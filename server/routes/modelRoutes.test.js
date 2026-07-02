@@ -27,18 +27,23 @@ test('model routes list, create, and update MODELS_CONFIG without losing other e
   const listRes = await dispatchJson(app, 'GET', '/api/models');
   assert.equal(listRes.status, 200);
   assert.equal(listRes.body[0].name, 'DeepSeek');
+  assert.equal(listRes.body[0].protocol, 'openai_chat_completions');
+  assert.equal(listRes.body[0].contextWindow, 1000000);
   assert.equal(JSON.parse(env.MODELS_CONFIG)[0].id, '1');
 
   const createRes = await dispatchJson(app, 'POST', '/api/models', {
-    body: { id: '2', name: 'Kimi', contextWindow: 128000 },
+    body: { id: '2', name: 'Kimi', protocol: 'openai', baseUrl: 'https://api.moonshot.ai/v1', apiKey: 'k', contextWindow: 128000 },
   });
   assert.equal(createRes.status, 200);
   assert.equal(createRes.body.length, 2);
+  assert.equal(createRes.body.find(model => model.id === '2').protocol, 'openai_chat_completions');
+  assert.equal(createRes.body.find(model => model.id === '2').url, 'https://api.moonshot.ai/v1');
 
   const updateRes = await dispatchJson(app, 'PUT', '/api/models/2', {
     body: { contextWindow: 256000 },
   });
   assert.equal(updateRes.status, 200);
+  assert.equal(updateRes.body.find(model => model.id === '2').contextWindow, 256000);
 
   const envText = await readFile(fixture.envPath, 'utf-8');
   const models = parseModelsConfig(envText);

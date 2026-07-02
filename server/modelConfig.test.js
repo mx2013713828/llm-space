@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseModelsConfig, upsertModelsConfig } from './modelConfig.js';
+import { parseModelsConfig, parseModelRegistry, upsertModelsConfig } from './modelConfig.js';
 
 test('parses legacy single-line MODELS_CONFIG', () => {
   const envText = 'PORT=3001\nMODELS_CONFIG=[{"id":"1","name":"DeepSeek","modelId":"deepseek-v4","url":"https://api.deepseek.com/anthropic","key":"k"}]\n';
@@ -45,4 +45,16 @@ test('upserts MODELS_CONFIG as standard pretty JSON', () => {
   assert.match(updated, /"contextWindow": 128000/);
   assert.match(updated, /TAVILY_API_KEY=tvly/);
   assert.equal(parseModelsConfig(updated).length, 2);
+});
+
+test('parseModelRegistry returns normalized model profiles for API and runtime use', () => {
+  const envText = 'MODELS_CONFIG=[{"id":"kimi","name":"Kimi","provider":"kimi","protocol":"openai","baseUrl":"https://api.moonshot.ai/v1","modelId":"kimi-k2","apiKey":"k"}]\n';
+  const registry = parseModelRegistry(envText);
+  const profile = registry.resolveModelProfile('kimi');
+
+  assert.equal(profile.protocol, 'openai_chat_completions');
+  assert.equal(profile.baseUrl, 'https://api.moonshot.ai/v1');
+  assert.equal(profile.url, 'https://api.moonshot.ai/v1');
+  assert.equal(profile.key, 'k');
+  assert.equal(profile.contextWindow, 128000);
 });

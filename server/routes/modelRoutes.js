@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import { parseModelsConfig, upsertModelsConfig } from '../modelConfig.js';
+import { parseModelRegistry, parseModelsConfig, upsertModelsConfig } from '../modelConfig.js';
 
 const DEFAULT_ENV_PATH = path.join(process.cwd(), '.env');
 
@@ -16,7 +16,7 @@ export function registerModelRoutes(app, {
       const envStr = await fsImpl.readFile(envPath, 'utf-8').catch(() => '');
       const models = parseModelsConfig(envStr);
       env.MODELS_CONFIG = JSON.stringify(models);
-      return res.json(models);
+      return res.json(parseModelRegistry(envStr).list());
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -35,7 +35,7 @@ export function registerModelRoutes(app, {
 
       await fsImpl.writeFile(envPath, envStr, 'utf-8');
       env.MODELS_CONFIG = JSON.stringify(models);
-      res.json(models);
+      res.json(parseModelRegistry(envStr).list());
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -61,7 +61,7 @@ export function registerModelRoutes(app, {
 
       await fsImpl.writeFile(envPath, envStr, 'utf-8');
       env.MODELS_CONFIG = JSON.stringify(models);
-      res.json(models);
+      res.json(parseModelRegistry(envStr).list());
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

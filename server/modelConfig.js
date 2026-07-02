@@ -1,3 +1,5 @@
+import { createModelRegistry } from './model/modelRegistry.js';
+
 function findModelsConfigRange(envText) {
   const lines = String(envText || '').split('\n');
   const start = lines.findIndex(line => line.trimStart().startsWith('MODELS_CONFIG='));
@@ -22,6 +24,10 @@ export function parseModelsConfig(envText) {
   if (!range) return [];
   const parsed = JSON.parse(range.rawValue);
   return Array.isArray(parsed) ? parsed : [];
+}
+
+export function parseModelRegistry(envText) {
+  return createModelRegistry(parseModelsConfig(envText));
 }
 
 export function formatModelsConfig(models) {
