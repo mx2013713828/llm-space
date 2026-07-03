@@ -5,6 +5,7 @@ import { AgentExecutor } from '../agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from '../agent/messageBuilder.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { createRuntimeNotificationQueue, summarizeNotificationsForUi } from '../agent/runtimeNotifications.js';
+import { listMemoryCandidates } from '../agent/memory/memoryCandidateStore.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
 import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
@@ -62,6 +63,7 @@ export function registerHarnessRoutes(app, {
   securityPlugin = SecurityPlugin,
   registry = toolRegistry,
   resolveStrategy = resolveSelectedStrategyId,
+  memoryCandidateStore = { listMemoryCandidates },
 } = {}) {
   app.get('/api/harnesses', async (req, res) => {
     try {
@@ -262,6 +264,7 @@ export function registerHarnessRoutes(app, {
         messages: aligned.messages,
         toolPoolSummary: describeToolPool(executor.toolPool),
         runtimeNotificationSummary: context.runtimeNotificationSummary || summarizeNotificationsForUi([]),
+        memoryCandidateSummary: await buildMemoryCandidateSummary({ harnessId, memoryCandidateStore }),
       });
     } catch (err) {
       console.error('[harnessRoutes /api/harnesses/:harnessId/dry-run] Error:', err);
@@ -272,4 +275,30 @@ export function registerHarnessRoutes(app, {
       }
     }
   });
+}
+
+async function buildMemoryCandidateSummary({ harnessId, memoryCandidateStore }) {
+  try {
+    const candidates = await memoryCandidateStore.listMemoryCandidates({ harnessId });
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+    for (const candidate of candidates || []) {
+      if (candidate?.status in counts) counts[candidate.status] += 1;
+    }
+
+    return {
+      counts,
+      previews: (candidates || []).slice(0, 3).map(candidate => ({
+        id: candidate.id,
+        status: candidate.status,
+        name: candidate.item?.name || '',
+        description: candidate.item?.description || '',
+        reason: candidate.reason || candidate.rejectionReason || '',
+      })),
+    };
+  } catch {
+    return {
+      counts: { pending: 0, approved: 0, rejected: 0 },
+      previews: [],
+    };
+  }
 }

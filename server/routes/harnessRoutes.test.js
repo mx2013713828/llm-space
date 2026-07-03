@@ -157,3 +157,73 @@ test('harness dry-run reports notification summary without consuming the live qu
   assert.equal(peekRuntimeNotifications({ harnessId: 'alpha', queue: defaultRuntimeNotificationQueue }).length, 1);
   drainRuntimeNotifications({ harnessId: 'alpha', limit: 100, queue: defaultRuntimeNotificationQueue });
 });
+
+test('harness dry-run reports memory candidate summary without loading full candidate bodies', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    sessionsDir: fixture.sessionsDir,
+    memoryCandidateStore: {
+      async listMemoryCandidates({ harnessId }) {
+        assert.equal(harnessId, 'alpha');
+        return [
+          {
+            id: 'memcand_1',
+            status: 'pending',
+            item: {
+              name: 'possible-project-convention',
+              description: '可能的项目约定',
+              body: 'x'.repeat(2000),
+            },
+            reason: 'Useful but ambiguous.',
+          },
+          {
+            id: 'memcand_2',
+            status: 'approved',
+            item: { name: 'approved-memory', description: '已批准', body: 'approved body' },
+          },
+        ];
+      },
+    },
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      tools: ['bash'],
+      features: {},
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.memoryCandidateSummary.counts, {
+    pending: 1,
+    approved: 1,
+    rejected: 0,
+  });
+  assert.deepEqual(res.body.memoryCandidateSummary.previews, [
+    {
+      id: 'memcand_1',
+      status: 'pending',
+      name: 'possible-project-convention',
+      description: '可能的项目约定',
+      reason: 'Useful but ambiguous.',
+    },
+    {
+      id: 'memcand_2',
+      status: 'approved',
+      name: 'approved-memory',
+      description: '已批准',
+      reason: '',
+    },
+  ]);
+  assert.equal(JSON.stringify(res.body.memoryCandidateSummary).includes('xxxx'), false);
+});

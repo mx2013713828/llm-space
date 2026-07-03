@@ -4,6 +4,7 @@ import cors from 'cors';
 import { createAccessGuard, createRateLimiter } from '../http/accessGuard.js';
 import { registerAgentRunRoutes } from '../routes/agentRunRoutes.js';
 import { registerHarnessRoutes } from '../routes/harnessRoutes.js';
+import { registerMemoryRoutes } from '../routes/memoryRoutes.js';
 import { registerModelRoutes } from '../routes/modelRoutes.js';
 import { registerSessionRoutes } from '../routes/sessionRoutes.js';
 
@@ -35,6 +36,7 @@ export function createServerApp({
   }
 
   registerHarnessRoutes(app, routeDeps.harness);
+  registerMemoryRoutes(app, routeDeps.memory);
   registerModelRoutes(app, routeDeps.model);
   registerSessionRoutes(app, routeDeps.session);
   registerAgentRunRoutes(app, routeDeps.agentRun);

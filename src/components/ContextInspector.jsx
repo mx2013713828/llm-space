@@ -408,6 +408,42 @@ export function ContextInspector({
     );
   };
 
+  const renderMemoryCandidateSummary = () => {
+    const summary = alignedData.memoryCandidateSummary;
+    if (!summary) return null;
+    const counts = summary.counts || {};
+    const total = (counts.pending || 0) + (counts.approved || 0) + (counts.rejected || 0);
+
+    return (
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(168, 85, 247, 0.05)', border: '1px solid var(--purple)', borderRadius: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--purple)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🧠</span> Memory Candidates
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>({total} tracked)</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: (summary.previews || []).length ? 10 : 0 }}>
+          {['pending', 'approved', 'rejected'].map(status => (
+            <div key={status} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{status}</div>
+              <div style={{ fontSize: 12, color: status === 'pending' && counts[status] ? 'var(--orange)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{counts[status] || 0}</div>
+            </div>
+          ))}
+        </div>
+        {(summary.previews || []).length > 0 && (
+          <div style={{ display: 'grid', gap: 6 }}>
+            {(summary.previews || []).map(item => (
+              <div key={item.id} style={{ padding: '8px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{item.status || 'candidate'} · {item.name || '(unnamed)'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {item.description || '(no description)'}{item.reason ? `\n${item.reason}` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowContextInspector(false)}>
       {/* 半透明遮罩 */}
@@ -478,6 +514,9 @@ export function ContextInspector({
 
               {/* Runtime Notifications */}
               {renderRuntimeNotificationSummary()}
+
+              {/* Memory Candidates */}
+              {renderMemoryCandidateSummary()}
 
               {/* Tools */}
               {renderTools()}
