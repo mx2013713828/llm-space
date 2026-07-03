@@ -511,15 +511,17 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 - `approveMemoryCandidate({ harnessId, candidateId, patch })`
 - `rejectMemoryCandidate({ harnessId, candidateId, reason })`
 
+**Implementation note:** MVP completed as an automatic memory quality gate, not a heavy approval workflow. Auto-capture now routes extracted memories through deterministic decisions: `auto_write`, `pending_review`, `discard`, and `sensitive_blocked`. Pending candidates are stored in a background queue and surfaced through bounded API / Context Inspector summaries. A full review UI is intentionally deferred until the candidate behavior has been tested in real use.
+
 **Steps:**
 
-- [ ] Write quality-gate tests for `auto_write`, `pending_review`, `discard`, and `sensitive_blocked`.
-- [ ] Implement classification rules that auto-write explicit user memory and stable preferences, discard transient/runtime outputs, block secrets, and queue ambiguous but useful items.
-- [ ] Write candidate store tests for creation, listing, approval, rejection, persistence, and path safety.
-- [ ] Implement filesystem-backed candidate storage with `pending`, `approved`, and `rejected` states.
-- [ ] Rewire extraction so `auto_write` continues to write long-term memory, `pending_review` creates candidates, and `discard` / `sensitive_blocked` do not write.
-- [ ] Add review API and lightweight candidate visibility without interruptive prompts.
-- [ ] Verify and commit with `feat: add automatic memory quality gate`.
+- [x] Write quality-gate tests for `auto_write`, `pending_review`, `discard`, and `sensitive_blocked`.
+- [x] Implement classification rules that auto-write explicit user memory and stable preferences, discard transient/runtime outputs, block secrets, and queue ambiguous but useful items.
+- [x] Write candidate store tests for creation, listing, approval, rejection, persistence, and path safety.
+- [x] Implement filesystem-backed candidate storage with `pending`, `approved`, and `rejected` states.
+- [x] Rewire extraction so `auto_write` continues to write long-term memory, `pending_review` creates candidates, and `discard` / `sensitive_blocked` do not write.
+- [x] Add review API and lightweight candidate visibility without interruptive prompts.
+- [x] Verify and commit with `feat: add automatic memory quality gate`.
 
 ### Task 12: Mountable Knowledge Bases
 
