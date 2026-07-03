@@ -147,6 +147,7 @@ test('runTeammate creates a teammate child executor, marks running then complete
         name: 'Reviewer',
         role: 'Critic',
         content: 'done',
+        traceRef: updates[1].updates.traceRef,
       },
     },
   ]);
@@ -256,6 +257,7 @@ test('runTeammate marks no_result when child finishes without final assistant te
   assert.equal(events[1].payload.teammates[0].state, 'no_result');
   assert.equal(sentMessages[0].type, 'error');
   assert.equal(sentMessages[0].payload.status, 'no_result');
+  assert.deepEqual(sentMessages[0].payload.traceRef, updates[1].updates.traceRef);
   assert.match(sentMessages[0].payload.error, /final text report/i);
 });
 

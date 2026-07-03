@@ -183,6 +183,7 @@ export async function runTeammate({
         name,
         role: role ?? null,
         content,
+        traceRef,
       } : {
         teammateId,
         name,
@@ -190,6 +191,7 @@ export async function runTeammate({
         error: finalError,
         status: finalState,
         lastToolName: outcome.lastToolName,
+        traceRef,
       },
     });
 

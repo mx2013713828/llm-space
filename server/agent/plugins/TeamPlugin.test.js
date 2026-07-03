@@ -369,6 +369,10 @@ test('check_team_inbox labels teammate no_result messages as errors with trace g
       teammateId: 'teammate_frontend',
       status: 'no_result',
       error: 'Teammate finished without a final text report after its last tool call.',
+      traceRef: {
+        traceId: 'team_1_teammate_frontend',
+        path: 'server/sessions/h1_teammates/team_1/teammate_frontend.json',
+      },
     },
   });
   await fixture.stateStore.createTeam({
@@ -388,6 +392,7 @@ test('check_team_inbox labels teammate no_result messages as errors with trace g
   assert.match(tool.toolOutput, /type=error/);
   assert.match(tool.toolOutput, /status=no_result/);
   assert.match(tool.toolOutput, /Use the teammate trace for details/);
+  assert.match(tool.toolOutput, /trace=server\/sessions\/h1_teammates\/team_1\/teammate_frontend\.json/);
 
   await rm(fixture.rootDir, { recursive: true, force: true });
 });

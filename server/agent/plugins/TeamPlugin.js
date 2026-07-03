@@ -24,17 +24,18 @@ const defaultTeamStateStore = createTeamStateStore();
 const defaultTeamOutputRootDir = path.join(globalThis.process?.cwd?.() || '.', 'server', 'sessions');
 
 function getInboxText(payload) {
-  if (payload?.message) return payload.message;
-  if (payload?.content) return payload.content;
+  const traceText = payload?.traceRef?.path ? ` trace=${payload.traceRef.path}` : '';
+  if (payload?.message) return `${payload.message}${traceText}`;
+  if (payload?.content) return `${payload.content}${traceText}`;
   if (payload?.error) {
     const status = payload.status ? ` status=${payload.status}` : '';
     const traceHint = payload.status === 'no_result'
       ? ' Use the teammate trace for details if needed.'
       : '';
-    return `ERROR${status}: ${payload.error}${traceHint}`;
+    return `ERROR${status}: ${payload.error}${traceHint}${traceText}`;
   }
   if (payload == null) return '';
-  return JSON.stringify(payload);
+  return `${JSON.stringify(payload)}${traceText}`;
 }
 
 function formatInboxEntries(messages) {

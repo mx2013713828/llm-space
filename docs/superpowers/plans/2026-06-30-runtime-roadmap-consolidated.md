@@ -399,13 +399,15 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 - Lifecycle states: `running`, `awaiting_permission`, `completed`, `failed`, `no_result`, `cancelled`.
 - Lead actions: wait, check inbox, request resend, summarize partial results, cancel.
 
+**Implementation note:** Completed in the Teams v2 reliability batch. `wait_for_teammates` is status-only and preserves inbox contents; teammate reports flow through `check_team_inbox` or lazy trace references. Teammate result/error inbox payloads include `traceRef` so the lead can locate the full trace when a report is truncated, no-result, or needs audit.
+
 **Steps:**
 
-- [ ] Add observability tests for spawn cards, wait cards, no-result inbox, permission waits, and lazy trace references.
-- [ ] Ensure `wait_for_teammates` returns state and unread counts, never large reports.
-- [ ] Ensure final report data flows through inbox or trace store, not wait output.
-- [ ] Improve lead-facing text so the model knows when to call `check_team_inbox`.
-- [ ] Verify and commit with `feat: improve teams v2 observability`.
+- [x] Add observability tests for spawn cards, wait cards, no-result inbox, permission waits, and lazy trace references.
+- [x] Ensure `wait_for_teammates` returns state and unread counts, never large reports.
+- [x] Ensure final report data flows through inbox or trace store, not wait output.
+- [x] Improve lead-facing text so the model knows when to call `check_team_inbox`.
+- [x] Verify and commit with `feat: improve teams v2 observability`.
 
 ### Task 9: Team Protocols MVP
 
