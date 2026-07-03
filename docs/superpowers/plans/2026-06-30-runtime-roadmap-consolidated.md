@@ -100,7 +100,9 @@ Stage 5: Mountable resources: memory, skills, knowledge, MCP
 Stage 6: Runtime quality: tests, observability, E2E, maintainability
 ```
 
-The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**. It creates the seams needed by later kernel work without changing user-visible behavior.
+Current closure point: **Stage 1 through Stage 4 Task 8 are minimally closed and tested**. Task 9 and Task 10 remain intentionally deferred because protocol approval and worktree isolation are heavier collaboration features.
+
+The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stage 5 by turning memory from an automatic durable side effect into a reviewable mountable runtime resource.
 
 ---
 
@@ -411,6 +413,8 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 
 ### Task 9: Team Protocols MVP
 
+> **Status:** Deferred. This is useful for safer multi-agent coding, but it is heavier than the current experimental-platform closure target. Resume after Stage 5 resource mounting is usable or when teams start doing substantial code-changing work.
+
 **Goal:** Add an optional plan/review/approval protocol for teammate work before code-changing tasks begin.
 
 **Why:** Teams become safer when teammates can submit a plan, pause for approval, and only then claim work. This is especially important once worktree isolation and write tools are enabled.
@@ -441,6 +445,8 @@ The recommended next task is **Task 1: Runtime Shell and Server Boundary Split**
 - [ ] Verify and commit with `feat: add team plan protocol`.
 
 ### Task 10: Worktree-Isolated Team Execution
+
+> **Status:** Deferred. This should wait until team protocols and child-agent write workflows need true parallel code modification. Current teams are considered minimally closed after Task 8.
 
 **Goal:** Let teammates and complex sub-agents work in isolated git worktrees for code-changing tasks.
 
