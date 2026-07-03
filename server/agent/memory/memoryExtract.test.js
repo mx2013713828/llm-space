@@ -48,7 +48,10 @@ test('extractMemories routes extracted items through the quality gate', async (t
     await rm(rootDir, { recursive: true, force: true });
   });
 
-  const callLLM = async () => JSON.stringify([
+  let capturedSystemPrompt = '';
+  const callLLM = async (_messages, systemPrompt) => {
+    capturedSystemPrompt = systemPrompt;
+    return JSON.stringify([
     {
       name: 'prefer-tab-indentation',
       type: 'user',
@@ -78,6 +81,7 @@ test('extractMemories routes extracted items through the quality gate', async (t
       confidence: 0.99,
     },
   ]);
+  };
 
   const summary = await extractMemories(callLLM, 'h1', [
     { role: 'user', type: 'text', content: '请记住我喜欢 Tab 缩进。' },
@@ -90,6 +94,8 @@ test('extractMemories routes extracted items through the quality gate', async (t
     discard: 1,
     sensitive_blocked: 1,
   });
+  assert.match(capturedSystemPrompt, /confidence/);
+  assert.match(capturedSystemPrompt, /reason/);
 
   const memoryFiles = await listMemoryFiles('h1');
   assert.deepEqual(memoryFiles.map(file => file.meta.name), ['prefer-tab-indentation']);

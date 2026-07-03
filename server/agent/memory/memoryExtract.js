@@ -75,9 +75,10 @@ export async function extractMemories(callLLM, harnessId, messages) {
 1. 只提取真正稳定、跨会话仍有价值的信息（如编码偏好、项目约定、用户习惯）
 2. 临时性内容（如"这次帮我做X"）不提取
 3. 如果已有记忆已完全覆盖，返回空数组 []
-4. 返回 JSON 数组，每项格式：{"name":"slug-name","type":"user|feedback|project|reference","description":"一行描述（不含换行）","body":"详细内容"}
+4. 返回 JSON 数组，每项格式：{"name":"slug-name","type":"user|feedback|project|reference","description":"一行描述（不含换行）","body":"详细内容","confidence":0.0到1.0,"reason":"为什么值得记住或为什么只是候选"}
 5. name 只用小写字母、数字和连字符
-6. 若无新信息，返回 []`;
+6. confidence 只给稳定、明确、跨会话仍适用的信息高分；模糊推测给 0.4-0.7
+7. 若无新信息，返回 []`;
 
   const userMsg = `已有记忆：\n${existing}\n\n近期对话：\n${dialogue}`;
 
