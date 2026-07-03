@@ -2,7 +2,6 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 
-const MEMORY_ROOT = path.join(process.cwd(), '.memory');
 const MAX_MEMORIES = 200;
 const MAX_FILE_LINES = 200;
 const MAX_FILE_BYTES = 4096;
@@ -21,7 +20,7 @@ export function getMemoryDir(harnessId) {
   // P0-2：harnessId 校验，防路径穿越
   if (!harnessId || typeof harnessId !== 'string') throw new Error('harnessId 不能为空');
   if (/[/\\.]/.test(harnessId)) throw new Error(`harnessId 含非法字符: ${harnessId}`);
-  return path.join(MEMORY_ROOT, harnessId);
+  return path.join(process.cwd(), '.memory', harnessId);
 }
 
 /** 安全地按字节截断 UTF-8 字符串，不破坏多字节字符（P1-3）*/

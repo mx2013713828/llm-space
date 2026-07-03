@@ -1,5 +1,7 @@
 // server/agent/memory/memoryExtract.js
 import { listMemoryFiles, writeMemoryFile } from './memoryStore.js';
+import { createMemoryCandidate } from './memoryCandidateStore.js';
+import { classifyMemoryItem, summarizeMemoryRouting } from './memoryQualityGate.js';
 
 const VALID_TYPES = new Set(['user', 'feedback', 'project', 'reference']);
 const MIN_TEXT_MESSAGES = 2; // 消息太少时不提取
@@ -22,6 +24,25 @@ export function filterMemoryExtractionItems(items) {
     .slice(0, MAX_EXTRACTED_ITEMS_PER_RUN);
 }
 
+function normalizeExtractionItems(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter(item => item?.name && item?.description && item?.body)
+    .slice(0, 12);
+}
+
+function hasExplicitMemoryRequest(messages = []) {
+  return messages.some(message => (
+    message.role === 'user' &&
+    /(请)?记住|记下|保存为记忆|remember this|please remember/i.test(String(message.content || ''))
+  ));
+}
+
+function emptyRoutingSummary() {
+  return summarizeMemoryRouting([]);
+}
+
 /**
  * 从最近对话中提取用户偏好、项目事实，写入记忆文件
  * 只在对话真正告一段落时调用（stop_reason !== 'tool_use'）
@@ -36,7 +57,7 @@ export async function extractMemories(callLLM, harnessId, messages) {
     m => (m.type === 'text' || m.role === 'user') && m.type !== 'system_alert'
   ).slice(-10);
 
-  if (textMessages.length < MIN_TEXT_MESSAGES) return;
+  if (textMessages.length < MIN_TEXT_MESSAGES) return emptyRoutingSummary();
 
   const dialogue = textMessages
     .map(m => `${m.role}: ${String(m.content || '').slice(0, 500)}`)
@@ -67,21 +88,50 @@ export async function extractMemories(callLLM, harnessId, messages) {
     const match = raw.match(/\[[\s\S]*\]/);
     if (!match) return;
 
-    const items = filterMemoryExtractionItems(JSON.parse(match[0]));
-    if (items.length === 0) return;
+    const items = normalizeExtractionItems(JSON.parse(match[0]));
+    if (items.length === 0) return emptyRoutingSummary();
 
+    const routingResults = [];
+    const explicitMemoryRequest = hasExplicitMemoryRequest(textMessages);
     for (const item of items) {
       const validType = VALID_TYPES.has(item.type) ? item.type : 'user';
+      const normalizedItem = { ...item, type: validType };
+      const routing = classifyMemoryItem(normalizedItem, {
+        explicitMemoryRequest,
+        source: { kind: 'conversation' },
+      });
+      routingResults.push(routing);
 
-      try {
-        await writeMemoryFile(harnessId, item.name, validType, item.description, item.body);
-        console.log(`[MemoryExtract] 写入记忆: ${item.name} (${validType})`);
-      } catch (writeErr) {
-        console.error(`[MemoryExtract] 写入记忆失败 "${item.name}":`, writeErr.message);
+      if (routing.decision === 'auto_write') {
+        try {
+          await writeMemoryFile(harnessId, normalizedItem.name, validType, normalizedItem.description, normalizedItem.body);
+          console.log(`[MemoryExtract] 写入记忆: ${normalizedItem.name} (${validType})`);
+        } catch (writeErr) {
+          console.error(`[MemoryExtract] 写入记忆失败 "${normalizedItem.name}":`, writeErr.message);
+        }
+      } else if (routing.decision === 'pending_review') {
+        try {
+          await createMemoryCandidate({
+            harnessId,
+            item: normalizedItem,
+            source: { kind: 'conversation' },
+            reason: routing.reason,
+            confidence: routing.confidence,
+            risk: routing.risk,
+          });
+          console.log(`[MemoryExtract] 候选记忆: ${normalizedItem.name} (${validType})`);
+        } catch (candidateErr) {
+          console.error(`[MemoryExtract] 写入候选记忆失败 "${normalizedItem.name}":`, candidateErr.message);
+        }
       }
     }
+
+    const summary = summarizeMemoryRouting(routingResults);
+    console.log(`[MemoryExtract] 路由结果: auto_write=${summary.auto_write}, pending_review=${summary.pending_review}, discard=${summary.discard}, sensitive_blocked=${summary.sensitive_blocked}`);
+    return summary;
   } catch (err) {
     // 提取失败不影响主流程，静默降级
     console.error('[MemoryExtract] 提取失败，跳过:', err.message);
+    return emptyRoutingSummary();
   }
 }

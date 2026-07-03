@@ -38,7 +38,7 @@ export function classifyMemoryItem(item = {}, context = {}) {
     });
   }
 
-  if (context.explicitMemoryRequest && confidence >= MIN_PENDING_CONFIDENCE) {
+  if (context.explicitMemoryRequest && AUTO_WRITE_TYPES.has(item.type) && confidence >= MIN_PENDING_CONFIDENCE) {
     return buildDecision('auto_write', {
       confidence: Math.max(confidence, 0.9),
       risk: 'low',
