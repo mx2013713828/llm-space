@@ -482,11 +482,11 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 
 ## Stage 5: Mountable Resources
 
-### Task 11: Candidate Memory Queue
+### Task 11: Automatic Memory Quality Gate
 
-**Goal:** Stop writing extracted memories directly into long-term memory. Stage memory candidates for review, approval, rejection, and later consolidation.
+**Goal:** Improve the automatic memory module so extracted memories are classified, observable, and routed safely without turning memory into a heavy approval workflow.
 
-**Why:** Memory is a runtime resource. It should be inspectable and governed, not silently durable.
+**Why:** Memory is a runtime resource. Automatic capture should stay smooth, but it must not silently turn teammate reports, temporary task state, sensitive data, or low-confidence guesses into durable long-term memory.
 
 **Loop stages:** Stop / cleanup, pre-LLM assembly.
 
@@ -494,29 +494,32 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 
 - Modify: `server/agent/plugins/MemoryPlugin.js`
 - Modify: `server/agent/memory/memoryExtract.js`
-- Modify: `server/agent/memory/memoryStore.js`
+- Create: `server/agent/memory/memoryQualityGate.js`
+- Create: `server/agent/memory/memoryQualityGate.test.js`
 - Create: `server/agent/memory/memoryCandidateStore.js`
 - Create: `server/agent/memory/memoryCandidateStore.test.js`
 - Create: `server/agent/memory/memoryCandidateApi.test.js`
 - Modify: memory routes.
-- Add or modify a focused memory queue UI.
+- Add lightweight memory candidate visibility; do not add interruptive approval prompts in the main chat.
 - Create: `src/lib/memoryCandidates.test.js`
 
 **Interfaces:**
 
-- `createMemoryCandidate({ harnessId, scope, source, content, reason, confidence })`
+- `classifyMemoryItem(item, context): { decision, reason, confidence, risk }`
+- `createMemoryCandidate({ harnessId, item, source, reason, confidence, risk })`
 - `listMemoryCandidates({ harnessId, status })`
-- `approveMemoryCandidate(candidateId, patch)`
-- `rejectMemoryCandidate(candidateId, reason)`
+- `approveMemoryCandidate({ harnessId, candidateId, patch })`
+- `rejectMemoryCandidate({ harnessId, candidateId, reason })`
 
 **Steps:**
 
+- [ ] Write quality-gate tests for `auto_write`, `pending_review`, `discard`, and `sensitive_blocked`.
+- [ ] Implement classification rules that auto-write explicit user memory and stable preferences, discard transient/runtime outputs, block secrets, and queue ambiguous but useful items.
 - [ ] Write candidate store tests for creation, listing, approval, rejection, persistence, and path safety.
 - [ ] Implement filesystem-backed candidate storage with `pending`, `approved`, and `rejected` states.
-- [ ] Rewire extraction so candidates are pending by default.
-- [ ] Add review API and lightweight queue UI.
-- [ ] Keep direct auto-write as an advanced experimental feature, default off.
-- [ ] Verify and commit with `feat: add memory candidate review queue`.
+- [ ] Rewire extraction so `auto_write` continues to write long-term memory, `pending_review` creates candidates, and `discard` / `sensitive_blocked` do not write.
+- [ ] Add review API and lightweight candidate visibility without interruptive prompts.
+- [ ] Verify and commit with `feat: add automatic memory quality gate`.
 
 ### Task 12: Mountable Knowledge Bases
 
