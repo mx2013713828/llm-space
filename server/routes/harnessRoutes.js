@@ -6,6 +6,11 @@ import { alignRequestPayload, buildApiMessages } from '../agent/messageBuilder.j
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { createRuntimeNotificationQueue, summarizeNotificationsForUi } from '../agent/runtimeNotifications.js';
 import { listMemoryCandidates } from '../agent/memory/memoryCandidateStore.js';
+import {
+  loadAgentGuidance,
+  saveAgentGuidance,
+  stripLegacySystemPrompt,
+} from '../agent/guidance/agentGuidance.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
 import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
@@ -13,6 +18,7 @@ import { getToolSchemasForTools } from '../tools/index.js';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 
 const DEFAULT_HARNESS_DIR = path.join(process.cwd(), 'harnesses');
+const DEFAULT_GUIDANCE_ROOT = path.join(process.cwd(), 'guidance');
 const DEFAULT_SESSIONS_DIR = path.join(process.cwd(), 'server', 'sessions');
 
 export async function findSafeHarnessPath(harnessId, { harnessDir = DEFAULT_HARNESS_DIR, fsImpl = fs } = {}) {
@@ -57,6 +63,7 @@ export async function loadHarnessesFromDir({ harnessDir = DEFAULT_HARNESS_DIR, f
 
 export function registerHarnessRoutes(app, {
   harnessDir = DEFAULT_HARNESS_DIR,
+  guidanceRoot = DEFAULT_GUIDANCE_ROOT,
   sessionsDir = DEFAULT_SESSIONS_DIR,
   fsImpl = fs,
   ExecutorClass = AgentExecutor,
@@ -98,7 +105,12 @@ export function registerHarnessRoutes(app, {
         const content = await fsImpl.readFile(path.join(harnessDir, file), 'utf-8');
         const data = JSON.parse(content);
         if (data.id === req.params.id) {
-          return res.json(data);
+          return res.json(await hydrateHarnessGuidance({
+            harness: data,
+            harnessId: req.params.id,
+            guidanceRoot,
+            fsImpl,
+          }));
         }
       }
       res.status(404).json({ error: 'Harness not found' });
@@ -146,7 +158,20 @@ export function registerHarnessRoutes(app, {
       }
 
       const targetPath = path.join(harnessDir, filename);
-      await fsImpl.writeFile(targetPath, JSON.stringify(data, null, 2), 'utf-8');
+      const guidance = await saveAgentGuidance({
+        harnessId: req.params.id,
+        content: data.systemPrompt || '',
+        guidanceRoot,
+        fsImpl,
+      });
+      const harnessToSave = {
+        ...stripLegacySystemPrompt(data),
+        guidance: {
+          ...(data.guidance && typeof data.guidance === 'object' ? data.guidance : {}),
+          file: guidance.file,
+        },
+      };
+      await fsImpl.writeFile(targetPath, JSON.stringify(harnessToSave, null, 2), 'utf-8');
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -275,6 +300,26 @@ export function registerHarnessRoutes(app, {
       }
     }
   });
+}
+
+async function hydrateHarnessGuidance({ harness, harnessId, guidanceRoot, fsImpl }) {
+  const guidance = await loadAgentGuidance({
+    harnessId,
+    fallbackContent: harness.systemPrompt || '',
+    guidanceRoot,
+    fsImpl,
+  });
+
+  return {
+    ...harness,
+    systemPrompt: guidance.content,
+    guidance: {
+      ...(harness.guidance && typeof harness.guidance === 'object' ? harness.guidance : {}),
+      file: guidance.file,
+      filename: guidance.filename,
+      source: guidance.source,
+    },
+  };
 }
 
 async function buildMemoryCandidateSummary({ harnessId, memoryCandidateStore }) {

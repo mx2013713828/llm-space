@@ -16,13 +16,15 @@ import {
 async function createFixture(t) {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'harness-routes-'));
   const harnessDir = path.join(rootDir, 'harnesses');
+  const guidanceRoot = path.join(rootDir, 'guidance');
   const sessionsDir = path.join(rootDir, 'server', 'sessions');
   await mkdir(harnessDir, { recursive: true });
+  await mkdir(guidanceRoot, { recursive: true });
   await mkdir(sessionsDir, { recursive: true });
   t.after(async () => {
     await rm(rootDir, { recursive: true, force: true });
   });
-  return { rootDir, harnessDir, sessionsDir };
+  return { rootDir, harnessDir, guidanceRoot, sessionsDir };
 }
 
 test('harness routes list, load, create, copy, and delete harness files', async (t) => {
@@ -226,4 +228,77 @@ test('harness dry-run reports memory candidate summary without loading full cand
     },
   ]);
   assert.equal(JSON.stringify(res.body.memoryCandidateSummary).includes('xxxx'), false);
+});
+
+test('harness load initializes AGENTS.md from legacy system prompt', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+    systemPrompt: 'Legacy prompt from JSON.',
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const res = await dispatchJson(app, 'GET', '/api/harnesses/alpha');
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.systemPrompt, 'Legacy prompt from JSON.');
+  assert.deepEqual(res.body.guidance, {
+    file: 'guidance/alpha/AGENTS.md',
+    filename: 'AGENTS.md',
+    source: 'initialized_from_legacy',
+  });
+  assert.equal(
+    await readFile(path.join(fixture.guidanceRoot, 'alpha', 'AGENTS.md'), 'utf-8'),
+    'Legacy prompt from JSON.',
+  );
+});
+
+test('harness save writes systemPrompt to AGENTS.md and strips it from JSON', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+    systemPrompt: 'Legacy prompt from JSON.',
+    tools: ['bash'],
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha', {
+    body: {
+      id: 'alpha',
+      name: 'alpha.json',
+      description: 'Alpha updated',
+      systemPrompt: 'Updated AGENTS guidance.',
+      tools: ['bash', 'read_file'],
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(
+    await readFile(path.join(fixture.guidanceRoot, 'alpha', 'AGENTS.md'), 'utf-8'),
+    'Updated AGENTS guidance.',
+  );
+  const savedHarness = JSON.parse(await readFile(path.join(fixture.harnessDir, 'alpha.json'), 'utf-8'));
+  assert.equal(savedHarness.description, 'Alpha updated');
+  assert.equal(savedHarness.systemPrompt, undefined);
+  assert.deepEqual(savedHarness.tools, ['bash', 'read_file']);
+
+  const loadRes = await dispatchJson(app, 'GET', '/api/harnesses/alpha');
+  assert.equal(loadRes.status, 200);
+  assert.equal(loadRes.body.systemPrompt, 'Updated AGENTS guidance.');
 });
