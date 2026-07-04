@@ -32,6 +32,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState(harness.systemPrompt);
   const [isPromptDirty, setIsPromptDirty] = useState(false);
+  const guidanceFile = harness.guidance?.file || (harness.id ? `guidance/${harness.id}/AGENTS.md` : 'guidance/<harness>/AGENTS.md');
 
   const [allSkills, setAllSkills] = useState([]);
   useEffect(() => {
@@ -108,14 +109,14 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
           onHarnessUpdate(updatedHarness);
         }
         setIsPromptDirty(false);
-        alert('Prompt saved successfully ✓');
+        alert('AGENTS.md saved successfully ✓');
       } else {
-        alert('Failed to save Prompt ❌');
+        alert('Failed to save AGENTS.md ❌');
       }
     })
     .catch(err => {
       console.error("Failed to save harness configuration:", err);
-      alert('Failed to save Prompt ❌');
+      alert('Failed to save AGENTS.md ❌');
     });
   };
 
@@ -236,6 +237,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         setThinkingEnabled={setThinkingEnabled}
         
         systemPrompt={systemPrompt}
+        guidanceFile={guidanceFile}
         isPromptDirty={isPromptDirty}
         onPromptChange={handlePromptChange}
         onSavePrompt={handleSavePrompt}

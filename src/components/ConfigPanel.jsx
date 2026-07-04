@@ -26,6 +26,7 @@ export function ConfigPanel({
   setThinkingEnabled,
   
   systemPrompt,
+  guidanceFile,
   isPromptDirty,
   onPromptChange,
   onSavePrompt
@@ -201,15 +202,20 @@ export function ConfigPanel({
         </div>
       </div>
 
-      {/* System Prompt */}
+      {/* Agent Guidance */}
       <div className="card prompt-card" style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>
-        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Base System Prompt</span>
-          {isPromptDirty && (
-            <span style={{ color: 'var(--orange)', fontSize: 11, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: 4 }}>
-              ● Unsaved changes
-            </span>
-          )}
+        <div className="panel-title" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span>AGENTS.md</span>
+            {isPromptDirty && (
+              <span style={{ color: 'var(--orange)', fontSize: 11, fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: 4 }}>
+                ● Unsaved changes
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 400 }}>
+            {guidanceFile || 'guidance/<harness>/AGENTS.md'}
+          </span>
         </div>
         <textarea
           className="prompt-editor"
@@ -241,7 +247,7 @@ export function ConfigPanel({
             transition: 'all 0.2s'
           }}
         >
-          Save Prompt
+          Save AGENTS.md
         </button>
       </div>
     </div>

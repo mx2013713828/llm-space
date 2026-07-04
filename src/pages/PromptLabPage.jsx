@@ -39,6 +39,7 @@ export function PromptLabPage({ harness, onSave }) {
   const [expandedPrompts, setExpandedPrompts] = useState({});
   const [promptSaveStatus, setPromptSaveStatus] = useState({});
   const timersRef = useRef({});
+  const guidanceFile = harness.guidance?.file || (harness.id ? `guidance/${harness.id}/AGENTS.md` : 'guidance/<harness>/AGENTS.md');
 
   useEffect(() => {
     const currentTimers = timersRef.current;
@@ -314,13 +315,16 @@ export function PromptLabPage({ harness, onSave }) {
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
 
-        {/* Prompt 编辑器 */}
+        {/* Guidance 编辑器 */}
         {activeTab === 'editor' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 3, height: 16, borderRadius: 99, background: 'var(--blue)' }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Current System Prompt</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ width: 3, height: 16, borderRadius: 99, background: 'var(--blue)', marginTop: 2 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>AGENTS.md</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{guidanceFile}</span>
+                </div>
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                   {systemPrompt.length} chars / ≈{Math.ceil(systemPrompt.length/4)} tokens
                 </span>
@@ -338,7 +342,7 @@ export function PromptLabPage({ harness, onSave }) {
                 }}
                 onFocus={e => { e.target.style.borderColor = 'var(--blue)'; e.target.style.boxShadow = `0 0 0 2px rgba(59, 130, 246, 0.2)`; }}
                 onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
-                placeholder="Enter system prompt..."
+                placeholder="Edit AGENTS.md guidance..."
               />
             </div>
           </div>
