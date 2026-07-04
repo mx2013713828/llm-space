@@ -1,5 +1,6 @@
 import * as taskManager from '../utils/taskManager.js';
 import { FEATURE_SCHEMA } from '../../../src/lib/FeatureSchema.js';
+import { appendSystemPromptSection } from '../promptAssembly/promptAssembly.js';
 
 export const TaskSystemPlugin = {
   name: 'TaskSystemPlugin',
@@ -17,7 +18,16 @@ export const TaskSystemPlugin = {
     }
 
     if (promptToInject && !context.systemPrompt.includes('<task_system_guidelines>')) {
-      context.systemPrompt += `\n${promptToInject}\n`;
+      appendSystemPromptSection(context, {
+        id: 'task_system_guidelines',
+        label: 'Task System Guidelines',
+        target: 'system',
+        lifecycle: 'pinned',
+        source: 'feature:task_orchestration.task_system_prompt',
+        content: promptToInject,
+        order: 70,
+        cacheImpact: 'stable_until_feature_prompt_changes',
+      });
     }
 
     // 1. 加载磁盘上该 Harness 下的所有任务
@@ -34,7 +44,17 @@ export const TaskSystemPlugin = {
     
     // 如果系统提示词中尚未注入，则追加到 System 末尾锁定缓存前缀
     if (!context.systemPrompt.includes('<task_dependency_graph>')) {
-      context.systemPrompt += staticSection;
+      appendSystemPromptSection(context, {
+        id: 'task_dependency_graph',
+        label: 'Task Dependency Graph',
+        target: 'system',
+        lifecycle: 'pinned',
+        source: `_tasks/${harnessId}`,
+        content: staticSection.trim(),
+        order: 90,
+        cacheImpact: 'changes_when_task_graph_changes',
+        metadata: { count: tasks.length },
+      });
     }
 
     // 3. 动态状态差分注入：仅将高频变化的任务状态 Diff 附加到最后一轮 User 消息的末尾

@@ -3,6 +3,7 @@ import path from 'path';
 
 import { AgentExecutor } from '../agent/AgentExecutor.js';
 import { alignRequestPayload, buildApiMessages } from '../agent/messageBuilder.js';
+import { summarizePromptAssembly } from '../agent/promptAssembly/promptAssembly.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { createRuntimeNotificationQueue, summarizeNotificationsForUi } from '../agent/runtimeNotifications.js';
 import { listMemoryCandidates } from '../agent/memory/memoryCandidateStore.js';
@@ -240,6 +241,7 @@ export function registerHarnessRoutes(app, {
         thinkingEnabled,
         selectedStrategyId,
         dryRunMode,
+        includeDebugSummaries,
         skills
       } = req.body || {};
 
@@ -273,7 +275,8 @@ export function registerHarnessRoutes(app, {
         ),
         systemPrompt: executor.systemPrompt || '',
         tools: executor.tools,
-        turnIndex: 1
+        turnIndex: 1,
+        promptAssemblySections: [...(executor.promptAssemblySections || [])],
       };
 
       await executor.hooks.dispatch('preLLM', context);
@@ -284,15 +287,22 @@ export function registerHarnessRoutes(app, {
         context.apiMessages || [],
         executor.model
       );
+      const promptAssembly = summarizePromptAssembly(context.promptAssemblySections || []);
 
-      res.json({
+      const responsePayload = {
         system: aligned.system,
         tools: aligned.tools,
         messages: aligned.messages,
-        toolPoolSummary: describeToolPool(executor.toolPool),
-        runtimeNotificationSummary: context.runtimeNotificationSummary || summarizeNotificationsForUi([]),
-        memoryCandidateSummary: await buildMemoryCandidateSummary({ harnessId, memoryCandidateStore }),
-      });
+        promptAssembly,
+      };
+
+      if (includeDebugSummaries) {
+        responsePayload.toolPoolSummary = describeToolPool(executor.toolPool);
+        responsePayload.runtimeNotificationSummary = context.runtimeNotificationSummary || summarizeNotificationsForUi([]);
+        responsePayload.memoryCandidateSummary = await buildMemoryCandidateSummary({ harnessId, memoryCandidateStore });
+      }
+
+      res.json(responsePayload);
     } catch (err) {
       console.error('[harnessRoutes /api/harnesses/:harnessId/dry-run] Error:', err);
       res.status(500).json({ error: `Dry-Run 模拟运行失败: ${err.message}` });

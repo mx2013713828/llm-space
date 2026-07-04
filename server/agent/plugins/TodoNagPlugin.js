@@ -1,5 +1,6 @@
 import { injectTodoState } from '../messageBuilder.js';
 import { FEATURE_SCHEMA } from '../../../src/lib/FeatureSchema.js';
+import { appendSystemPromptSection } from '../promptAssembly/promptAssembly.js';
 
 export const TodoNagPlugin = {
   name: 'TodoNagPlugin',
@@ -16,7 +17,16 @@ export const TodoNagPlugin = {
     }
 
     if (promptToInject && !context.systemPrompt.includes('<todo_mode_guidelines>')) {
-      context.systemPrompt += `\n${promptToInject}\n`;
+      appendSystemPromptSection(context, {
+        id: 'todo_guidelines',
+        label: 'Todo Guidelines',
+        target: 'system',
+        lifecycle: 'pinned',
+        source: 'feature:task_orchestration.todo_prompt',
+        content: promptToInject,
+        order: 70,
+        cacheImpact: 'stable_until_feature_prompt_changes',
+      });
     }
 
     // 调用现有的注入逻辑，将 current_tasks_status 附加到 apiMessages 末尾

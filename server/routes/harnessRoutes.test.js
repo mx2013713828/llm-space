@@ -95,6 +95,7 @@ test('harness dry-run returns compact tool pool summary from runtime tools', asy
   const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
     body: {
       messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      includeDebugSummaries: true,
       tools: ['bash', 'sub_agent'],
       features: {
         task_orchestration: {
@@ -149,6 +150,7 @@ test('harness dry-run reports notification summary without consuming the live qu
   const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
     body: {
       messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      includeDebugSummaries: true,
       tools: ['bash'],
       features: {},
       model: { modelId: 'test', key: 'test' },
@@ -201,6 +203,7 @@ test('harness dry-run reports memory candidate summary without loading full cand
   const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
     body: {
       messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      includeDebugSummaries: true,
       tools: ['bash'],
       features: {},
       model: { modelId: 'test', key: 'test' },
@@ -284,6 +287,63 @@ test('harness dry-run static context mode avoids LLM-backed memory selection', a
   assert.equal(res.status, 200);
   assert.equal(selectedConcreteMemory, false);
   assert.equal(JSON.stringify(res.body.messages).includes('<memory_context>'), false);
+});
+
+test('harness dry-run returns prompt assembly sections for sent model context only', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      dryRunMode: 'static_context',
+      messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      systemPrompt: 'You are helpful.',
+      tools: ['bash'],
+      features: {
+        task_orchestration: {
+          enabled: true,
+          mode: 'todo',
+          strategy: 'async_teams',
+          enable_agent_teams: true,
+        },
+      },
+      selectedStrategyId: 'async_teams',
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(
+    res.body.promptAssembly.sections.map(section => section.id).filter(id => [
+      'agent_guidance',
+      'runtime_context',
+      'execution_strategy_index',
+      'active_execution_strategy',
+      'todo_guidelines',
+    ].includes(id)),
+    [
+      'agent_guidance',
+      'runtime_context',
+      'execution_strategy_index',
+      'active_execution_strategy',
+      'todo_guidelines',
+    ],
+  );
+  assert.equal(res.body.promptAssembly.sections.every(section => section.sentToModel), true);
+  assert.equal('toolPoolSummary' in res.body, false);
+  assert.equal('runtimeNotificationSummary' in res.body, false);
+  assert.equal('memoryCandidateSummary' in res.body, false);
 });
 
 test('harness load initializes AGENTS.md from legacy system prompt', async (t) => {

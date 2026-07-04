@@ -1,6 +1,7 @@
 import os from 'os';
 import path from 'path';
 import { promises as fs } from 'fs';
+import { appendSystemPromptSection } from '../promptAssembly/promptAssembly.js';
 
 function parseFrontmatter(content) {
   const meta = { name: '', description: '' };
@@ -87,7 +88,17 @@ export const SkillsPlugin = {
         return `- **${s.id}** (read \`${s.file}\` to activate): ${s.description}`;
       }).join('\n')}\n</available_skills>`;
       
-      context.systemPrompt += skillsPrompt;
+      appendSystemPromptSection(context, {
+        id: 'available_skills',
+        label: 'Available Skills',
+        target: 'system',
+        lifecycle: 'pinned',
+        source: 'skills',
+        content: skillsPrompt.trim(),
+        order: 60,
+        cacheImpact: 'stable_until_skill_selection_changes',
+        metadata: { count: richSkills.length },
+      });
     }
   }
 };
