@@ -96,13 +96,13 @@ Stage 1: Runtime shell and server boundaries
 Stage 2: Agent loop kernel, tool pool, and notifications
 Stage 3: Model gateway and stream normalization
 Stage 4: Collaboration runtime: teams, protocols, worktrees
-Stage 5: Mountable resources: memory, skills, knowledge, MCP
+Stage 5: Context & knowledge layer: guidance, memory, prompt assembly, knowledge, resource mounting
 Stage 6: Runtime quality: tests, observability, E2E, maintainability
 ```
 
 Current closure point: **Stage 1 through Stage 4 Task 8 are minimally closed and tested**. Task 9 and Task 10 remain intentionally deferred because protocol approval and worktree isolation are heavier collaboration features.
 
-The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stage 5 by turning memory from an automatic durable side effect into a reviewable mountable runtime resource.
+The recommended next task is **Task 13: Pinned Strategy + Context Assembly Inspector**. Task 11 and Task 12 have closed the first two Stage 5 foundations: automatic memory quality gating and `AGENTS.md` explicit guidance.
 
 ---
 
@@ -480,7 +480,9 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 
 ---
 
-## Stage 5: Mountable Resources
+## Stage 5: Context & Knowledge Layer
+
+Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resources as separate context layers. The key product rule is: Context Inspector shows what is sent to the model; runtime queues and sidecar state belong in their own observability surfaces unless they are actually injected into the model request.
 
 ### Task 11: Automatic Memory Quality Gate
 
@@ -523,7 +525,91 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 - [x] Add review API and lightweight candidate visibility without interruptive prompts.
 - [x] Verify and commit with `feat: add automatic memory quality gate`.
 
-### Task 12: Mountable Knowledge Bases
+### Task 12: AGENTS.md Explicit Guidance
+
+**Goal:** Move editable base agent instructions out of harness JSON and into `guidance/<harnessId>/AGENTS.md`.
+
+**Why:** Explicit guidance should be directly editable, file-backed, and separate from structured harness runtime configuration.
+
+**Status:** Completed.
+
+**Implementation note:** The harness API still transports the editable guidance as `systemPrompt` for compatibility, but load/save now hydrates from and persists to `guidance/<harnessId>/AGENTS.md`. Legacy `harnesses/*.json.systemPrompt` is used only as fallback initialization.
+
+### Task 13: Pinned Strategy + Context Assembly Inspector
+
+**Goal:** Make Context Inspector a fast, clear view of exactly what the current model request receives.
+
+**Why:** The current inspector mixes model context with runtime dashboard state. It also dynamically injects the full active strategy guideline into the latest user turn, which is less cache-friendly and harder to reason about.
+
+**Loop stages:** Pre-LLM assembly, static dry-run inspection.
+
+**Files:**
+
+- Create: `server/agent/promptAssembly/promptAssembly.js`
+- Create: `server/agent/promptAssembly/promptAssembly.test.js`
+- Modify: `server/agent/AgentExecutor.js`
+- Modify: `server/agent/runtimeContext.js`
+- Modify: `server/agent/plugins/ExecutionStrategyPlugin.js`
+- Modify: `server/agent/plugins/MemoryPlugin.js`
+- Modify: `server/agent/plugins/SkillsPlugin.js`
+- Modify: `server/agent/plugins/TaskSystemPlugin.js`
+- Modify: `server/agent/plugins/TodoNagPlugin.js`
+- Modify: `server/routes/harnessRoutes.js`
+- Create: `src/lib/contextInspectorModel.js`
+- Create: `src/lib/contextInspectorModel.test.js`
+- Modify: `src/components/ContextInspector.jsx`
+
+**Interfaces:**
+
+- `createPromptSection({ id, label, target, lifecycle, source, content, order, sentToModel, cacheImpact, metadata })`
+- `appendSystemPromptSection(context, section)`
+- `summarizePromptAssembly(sections)`
+- `dryRunMode: 'static_context'`
+- `promptAssembly: { sections, totals }`
+
+**Steps:**
+
+- [ ] Add prompt assembly section helpers and base AGENTS.md/runtime context tracking.
+- [ ] Pin `<active_execution_strategy>` into system prompt and remove it from latest user turn.
+- [ ] Add static Context Inspector dry-run mode that does not call LLM and skips concrete memory side-query.
+- [ ] Return `promptAssembly.sections` from dry-run and remove runtime tool pool / notification / memory candidate summaries from default inspector response.
+- [ ] Replace Context Inspector with a split assembly UI showing System Prompt, Messages Payload, and Provider Tool Schema only.
+- [ ] Verify and commit with `feat: add context assembly inspector`.
+
+### Task 14: Multi-layer Guidance Composition
+
+**Goal:** Add project-level guidance composition on top of harness-level `AGENTS.md`.
+
+**Why:** Explicit Guidance should support reusable project instructions without forcing every harness to duplicate the same rules.
+
+**Loop stages:** Pre-LLM assembly, harness configuration.
+
+**Files:**
+
+- Modify: `server/agent/guidance/agentGuidance.js`
+- Modify: `server/agent/guidance/agentGuidance.test.js`
+- Modify: `server/routes/harnessRoutes.js`
+- Modify: `server/routes/harnessRoutes.test.js`
+- Modify: `src/components/ConfigPanel.jsx`
+- Modify: `src/pages/PromptLabPage.jsx`
+- Modify: `src/components/ContextInspector.jsx`
+
+**Interfaces:**
+
+- `loadGuidanceLayers({ harnessId }): GuidanceLayer[]`
+- `saveHarnessGuidance({ harnessId, content })`
+- `guidance/project/AGENTS.md`
+- `guidance/<harnessId>/AGENTS.md`
+
+**Steps:**
+
+- [ ] Add project-level `guidance/project/AGENTS.md` loading before harness-level guidance.
+- [ ] Keep harness-level guidance editable through the existing AGENTS.md editor.
+- [ ] Show both guidance layers in Context Inspector prompt assembly.
+- [ ] Add tests proving composition order is project guidance then harness guidance.
+- [ ] Verify and commit with `feat: compose multi-layer guidance`.
+
+### Task 15: Mountable Knowledge Bases
 
 **Goal:** Let users upload files, generate reusable local knowledge bases, and mount selected bases into a conversation as external context.
 
@@ -563,7 +649,7 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 - [ ] Add lightweight upload/select UI without embedding large file contents into the trajectory.
 - [ ] Verify and commit with `feat: add mountable knowledge bases`.
 
-### Task 13: Runtime Resource Mount Registry
+### Task 16: Runtime Resource Mount Registry
 
 **Goal:** Create one registry for mountable runtime resources: skills, memories, knowledge bases, MCP tool servers, and future provider capabilities.
 
@@ -598,7 +684,7 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 
 ## Stage 6: Runtime Quality And Maintainability
 
-### Task 14: Runtime Test Harness And E2E Smoke Tests
+### Task 17: Runtime Test Harness And E2E Smoke Tests
 
 **Goal:** Add test coverage for the full agent run lifecycle without depending on real model calls.
 
@@ -623,7 +709,7 @@ The recommended next task is **Task 11: Candidate Memory Queue**. It starts Stag
 - [ ] Keep fake model scripts small and readable.
 - [ ] Verify and commit with `test: add runtime harness smoke tests`.
 
-### Task 15: Observability And Debug Surfaces
+### Task 18: Observability And Debug Surfaces
 
 **Goal:** Make runtime state understandable without dumping huge raw traces into the main UI.
 
