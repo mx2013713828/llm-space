@@ -45,6 +45,7 @@ test('harness routes list, load, create, copy, and delete harness files', async 
   const app = createRouteApp();
   registerHarnessRoutes(app, {
     harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
     sessionsDir: fixture.sessionsDir,
   });
 
