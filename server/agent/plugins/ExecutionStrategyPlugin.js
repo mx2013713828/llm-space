@@ -4,6 +4,7 @@ import {
   listExecutionStrategies,
   loadExecutionStrategy,
 } from '../strategies/strategyRegistry.js';
+import { appendSystemPromptSection } from '../promptAssembly/promptAssembly.js';
 
 function appendTextContext(apiMessages, text) {
   if (!text) return;
@@ -49,7 +50,16 @@ export const ExecutionStrategyPlugin = {
 
     if (executor.features?.task_orchestration?.enabled !== false && !context.systemPrompt.includes('<available_execution_strategies>')) {
       const strategies = await listExecutionStrategies();
-      context.systemPrompt += `\n\n${buildStrategyIndexBlock(strategies)}`;
+      appendSystemPromptSection(context, {
+        id: 'execution_strategy_index',
+        label: 'Available Execution Strategies',
+        target: 'system',
+        lifecycle: 'pinned',
+        source: 'strategyRegistry:list',
+        content: buildStrategyIndexBlock(strategies),
+        order: 30,
+        cacheImpact: 'stable_until_strategy_catalog_changes',
+      });
     }
 
     if (!selectedStrategyId) {
@@ -80,6 +90,20 @@ ${guidelineOverride}
           ...strategy,
           body: guidelineOverride || strategy.body,
         }, executor.features);
-    appendTextContext(apiMessages, strategyContext);
+    appendSystemPromptSection(context, {
+      id: 'active_execution_strategy',
+      label: 'Active Execution Strategy',
+      target: 'system',
+      lifecycle: 'pinned',
+      source: `strategy:${strategy.id}`,
+      content: strategyContext,
+      order: 40,
+      cacheImpact: 'stable_until_selected_strategy_changes',
+      metadata: {
+        strategyId: strategy.id,
+        strategyName: strategy.name,
+        override: !!guidelineOverride,
+      },
+    });
   },
 };

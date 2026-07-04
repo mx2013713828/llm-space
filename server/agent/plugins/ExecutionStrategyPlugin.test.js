@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ExecutionStrategyPlugin } from './ExecutionStrategyPlugin.js';
 
-test('preLLM injects selected strategy into last user message', async () => {
+test('preLLM pins selected strategy into system prompt', async () => {
   const context = {
     executor: {
       selectedStrategyId: 'inline',
@@ -16,14 +16,25 @@ test('preLLM injects selected strategy into last user message', async () => {
       { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
 
   assert.equal(context.apiMessages.length, 1);
-  assert.match(context.apiMessages[0].content.at(-1).text, /<active_execution_strategy id="inline"/);
+  assert.equal(context.apiMessages[0].content.length, 1);
   assert.match(context.systemPrompt, /<available_execution_strategies>/);
+  assert.match(context.systemPrompt, /<active_execution_strategy id="inline"/);
   assert.match(context.systemPrompt, /do not replace it with a more direct path/);
+  assert.deepEqual(
+    context.promptAssemblySections
+      .filter(section => section.id.includes('execution_strategy'))
+      .map(section => ({ id: section.id, target: section.target, lifecycle: section.lifecycle })),
+    [
+      { id: 'execution_strategy_index', target: 'system', lifecycle: 'pinned' },
+      { id: 'active_execution_strategy', target: 'system', lifecycle: 'pinned' },
+    ],
+  );
 });
 
 test('preLLM leaves custom strategy untouched', async () => {
@@ -33,6 +44,7 @@ test('preLLM leaves custom strategy untouched', async () => {
       { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
@@ -56,12 +68,14 @@ test('preLLM injects custom strategy guideline when configured', async () => {
       { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
 
-  assert.match(context.apiMessages[0].content.at(-1).text, /<active_execution_strategy id="custom"/);
-  assert.match(context.apiMessages[0].content.at(-1).text, /Use my workflow/);
+  assert.equal(context.apiMessages[0].content.length, 1);
+  assert.match(context.systemPrompt, /<active_execution_strategy id="custom"/);
+  assert.match(context.systemPrompt, /Use my workflow/);
 });
 
 test('preLLM prefers configured strategy guideline over the built-in body', async () => {
@@ -79,16 +93,17 @@ test('preLLM prefers configured strategy guideline over the built-in body', asyn
       { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
 
-  const injected = context.apiMessages[0].content.at(-1).text;
+  const injected = context.systemPrompt;
   assert.match(injected, /Custom inline rule/);
   assert.doesNotMatch(injected, /Use direct lead-agent execution/);
 });
 
-test('preLLM appends separate user message after tool_result messages', async () => {
+test('preLLM pins strategy compatibility note without appending after tool_result messages', async () => {
   const context = {
     executor: {
       selectedStrategyId: 'sequential_subagent',
@@ -108,13 +123,14 @@ test('preLLM appends separate user message after tool_result messages', async ()
       },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
 
-  assert.equal(context.apiMessages.length, 2);
-  assert.equal(context.apiMessages[1].role, 'user');
-  assert.match(context.apiMessages[1].content[0].text, /Missing required primitives: sub_agent/);
+  assert.equal(context.apiMessages.length, 1);
+  assert.match(context.systemPrompt, /Missing required primitives: sub_agent/);
+  assert.match(context.systemPrompt, /<active_execution_strategy id="sequential_subagent"/);
 });
 
 test('preLLM skips strategy index when task orchestration is disabled', async () => {
@@ -131,6 +147,7 @@ test('preLLM skips strategy index when task orchestration is disabled', async ()
       { role: 'user', content: [{ type: 'text', text: 'Implement feature' }] },
     ],
     systemPrompt: '',
+    promptAssemblySections: [],
   };
 
   await ExecutionStrategyPlugin.preLLM(context);
