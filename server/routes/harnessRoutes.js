@@ -239,6 +239,7 @@ export function registerHarnessRoutes(app, {
         maxTokens,
         thinkingEnabled,
         selectedStrategyId,
+        dryRunMode,
         skills
       } = req.body || {};
 
@@ -256,6 +257,7 @@ export function registerHarnessRoutes(app, {
         maxTokens: maxTokens ?? 8192,
         thinkingEnabled: !!thinkingEnabled,
         selectedStrategyId: resolveStrategy({ explicitStrategyId: selectedStrategyId, features }),
+        dryRunMode: dryRunMode === 'static_context' ? 'static_context' : '',
         skills: safeSkills,
         runtimeNotificationQueue: dryRunNotificationQueue,
         onEvent: () => {}

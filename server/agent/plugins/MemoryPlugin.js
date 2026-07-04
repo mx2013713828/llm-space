@@ -3,6 +3,7 @@ import { readIndex } from '../memory/memoryStore.js';
 import { selectAndLoadMemories } from '../memory/memorySelect.js';
 import { extractMemories } from '../memory/memoryExtract.js';
 import { tryConsolidateMemories } from '../memory/memoryConsolidate.js';
+import { appendSystemPromptSection } from '../promptAssembly/promptAssembly.js';
 
 const MEMORY_CONTEXT_PATTERN = /(?:<memory_context>[\s\S]*?<\/memory_context>\s*)+/g;
 
@@ -53,6 +54,10 @@ export function shouldDisableMemoryForTurn(executor) {
   return executor?.interactionMode?.mode === 'trace_inspection';
 }
 
+export function isStaticContextInspection(executor) {
+  return executor?.dryRunMode === 'static_context';
+}
+
 export const MemoryPlugin = {
   name: 'MemoryPlugin',
 
@@ -82,20 +87,32 @@ export const MemoryPlugin = {
 
     // ① 将 MEMORY.md 索引注入 system prompt（不含具体内容，仅清单，利于缓存）
     try {
-      const index = await readIndex(harnessId);
+      const readIndexFn = executor.memoryDependencies?.readIndex || readIndex;
+      const index = await readIndexFn(harnessId);
       if (index) {
-        context.systemPrompt +=
-          `\n\n<memory_index>\n以下是可用的长期记忆清单（具体内容已按需自动注入到本轮对话）：\n\n${index}\n</memory_index>`;
+        appendSystemPromptSection(context, {
+          id: 'memory_index',
+          label: 'Memory Index',
+          target: 'system',
+          lifecycle: 'pinned',
+          source: `.memory/${harnessId}/MEMORY.md`,
+          content: `<memory_index>\n以下是可用的长期记忆清单（具体内容已按需自动注入到本轮对话）：\n\n${index}\n</memory_index>`,
+          order: 80,
+          cacheImpact: 'stable_until_memory_index_changes',
+        });
       }
     } catch (err) {
       console.error('[MemoryPlugin] 读取记忆索引失败:', err.message);
     }
 
+    if (isStaticContextInspection(executor)) return;
+
     // ② LLM side-query 选相关记忆，注入到最后一条 user 消息开头
     try {
       const callLLM = executor._callLLMNonStream.bind(executor);
       const recentMessages = executor.messages.slice(-10);
-      const memoryContents = await selectAndLoadMemories(callLLM, harnessId, recentMessages);
+      const selectAndLoadMemoriesFn = executor.memoryDependencies?.selectAndLoadMemories || selectAndLoadMemories;
+      const memoryContents = await selectAndLoadMemoriesFn(callLLM, harnessId, recentMessages);
 
       if (memoryContents.length > 0) {
         injectMemoryContext(context.apiMessages, memoryContents);

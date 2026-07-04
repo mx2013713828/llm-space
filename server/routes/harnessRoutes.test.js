@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 
 import { registerHarnessRoutes } from './harnessRoutes.js';
 import { createRouteApp, dispatchJson } from './routeTestUtils.js';
+import { AgentExecutor } from '../agent/AgentExecutor.js';
 import {
   defaultRuntimeNotificationQueue,
   drainRuntimeNotifications,
@@ -229,6 +230,60 @@ test('harness dry-run reports memory candidate summary without loading full cand
     },
   ]);
   assert.equal(JSON.stringify(res.body.memoryCandidateSummary).includes('xxxx'), false);
+});
+
+test('harness dry-run static context mode avoids LLM-backed memory selection', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+
+  let selectedConcreteMemory = false;
+
+  class FailingSummaryExecutor extends AgentExecutor {
+    constructor(args) {
+      super({
+        ...args,
+        memoryDependencies: {
+          readIndex: async () => '- [stable](stable.md) — Stable memory',
+          selectAndLoadMemories: async () => {
+            selectedConcreteMemory = true;
+            return ['should not be injected'];
+          },
+        },
+      });
+    }
+
+    async _callLLMNonStream() {
+      throw new Error('static context dry-run must not call LLM');
+    }
+  }
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+    ExecutorClass: FailingSummaryExecutor,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      dryRunMode: 'static_context',
+      messages: [{ role: 'user', turn: 1, content: 'Inspect context.' }],
+      tools: ['bash'],
+      features: {
+        enable_memory: { enabled: true },
+      },
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(selectedConcreteMemory, false);
+  assert.equal(JSON.stringify(res.body.messages).includes('<memory_context>'), false);
 });
 
 test('harness load initializes AGENTS.md from legacy system prompt', async (t) => {
