@@ -8,6 +8,15 @@
 
 **Tech Stack:** Node.js ESM, `node:test`, existing AgentExecutor hook pipeline, React, Vite, existing CSS variables.
 
+**Status:** Completed.
+
+**Implementation commits:**
+- `af2d64d` feat: track prompt assembly sections
+- `763ae83` feat: pin active execution strategy in system prompt
+- `e9918e8` perf: make context inspector dry-run static
+- `5e042fb` feat: return prompt assembly metadata from dry-run
+- `6fed6fb` ui: simplify context inspector assembly view
+
 ## Global Constraints
 
 - Context Inspector must only default-show content that is sent to the model: system prompt, messages, and provider tool schema.

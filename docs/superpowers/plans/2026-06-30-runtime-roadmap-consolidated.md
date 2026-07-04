@@ -543,6 +543,10 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Loop stages:** Pre-LLM assembly, static dry-run inspection.
 
+**Status:** Completed.
+
+**Implementation note:** Context Inspector now uses static dry-run mode, does not call LLM for memory side-query, and defaults to a split assembly view over only the model-bound payload: system prompt sections, messages, and provider tool schema. Active execution strategy is pinned into the system prompt instead of appended to the latest user turn.
+
 **Files:**
 
 - Create: `server/agent/promptAssembly/promptAssembly.js`
@@ -569,12 +573,12 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Steps:**
 
-- [ ] Add prompt assembly section helpers and base AGENTS.md/runtime context tracking.
-- [ ] Pin `<active_execution_strategy>` into system prompt and remove it from latest user turn.
-- [ ] Add static Context Inspector dry-run mode that does not call LLM and skips concrete memory side-query.
-- [ ] Return `promptAssembly.sections` from dry-run and remove runtime tool pool / notification / memory candidate summaries from default inspector response.
-- [ ] Replace Context Inspector with a split assembly UI showing System Prompt, Messages Payload, and Provider Tool Schema only.
-- [ ] Verify and commit with `feat: add context assembly inspector`.
+- [x] Add prompt assembly section helpers and base AGENTS.md/runtime context tracking.
+- [x] Pin `<active_execution_strategy>` into system prompt and remove it from latest user turn.
+- [x] Add static Context Inspector dry-run mode that does not call LLM and skips concrete memory side-query.
+- [x] Return `promptAssembly.sections` from dry-run and remove runtime tool pool / notification / memory candidate summaries from default inspector response.
+- [x] Replace Context Inspector with a split assembly UI showing System Prompt, Messages Payload, and Provider Tool Schema only.
+- [x] Verify and commit with `feat: add context assembly inspector`.
 
 ### Task 14: Multi-layer Guidance Composition
 
