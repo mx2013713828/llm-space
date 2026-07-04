@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { composeSystemPromptSections } from './promptAssembly/promptAssembly.js';
 
 const PLATFORM_NAMES = {
   darwin: 'macOS',
@@ -53,5 +54,20 @@ export function formatRuntimeContext(metadata) {
 }
 
 export function composeSystemPrompt(systemPrompt, runtimeContext) {
-  return systemPrompt ? `${systemPrompt}\n\n${runtimeContext}` : runtimeContext;
+  return composeSystemPromptWithSections({
+    agentGuidance: systemPrompt,
+    runtimeContext,
+  }).text;
+}
+
+export function composeSystemPromptWithSections({
+  agentGuidance = '',
+  guidanceFile = '',
+  runtimeContext = '',
+} = {}) {
+  return composeSystemPromptSections({
+    agentGuidance,
+    guidanceFile,
+    runtimeContext,
+  });
 }

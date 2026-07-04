@@ -28,6 +28,17 @@ test('uses runtime context as the system prompt when the configured prompt is em
   assert.match(executor.systemPrompt, /^<runtime_context>/);
 });
 
+test('tracks base prompt assembly sections', () => {
+  const executor = createExecutor();
+
+  assert.deepEqual(executor.promptAssemblySections.map(section => section.id), [
+    'agent_guidance',
+    'runtime_context',
+  ]);
+  assert.equal(executor.promptAssemblySections[0].target, 'system');
+  assert.equal(executor.promptAssemblySections[1].source, 'runtime');
+});
+
 test('adds the current-time tool exactly once to every executor', () => {
   const withoutExplicitTool = createExecutor({ tools: [] });
   const withExplicitTool = createExecutor({ tools: ['get_current_time'] });

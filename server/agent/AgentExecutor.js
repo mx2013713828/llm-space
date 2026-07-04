@@ -30,7 +30,7 @@ import {
   enqueueRuntimeNotification,
 } from './runtimeNotifications.js';
 import { normalizeUsageMetrics } from './usageNormalizer.js';
-import { composeSystemPrompt, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
+import { composeSystemPromptWithSections, formatRuntimeContext, getRuntimeMetadata } from './runtimeContext.js';
 import { applyToolPolicyToContext, resolveInteractionMode } from './runtime/interactionMode.js';
 import { isToolEnabled, parseTextEncodedToolCalls } from './textEncodedToolCalls.js';
 import { parseProviderSseLines } from '../model/streamParser.js';
@@ -137,6 +137,7 @@ export class AgentExecutor {
     todos = [],
     backgroundTasks = [],
     systemPrompt = '',
+    guidanceFile = '',
     tools = [],
     features = {},
     model = {},
@@ -147,6 +148,8 @@ export class AgentExecutor {
     interactionMode = null,
     skills = [],
     runtimeNotificationQueue = defaultRuntimeNotificationQueue,
+    dryRunMode = '',
+    memoryDependencies = null,
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
@@ -156,8 +159,15 @@ export class AgentExecutor {
     this.todos = [...(Array.isArray(todos) ? todos : [])];
     this.backgroundTasks = Array.isArray(backgroundTasks) ? [...backgroundTasks] : [];
     this.pendingNotifications = [];
+    this.guidanceFile = guidanceFile;
     const runtimeContext = formatRuntimeContext(getRuntimeMetadata());
-    this.systemPrompt = composeSystemPrompt(systemPrompt, runtimeContext);
+    const composedPrompt = composeSystemPromptWithSections({
+      agentGuidance: systemPrompt,
+      guidanceFile,
+      runtimeContext,
+    });
+    this.systemPrompt = composedPrompt.text;
+    this.promptAssemblySections = composedPrompt.sections;
     this.features = parseFeatures(features);
     const orchestration = this.features.task_orchestration;
     const orchestrationEnabled = isOrchestrationEnabled(orchestration);
@@ -180,6 +190,8 @@ export class AgentExecutor {
     this.interactionMode = interactionMode || resolveInteractionMode({ messages: this.messages });
     this.skills = [...skills];
     this.runtimeNotificationQueue = runtimeNotificationQueue;
+    this.dryRunMode = dryRunMode;
+    this.memoryDependencies = memoryDependencies;
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
