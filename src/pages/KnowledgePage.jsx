@@ -8,6 +8,13 @@ import {
 	isSupportedKnowledgeFile,
 	normalizeKnowledgeBaseSummary,
 } from '../lib/knowledgeBases.js';
+import { parseFeatures } from '../lib/FeatureSchema.js';
+import {
+	KNOWLEDGE_RUNTIME_STRATEGIES,
+	applyKnowledgeRuntimeStrategy,
+	getKnowledgeStrategySummary,
+	resolveKnowledgeRuntime,
+} from '../lib/knowledgeRuntime.js';
 
 const DEFAULT_SETTINGS = {
 	chunkSize: 1000,
@@ -52,7 +59,7 @@ function EmptyPanel({ title, body }) {
 	);
 }
 
-export function KnowledgePage({ harness }) {
+export function KnowledgePage({ harness, onSave }) {
 	const [knowledgeBases, setKnowledgeBases] = useState([]);
 	const [selectedId, setSelectedId] = useState('');
 	const [files, setFiles] = useState([]);
@@ -68,10 +75,22 @@ export function KnowledgePage({ harness }) {
 	const [hasLoadedBases, setHasLoadedBases] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
+	const [runtimeDraft, setRuntimeDraft] = useState(null);
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
 	const selectedBase = bases.find(base => base.id === selectedId) || null;
 	const selectedRawBase = knowledgeBases.find(base => base.id === selectedBase?.id) || null;
+	const parsedFeatures = useMemo(() => parseFeatures(harness?.features || {}), [harness?.features]);
+	const knowledgeRuntime = useMemo(() => resolveKnowledgeRuntime(parsedFeatures), [parsedFeatures]);
+	const strategySummary = getKnowledgeStrategySummary(knowledgeRuntime.strategy);
+
+	useEffect(() => {
+		setRuntimeDraft({
+			topK: knowledgeRuntime.topK,
+			maxChars: knowledgeRuntime.maxChars,
+			scoreThreshold: knowledgeRuntime.scoreThreshold,
+		});
+	}, [knowledgeRuntime.topK, knowledgeRuntime.maxChars, knowledgeRuntime.scoreThreshold]);
 
 	const loadBases = useCallback(async () => {
 		setIsLoading(true);
@@ -145,6 +164,45 @@ export function KnowledgePage({ harness }) {
 		} finally {
 			setIsLoading(false);
 		}
+	}
+
+	async function saveKnowledgeFeatures(nextFeatures, successMessage) {
+		if (!harness?.id || !onSave) {
+			setError('Select a harness before changing knowledge runtime settings.');
+			return;
+		}
+		setIsLoading(true);
+		setError('');
+		try {
+			await onSave({
+				...harness,
+				features: nextFeatures,
+			});
+			setStatus(successMessage);
+		} catch (err) {
+			setError(err.message || 'Failed to save knowledge runtime settings.');
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	async function changeKnowledgeStrategy(strategyId) {
+		const nextFeatures = applyKnowledgeRuntimeStrategy(harness?.features || {}, strategyId);
+		await saveKnowledgeFeatures(nextFeatures, `Knowledge runtime set to ${KNOWLEDGE_RUNTIME_STRATEGIES[strategyId]?.name || strategyId}.`);
+	}
+
+	async function applyRuntimeBounds() {
+		const draft = runtimeDraft || {};
+		const nextFeatures = {
+			...(harness?.features || {}),
+			knowledge_bases: {
+				...(parsedFeatures.knowledge_bases || {}),
+				topK: Number(draft.topK) || knowledgeRuntime.topK,
+				maxChars: Number(draft.maxChars) || knowledgeRuntime.maxChars,
+				scoreThreshold: Number(draft.scoreThreshold) || 0,
+			},
+		};
+		await saveKnowledgeFeatures(nextFeatures, 'Knowledge retrieval bounds updated.');
 	}
 
 	async function deleteKnowledgeBase() {
@@ -233,6 +291,48 @@ export function KnowledgePage({ harness }) {
 					<Metric label="bases" value={bases.length} />
 					<Metric label="current harness" value={harness?.name || '-'} />
 					<Metric label="formats" value="MD TXT JSON" />
+				</div>
+			</section>
+
+			<section className="knowledge-runtime-panel">
+				<div className="knowledge-runtime-copy">
+					<div className="knowledge-panel-title">Runtime Strategy</div>
+					<h2>{strategySummary.name}</h2>
+					<p>{strategySummary.detail}</p>
+					<div className="knowledge-runtime-flags">
+						<span>{knowledgeRuntime.manifestEnabled ? 'Manifest pinned' : 'Manifest hidden'}</span>
+						<span>{knowledgeRuntime.autoRetrieve ? 'Auto retrieval on' : 'Auto retrieval off'}</span>
+						<span>{knowledgeRuntime.knowledgeTools ? 'Agent tools on' : 'Agent tools off'}</span>
+					</div>
+				</div>
+				<div className="knowledge-strategy-grid">
+					{Object.values(KNOWLEDGE_RUNTIME_STRATEGIES).map(strategy => (
+						<button
+							key={strategy.id}
+							type="button"
+							className={`knowledge-strategy-card ${knowledgeRuntime.strategy === strategy.id ? 'active' : ''}`}
+							onClick={() => changeKnowledgeStrategy(strategy.id)}
+							disabled={isLoading}
+						>
+							<strong>{strategy.name}</strong>
+							<span>{strategy.description}</span>
+						</button>
+					))}
+				</div>
+				<div className="knowledge-runtime-bounds">
+					<label>
+						<span>Top K</span>
+						<input className="input" type="number" min="1" max="20" value={runtimeDraft?.topK ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />
+					</label>
+					<label>
+						<span>Max chars</span>
+						<input className="input" type="number" min="500" max="50000" value={runtimeDraft?.maxChars ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), maxChars: event.target.value }))} />
+					</label>
+					<label>
+						<span>Score threshold</span>
+						<input className="input" type="number" min="0" step="0.1" value={runtimeDraft?.scoreThreshold ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), scoreThreshold: event.target.value }))} />
+					</label>
+					<button className="btn btn-ghost" onClick={applyRuntimeBounds} disabled={isLoading || !harness?.id}>Apply Bounds</button>
 				</div>
 			</section>
 

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiFetch } from '../lib/apiClient.js';
+import { parseFeatures } from '../lib/FeatureSchema.js';
 import { getKnowledgeBaseStatusSummary, normalizeKnowledgeBaseSummary } from '../lib/knowledgeBases.js';
+import { getKnowledgeStrategySummary, resolveKnowledgeRuntime } from '../lib/knowledgeRuntime.js';
 
 function MiniStatus({ children, active = false }) {
 	return (
@@ -22,7 +24,7 @@ function MiniStatus({ children, active = false }) {
 	);
 }
 
-export function KnowledgeMountPanel({ harnessId }) {
+export function KnowledgeMountPanel({ harnessId, features }) {
 	const navigate = useNavigate();
 	const [knowledgeBases, setKnowledgeBases] = useState([]);
 	const [mountedIds, setMountedIds] = useState([]);
@@ -31,6 +33,8 @@ export function KnowledgeMountPanel({ harnessId }) {
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
 	const mountedSet = useMemo(() => new Set(mountedIds), [mountedIds]);
+	const knowledgeRuntime = useMemo(() => resolveKnowledgeRuntime(parseFeatures(features || {})), [features]);
+	const strategySummary = getKnowledgeStrategySummary(knowledgeRuntime.strategy);
 
 	const loadState = useCallback(async () => {
 		if (!harnessId) return;
@@ -89,6 +93,30 @@ export function KnowledgeMountPanel({ harnessId }) {
 				<button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => navigate(`/${harnessId}/knowledge`)}>
 					Manage
 				</button>
+			</div>
+
+			<div style={{
+				display: 'grid',
+				gridTemplateColumns: 'minmax(0, 1fr) auto',
+				gap: 8,
+				alignItems: 'center',
+				padding: '8px 10px',
+				marginBottom: 10,
+				border: '1px solid var(--border)',
+				borderRadius: 7,
+				background: 'var(--bg-base)',
+			}}>
+				<div style={{ minWidth: 0 }}>
+					<div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+						{strategySummary.name}
+					</div>
+					<div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+						{strategySummary.detail}
+					</div>
+				</div>
+				<MiniStatus active={knowledgeRuntime.knowledgeTools || knowledgeRuntime.autoRetrieve}>
+					{knowledgeRuntime.knowledgeTools ? 'tools' : knowledgeRuntime.autoRetrieve ? 'auto' : 'lab'}
+				</MiniStatus>
 			</div>
 
 			<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

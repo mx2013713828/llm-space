@@ -204,7 +204,7 @@ export function ConfigPanel({
         </div>
       </div>
 
-      {harness?.id && <KnowledgeMountPanel harnessId={harness.id} />}
+      {harness?.id && <KnowledgeMountPanel harnessId={harness.id} features={harness.features} />}
 
       {/* Agent Guidance */}
       <div className="card prompt-card" style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>

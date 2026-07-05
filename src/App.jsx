@@ -419,7 +419,7 @@ function AppContent() {
               key={activeHarnessId} 
               harness={harness} 
               onSave={(updatedHarness) => {
-                apiFetch(`/api/harnesses/${updatedHarness.id}`, {
+                return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(updatedHarness)
@@ -430,6 +430,13 @@ function AppContent() {
           {activeTab === 'knowledge' && (
             <KnowledgePage
               harness={harness}
+              onSave={(updatedHarness) => {
+                return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(updatedHarness)
+                }).then(() => setHarness(updatedHarness));
+              }}
             />
           )}
         </main>

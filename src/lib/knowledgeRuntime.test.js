@@ -44,6 +44,20 @@ test('manual_lab disables model-bound knowledge primitives', () => {
 	assert.equal(resolveKnowledgeRuntime(features).knowledgeTools, false);
 });
 
+test('custom strategy keeps the current primitive mix', () => {
+	const features = applyKnowledgeRuntimeStrategy({
+		knowledge_bases: {
+			auto_retrieve: true,
+			knowledge_tools: false,
+		},
+	}, 'custom');
+	const runtime = resolveKnowledgeRuntime(features);
+
+	assert.equal(runtime.strategy, 'custom');
+	assert.equal(runtime.autoRetrieve, true);
+	assert.equal(runtime.knowledgeTools, false);
+});
+
 test('custom settings preserve numeric retrieval bounds', () => {
 	const runtime = resolveKnowledgeRuntime({
 		knowledge_bases: {

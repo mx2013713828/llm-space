@@ -37,10 +37,27 @@ const DEFAULT_RUNTIME = {
 };
 
 export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agentic_rag') {
-	const preset = KNOWLEDGE_RUNTIME_STRATEGIES[strategyId] || KNOWLEDGE_RUNTIME_STRATEGIES.agentic_rag;
 	const previous = features.knowledge_bases && typeof features.knowledge_bases === 'object'
 		? features.knowledge_bases
 		: {};
+	if (strategyId === 'custom') {
+		return {
+			...features,
+			knowledge_bases: {
+				...previous,
+				enabled: true,
+				strategy: 'custom',
+				manifest_enabled: previous.manifest_enabled ?? DEFAULT_RUNTIME.manifest_enabled,
+				auto_retrieve: previous.auto_retrieve ?? DEFAULT_RUNTIME.auto_retrieve,
+				knowledge_tools: previous.knowledge_tools ?? DEFAULT_RUNTIME.knowledge_tools,
+				topK: normalizeInteger(previous.topK, DEFAULT_RUNTIME.topK),
+				maxChars: normalizeInteger(previous.maxChars, DEFAULT_RUNTIME.maxChars),
+				scoreThreshold: normalizeNumber(previous.scoreThreshold, DEFAULT_RUNTIME.scoreThreshold),
+			},
+		};
+	}
+
+	const preset = KNOWLEDGE_RUNTIME_STRATEGIES[strategyId] || KNOWLEDGE_RUNTIME_STRATEGIES.agentic_rag;
 
 	return {
 		...features,
@@ -93,6 +110,9 @@ export function getKnowledgeStrategySummary(strategyId = 'agentic_rag') {
 	}
 	if (strategyId === 'manual_lab') {
 		return { name: 'Manual Lab', detail: 'Knowledge stays in the lab surface' };
+	}
+	if (strategyId === 'custom') {
+		return { name: 'Custom', detail: 'Manual mix of manifest, retrieval, and tools' };
 	}
 	return { name: 'Agentic RAG', detail: 'Manifest pinned, retrieval via tools' };
 }
