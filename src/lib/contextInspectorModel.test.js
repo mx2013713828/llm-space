@@ -32,16 +32,6 @@ test('buildContextInspectorModel groups sent model context only', () => {
           chars: 8,
           sentToModel: false,
         },
-        {
-          id: 'mounted_knowledge',
-          label: 'Mounted Knowledge',
-          target: 'user',
-          lifecycle: 'dynamic',
-          source: 'knowledge',
-          content: '<mounted_knowledge>docs</mounted_knowledge>',
-          chars: 37,
-          sentToModel: true,
-        },
       ],
     },
     messages: [
@@ -52,11 +42,61 @@ test('buildContextInspectorModel groups sent model context only', () => {
     ],
   });
 
-  assert.deepEqual(model.groups.map(group => group.id), ['system', 'dynamic', 'messages', 'tools']);
+  assert.deepEqual(model.groups.map(group => group.id), ['system', 'messages', 'tools']);
   assert.deepEqual(model.groups[0].rows.map(row => row.id), ['agent_guidance']);
-  assert.deepEqual(model.groups[1].rows.map(row => row.id), ['mounted_knowledge']);
   assert.equal(JSON.stringify(model).includes('memory_candidate_queue'), false);
   assert.equal(model.defaultSelectionId, 'agent_guidance');
+});
+
+test('buildContextInspectorModel separates mounted manifest and retrieved knowledge', () => {
+  const model = buildContextInspectorModel({
+    promptAssembly: {
+      sections: [
+        {
+          id: 'agent_guidance',
+          label: 'AGENTS.md',
+          target: 'system',
+          lifecycle: 'pinned',
+          source: 'guidance',
+          content: 'base',
+          sentToModel: true,
+        },
+        {
+          id: 'mounted_knowledge_manifest',
+          label: 'Mounted Knowledge Manifest',
+          target: 'system',
+          lifecycle: 'pinned',
+          source: 'knowledge/mounts',
+          content: '<mounted_knowledge_manifest>docs</mounted_knowledge_manifest>',
+          cacheImpact: 'changes_on_mount',
+          sentToModel: true,
+        },
+        {
+          id: 'retrieved_knowledge',
+          label: 'Retrieved Knowledge',
+          target: 'user',
+          lifecycle: 'dynamic',
+          source: 'knowledge/retrieval',
+          content: '<retrieved_knowledge>chunk</retrieved_knowledge>',
+          cacheImpact: 'changes_per_user_turn',
+          sentToModel: true,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(model.groups.map(group => group.id), [
+    'system',
+    'mounted_knowledge',
+    'retrieved_knowledge',
+    'messages',
+    'tools',
+  ]);
+  assert.deepEqual(model.groups[0].rows.map(row => row.id), ['agent_guidance']);
+  assert.deepEqual(model.groups[1].rows.map(row => row.id), ['mounted_knowledge_manifest']);
+  assert.deepEqual(model.groups[2].rows.map(row => row.id), ['retrieved_knowledge']);
+  assert.equal(model.groups[1].rows[0].cacheImpact, 'changes_on_mount');
+  assert.equal(model.groups[2].rows[0].cacheImpact, 'changes_per_user_turn');
 });
 
 test('formatContextSize uses compact readable labels', () => {

@@ -101,40 +101,45 @@ function createToolRow(tool, index) {
   };
 }
 
+function createPromptSectionRow(section, subtitleTarget) {
+  const chars = section.chars || String(section.content || '').length;
+  return {
+    id: section.id,
+    label: section.label || section.id,
+    subtitle: `${subtitleTarget || section.target || 'context'} · ${section.lifecycle || 'dynamic'} · ${formatContextSize(chars)}`,
+    target: section.target || subtitleTarget || 'context',
+    lifecycle: section.lifecycle || 'dynamic',
+    chars,
+    content: section.content || '',
+    kind: 'prompt_section',
+    cacheImpact: section.cacheImpact || '',
+  };
+}
+
 export function buildContextInspectorModel({
   promptAssembly = {},
   messages = [],
   tools = [],
 } = {}) {
-  const sentPromptSections = (promptAssembly.sections || [])
-    .filter(section => section?.sentToModel !== false && section?.target === 'system')
+  const sentSections = (promptAssembly.sections || [])
+    .filter(section => section?.sentToModel !== false);
+  const mountedKnowledgeRows = sentSections
+    .filter(section => section?.id === 'mounted_knowledge_manifest')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map(section => ({
-      id: section.id,
-      label: section.label || section.id,
-      subtitle: `${section.source || 'unknown'} · ${section.lifecycle || 'pinned'} · ${formatContextSize(section.chars || section.content?.length || 0)}`,
-      target: section.target,
-      lifecycle: section.lifecycle || 'pinned',
-      chars: section.chars || String(section.content || '').length,
-      content: section.content || '',
-      kind: 'prompt_section',
-      cacheImpact: section.cacheImpact || '',
-    }));
+    .map(section => createPromptSectionRow(section, 'system'));
+  const retrievedKnowledgeRows = sentSections
+    .filter(section => section?.id === 'retrieved_knowledge')
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(section => createPromptSectionRow(section, 'user'));
+  const sentPromptSections = sentSections
+    .filter(section => section?.target === 'system' && section?.id !== 'mounted_knowledge_manifest')
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(section => createPromptSectionRow(section, section.source || 'system'));
   const systemRows = sentPromptSections;
-  const dynamicRows = (promptAssembly.sections || [])
-    .filter(section => section?.sentToModel !== false && section?.target && section.target !== 'system')
+  const dynamicRows = sentSections
+    .filter(section => section?.target && section.target !== 'system' && section?.id !== 'retrieved_knowledge')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map(section => ({
-      id: section.id,
-      label: section.label || section.id,
-      subtitle: `${section.target || 'messages'} · ${section.lifecycle || 'dynamic'} · ${formatContextSize(section.chars || section.content?.length || 0)}`,
-      target: section.target || 'messages',
-      lifecycle: section.lifecycle || 'dynamic',
-      chars: section.chars || String(section.content || '').length,
-      content: section.content || '',
-      kind: 'prompt_section',
-      cacheImpact: section.cacheImpact || '',
-    }));
+    .map(section => createPromptSectionRow(section, section.target || 'messages'));
 
   const messageTranscriptItems = (messages || []).map(createMessageTranscriptItem);
   const messageRows = messageTranscriptItems.map(item => ({
@@ -152,10 +157,12 @@ export function buildContextInspectorModel({
 
   const groups = [
     { id: 'system', label: 'System Prompt', rows: systemRows },
+    { id: 'mounted_knowledge', label: 'Mounted Knowledge Manifest', rows: mountedKnowledgeRows },
+    { id: 'retrieved_knowledge', label: 'Retrieved Knowledge', rows: retrievedKnowledgeRows },
     { id: 'dynamic', label: 'Dynamic Context', rows: dynamicRows },
     { id: 'messages', label: 'Messages Payload', rows: messageRows },
     { id: 'tools', label: 'Provider Tool Schema', rows: toolRows },
-  ].filter(group => group.id === 'dynamic' ? group.rows.length > 0 : true);
+  ].filter(group => ['dynamic', 'mounted_knowledge', 'retrieved_knowledge'].includes(group.id) ? group.rows.length > 0 : true);
   const firstRow = groups.flatMap(group => group.rows)[0] || null;
 
   return {
