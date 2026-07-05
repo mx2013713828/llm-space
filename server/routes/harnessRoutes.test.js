@@ -386,16 +386,26 @@ test('harness dry-run includes mounted knowledge manifest and retrieved chunks',
       dryRunMode: 'static_context',
       messages: [{ role: 'user', turn: 1, content: 'What knowledge bases are mounted for RAG?' }],
       tools: ['bash'],
-      features: {},
+      features: {
+        knowledge_bases: {
+          enabled: true,
+          strategy: 'auto_rag',
+          auto_retrieve: true,
+          knowledge_tools: false,
+        },
+      },
       model: { modelId: 'test', key: 'test' },
     },
   });
 
   assert.equal(res.status, 200);
-  const mountedSection = res.body.promptAssembly.sections.find(section => section.id === 'mounted_knowledge');
-  assert.equal(mountedSection?.target, 'user');
-  assert.match(mountedSection?.content || '', /<knowledge_base_manifest count="1">/);
+  const mountedSection = res.body.promptAssembly.sections.find(section => section.id === 'mounted_knowledge_manifest');
+  const retrievedSection = res.body.promptAssembly.sections.find(section => section.id === 'retrieved_knowledge');
+  assert.equal(mountedSection?.target, 'system');
+  assert.equal(retrievedSection?.target, 'user');
+  assert.match(mountedSection?.content || '', /<mounted_knowledge_manifest>/);
   assert.match(mountedSection?.content || '', /Project Docs/);
+  assert.match(retrievedSection?.content || '', /<retrieved_knowledge>/);
   assert.match(JSON.stringify(res.body.messages), /RAG retrieves external project context/);
 });
 
