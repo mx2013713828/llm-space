@@ -24,6 +24,47 @@ function getRoleTone(role) {
   return { color: 'var(--text-secondary)', background: 'var(--bg-surface)', border: 'var(--border)' };
 }
 
+function getBlockTone(displayKind) {
+  if (displayKind === 'thinking') {
+    return {
+      label: 'THINKING',
+      color: '#b45309',
+      background: 'rgba(245, 158, 11, 0.10)',
+      header: 'rgba(245, 158, 11, 0.14)',
+      border: 'rgba(245, 158, 11, 0.36)',
+      rail: '#f59e0b',
+    };
+  }
+  if (displayKind === 'tool') {
+    return {
+      label: 'TOOL',
+      color: '#4f46e5',
+      background: 'rgba(99, 102, 241, 0.09)',
+      header: 'rgba(99, 102, 241, 0.13)',
+      border: 'rgba(99, 102, 241, 0.34)',
+      rail: '#6366f1',
+    };
+  }
+  if (displayKind === 'data') {
+    return {
+      label: 'DATA',
+      color: '#64748b',
+      background: 'rgba(100, 116, 139, 0.08)',
+      header: 'rgba(100, 116, 139, 0.12)',
+      border: 'rgba(100, 116, 139, 0.24)',
+      rail: '#94a3b8',
+    };
+  }
+  return {
+    label: 'TEXT',
+    color: 'var(--text-muted)',
+    background: 'var(--bg-base)',
+    header: 'var(--bg-surface)',
+    border: 'var(--border)',
+    rail: 'transparent',
+  };
+}
+
 export function ContextInspector({
   harness,
   messages,
@@ -419,16 +460,40 @@ export function ContextInspector({
                             </button>
                           </div>
                           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {item.blocks.map(block => (
-                              <div key={block.id} style={{ border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-base)', overflow: 'hidden' }}>
-                                <div style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 10, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-                                  {block.type} · {block.chars.toLocaleString()} chars
+                            {item.blocks.map(block => {
+                              const blockTone = getBlockTone(block.displayKind);
+                              return (
+                                <div
+                                  key={block.id}
+                                  style={{
+                                    position: 'relative',
+                                    border: `1px solid ${blockTone.border}`,
+                                    borderRadius: 7,
+                                    background: blockTone.background,
+                                    overflow: 'hidden',
+                                    boxShadow: block.displayKind === 'text' ? 'none' : '0 1px 0 rgba(0,0,0,0.04)',
+                                  }}
+                                >
+                                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: blockTone.rail }} />
+                                  <div style={{ padding: '6px 10px 6px 12px', borderBottom: `1px solid ${blockTone.border}`, background: blockTone.header, color: 'var(--text-muted)', fontSize: 10, fontWeight: 800, fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span
+                                      style={{
+                                        color: blockTone.color,
+                                        fontWeight: 900,
+                                        letterSpacing: 0,
+                                      }}
+                                    >
+                                      {blockTone.label}
+                                    </span>
+                                    <span style={{ color: 'var(--text-muted)' }}>{block.type}</span>
+                                    <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>{block.chars.toLocaleString()} chars</span>
+                                  </div>
+                                  <pre style={{ margin: 0, padding: '11px 12px 11px 14px', color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}>
+                                    {block.text || '(empty)'}
+                                  </pre>
                                 </div>
-                                <pre style={{ margin: 0, padding: 10, color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}>
-                                  {block.text || '(empty)'}
-                                </pre>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </article>
                       );

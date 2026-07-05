@@ -21,6 +21,13 @@ export function getActiveTranscriptItemId(positions = [], scrollTop = 0, anchorO
   return active?.id || '';
 }
 
+export function getTranscriptBlockDisplayKind(type = '') {
+  if (type === 'thinking') return 'thinking';
+  if (type === 'tool_use' || type === 'tool_result') return 'tool';
+  if (type === 'text') return 'text';
+  return 'data';
+}
+
 function getBlockText(block) {
   if (typeof block?.text === 'string') return block.text;
   if (typeof block?.content === 'string') return block.content;
@@ -40,6 +47,7 @@ function createTranscriptBlock(block, index) {
   return {
     id: `block_${index}`,
     type,
+    displayKind: getTranscriptBlockDisplayKind(type),
     text,
     chars: text.length,
   };

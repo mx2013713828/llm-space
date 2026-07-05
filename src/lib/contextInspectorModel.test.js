@@ -5,6 +5,7 @@ import {
   buildContextInspectorModel,
   formatContextSize,
   getActiveTranscriptItemId,
+  getTranscriptBlockDisplayKind,
 } from './contextInspectorModel.js';
 
 test('buildContextInspectorModel groups sent model context only', () => {
@@ -87,4 +88,12 @@ test('getActiveTranscriptItemId picks the message nearest the viewport anchor', 
   assert.equal(getActiveTranscriptItemId(positions, 260, 64), 'message_2');
   assert.equal(getActiveTranscriptItemId(positions, -20, 64), 'message_0');
   assert.equal(getActiveTranscriptItemId([], 0, 64), '');
+});
+
+test('getTranscriptBlockDisplayKind highlights reasoning and tool blocks separately', () => {
+  assert.equal(getTranscriptBlockDisplayKind('thinking'), 'thinking');
+  assert.equal(getTranscriptBlockDisplayKind('tool_use'), 'tool');
+  assert.equal(getTranscriptBlockDisplayKind('tool_result'), 'tool');
+  assert.equal(getTranscriptBlockDisplayKind('text'), 'text');
+  assert.equal(getTranscriptBlockDisplayKind('json'), 'data');
 });
