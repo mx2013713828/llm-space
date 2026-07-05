@@ -4,6 +4,23 @@ export function formatContextSize(chars = 0) {
   return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k chars`;
 }
 
+export function getActiveTranscriptItemId(positions = [], scrollTop = 0, anchorOffset = 72) {
+  if (!positions.length) return '';
+
+  const anchor = scrollTop + anchorOffset;
+  let active = positions[0];
+
+  for (const position of positions) {
+    if (position.top <= anchor) {
+      active = position;
+    } else {
+      break;
+    }
+  }
+
+  return active?.id || '';
+}
+
 function getBlockText(block) {
   if (typeof block?.text === 'string') return block.text;
   if (typeof block?.content === 'string') return block.content;

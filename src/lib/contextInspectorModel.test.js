@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildContextInspectorModel,
   formatContextSize,
+  getActiveTranscriptItemId,
 } from './contextInspectorModel.js';
 
 test('buildContextInspectorModel groups sent model context only', () => {
@@ -72,4 +73,18 @@ test('buildContextInspectorModel exposes a continuous message transcript', () =>
   assert.match(model.messageTranscript.content, /#1 user/);
   assert.match(model.messageTranscript.content, /#2 assistant/);
   assert.match(model.messageTranscript.content, /considering/);
+});
+
+test('getActiveTranscriptItemId picks the message nearest the viewport anchor', () => {
+  const positions = [
+    { id: 'message_0', top: 0, bottom: 120 },
+    { id: 'message_1', top: 132, bottom: 280 },
+    { id: 'message_2', top: 292, bottom: 420 },
+  ];
+
+  assert.equal(getActiveTranscriptItemId(positions, 0, 64), 'message_0');
+  assert.equal(getActiveTranscriptItemId(positions, 90, 64), 'message_1');
+  assert.equal(getActiveTranscriptItemId(positions, 260, 64), 'message_2');
+  assert.equal(getActiveTranscriptItemId(positions, -20, 64), 'message_0');
+  assert.equal(getActiveTranscriptItemId([], 0, 64), '');
 });

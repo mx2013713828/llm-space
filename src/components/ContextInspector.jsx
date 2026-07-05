@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { apiFetch } from '../lib/apiClient.js';
-import { buildContextInspectorModel } from '../lib/contextInspectorModel.js';
+import { buildContextInspectorModel, getActiveTranscriptItemId } from '../lib/contextInspectorModel.js';
 
 function getToolName(tool) {
   return typeof tool === 'string' ? tool : tool?.name;
@@ -40,6 +40,11 @@ export function ContextInspector({
   const [error, setError] = useState(null);
   const [alignedData, setAlignedData] = useState({ system: '', tools: [], messages: [], promptAssembly: { sections: [] } });
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  const transcriptScrollRef = useRef(null);
+  const messageNodeRefs = useRef(new Map());
+  const indexNodeRefs = useRef(new Map());
+  const pendingMessageScrollRef = useRef('');
+  const scrollFrameRef = useRef(null);
 
   const toolsDeps = (tools || []).map(getToolName).join(',');
   const skillsDeps = (skills || []).join(',');
@@ -148,6 +153,83 @@ export function ContextInspector({
   const totalChars = JSON.stringify(fullContext).length;
   const displayTokens = currentTokens || Math.round(totalChars / 4);
 
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedMessageId) return;
+
+    const indexNode = indexNodeRefs.current.get(selectedMessageId);
+    indexNode?.scrollIntoView({ block: 'nearest' });
+  }, [selectedMessageId]);
+
+  useEffect(() => {
+    if (!selectedIsMessages) return;
+    const targetId = pendingMessageScrollRef.current;
+    if (!targetId) return;
+
+    pendingMessageScrollRef.current = '';
+    const messageNode = messageNodeRefs.current.get(targetId);
+    messageNode?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [selectedIsMessages, selectedMessageId]);
+
+  function setMessageNode(id, node) {
+    if (node) {
+      messageNodeRefs.current.set(id, node);
+    } else {
+      messageNodeRefs.current.delete(id);
+    }
+  }
+
+  function setIndexNode(id, node) {
+    if (node) {
+      indexNodeRefs.current.set(id, node);
+    } else {
+      indexNodeRefs.current.delete(id);
+    }
+  }
+
+  function selectInspectorRow(row) {
+    if (row.kind === 'message') {
+      pendingMessageScrollRef.current = row.id;
+    }
+    setSelectedSectionId(row.id);
+  }
+
+  function syncSelectedMessageFromScroll() {
+    const container = transcriptScrollRef.current;
+    if (!container || !selectedIsMessages) return;
+
+    const positions = inspectorModel.messageTranscript.items
+      .map(item => {
+        const node = messageNodeRefs.current.get(item.id);
+        if (!node) return null;
+        return {
+          id: item.id,
+          top: node.offsetTop,
+          bottom: node.offsetTop + node.offsetHeight,
+        };
+      })
+      .filter(Boolean);
+    const activeId = getActiveTranscriptItemId(positions, container.scrollTop, 86);
+
+    if (activeId && activeId !== selectedMessageId) {
+      setSelectedSectionId(activeId);
+    }
+  }
+
+  function handleTranscriptScroll() {
+    if (scrollFrameRef.current) return;
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      syncSelectedMessageFromScroll();
+    });
+  }
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -242,7 +324,10 @@ export function ContextInspector({
                     return (
                       <button
                         key={row.id}
-                        onClick={() => setSelectedSectionId(row.id)}
+                        ref={node => {
+                          if (row.kind === 'message') setIndexNode(row.id, node);
+                        }}
+                        onClick={() => selectInspectorRow(row)}
                         style={{
                           width: '100%',
                           textAlign: 'left',
@@ -265,7 +350,11 @@ export function ContextInspector({
               ))}
             </aside>
 
-            <section style={{ minWidth: 0, overflow: 'auto', padding: 16 }}>
+            <section
+              ref={transcriptScrollRef}
+              onScroll={handleTranscriptScroll}
+              style={{ minWidth: 0, overflow: 'auto', padding: 16 }}
+            >
               {selectedIsMessages ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
@@ -291,6 +380,7 @@ export function ContextInspector({
                       return (
                         <article
                           key={item.id}
+                          ref={node => setMessageNode(item.id, node)}
                           style={{
                             border: selected ? '1px solid var(--blue)' : '1px solid var(--border)',
                             background: selected ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-primary)',
