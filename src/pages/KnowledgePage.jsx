@@ -36,7 +36,7 @@ function formatDate(value) {
 function Metric({ label, value }) {
 	return (
 		<div className="knowledge-metric">
-			<div className="knowledge-metric-value">{value}</div>
+			<div className="knowledge-metric-value" title={String(value ?? '')}>{value}</div>
 			<div className="knowledge-metric-label">{label}</div>
 		</div>
 	);
@@ -65,6 +65,7 @@ export function KnowledgePage({ harness }) {
 	const [showCreateForm, setShowCreateForm] = useState(false);
 	const [status, setStatus] = useState('');
 	const [error, setError] = useState('');
+	const [hasLoadedBases, setHasLoadedBases] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
 
@@ -84,6 +85,7 @@ export function KnowledgePage({ harness }) {
 		} catch (err) {
 			setError(err.message || 'Failed to load knowledge bases.');
 		} finally {
+			setHasLoadedBases(true);
 			setIsLoading(false);
 		}
 	}, []);
@@ -288,7 +290,10 @@ export function KnowledgePage({ harness }) {
 								</div>
 							</button>
 						))}
-						{bases.length === 0 && (
+						{!hasLoadedBases && bases.length === 0 && (
+							<div className="knowledge-muted-box">Loading knowledge bases...</div>
+						)}
+						{hasLoadedBases && bases.length === 0 && (
 							<EmptyPanel title="No knowledge bases yet" body="Create a base first. Then open it to add files and test retrieval." />
 						)}
 					</div>

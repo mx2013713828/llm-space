@@ -275,8 +275,15 @@
   flex-wrap: wrap;
 }
 
+.knowledge-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(520px, 45vw);
+  flex: 0 0 min(520px, 45vw);
+}
+
 .knowledge-metric {
-  min-width: 106px;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px;
@@ -284,9 +291,12 @@
 }
 
 .knowledge-metric-value {
+  overflow: hidden;
   font-size: 18px;
   color: var(--text-primary);
   font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .knowledge-metric-label {
@@ -657,7 +667,9 @@
   flex-direction: column;
   gap: 8px;
   max-height: 260px;
+  min-height: 84px;
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 .knowledge-file-row {

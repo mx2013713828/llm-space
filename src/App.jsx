@@ -429,7 +429,6 @@ function AppContent() {
           )}
           {activeTab === 'knowledge' && (
             <KnowledgePage
-              key={activeHarnessId}
               harness={harness}
             />
           )}

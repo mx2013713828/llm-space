@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { registerHarnessRoutes } from './harnessRoutes.js';
 import { createRouteApp, dispatchJson } from './routeTestUtils.js';
 import { AgentExecutor } from '../agent/AgentExecutor.js';
+import { createKnowledgeBase, mountKnowledgeBases } from '../knowledge/knowledgeStore.js';
+import { ingestKnowledgeFile } from '../knowledge/knowledgeIngest.js';
 import {
   defaultRuntimeNotificationQueue,
   drainRuntimeNotifications,
@@ -18,6 +20,7 @@ async function createFixture(t) {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'harness-routes-'));
   const harnessDir = path.join(rootDir, 'harnesses');
   const guidanceRoot = path.join(rootDir, 'guidance');
+  const knowledgeRoot = path.join(rootDir, 'knowledge');
   const sessionsDir = path.join(rootDir, 'server', 'sessions');
   await mkdir(harnessDir, { recursive: true });
   await mkdir(guidanceRoot, { recursive: true });
@@ -25,7 +28,7 @@ async function createFixture(t) {
   t.after(async () => {
     await rm(rootDir, { recursive: true, force: true });
   });
-  return { rootDir, harnessDir, guidanceRoot, sessionsDir };
+  return { rootDir, harnessDir, guidanceRoot, knowledgeRoot, sessionsDir };
 }
 
 test('harness routes list, load, create, copy, and delete harness files', async (t) => {
@@ -344,6 +347,56 @@ test('harness dry-run returns prompt assembly sections for sent model context on
   assert.equal('toolPoolSummary' in res.body, false);
   assert.equal('runtimeNotificationSummary' in res.body, false);
   assert.equal('memoryCandidateSummary' in res.body, false);
+});
+
+test('harness dry-run includes mounted knowledge manifest and retrieved chunks', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'alpha.json',
+    description: 'Alpha',
+  }), 'utf-8');
+  const kb = await createKnowledgeBase({
+    name: 'Project Docs',
+    description: 'RAG design notes',
+    knowledgeRoot: fixture.knowledgeRoot,
+  });
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'rag.md',
+    content: 'RAG retrieves external project context for user questions.',
+    knowledgeRoot: fixture.knowledgeRoot,
+  });
+  await mountKnowledgeBases({
+    harnessId: 'alpha',
+    knowledgeBaseIds: [kb.id],
+    knowledgeRoot: fixture.knowledgeRoot,
+  });
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+    knowledgeRoot: fixture.knowledgeRoot,
+  });
+
+  const res = await dispatchJson(app, 'POST', '/api/harnesses/alpha/dry-run', {
+    body: {
+      dryRunMode: 'static_context',
+      messages: [{ role: 'user', turn: 1, content: 'What knowledge bases are mounted for RAG?' }],
+      tools: ['bash'],
+      features: {},
+      model: { modelId: 'test', key: 'test' },
+    },
+  });
+
+  assert.equal(res.status, 200);
+  const mountedSection = res.body.promptAssembly.sections.find(section => section.id === 'mounted_knowledge');
+  assert.equal(mountedSection?.target, 'user');
+  assert.match(mountedSection?.content || '', /<knowledge_base_manifest count="1">/);
+  assert.match(mountedSection?.content || '', /Project Docs/);
+  assert.match(JSON.stringify(res.body.messages), /RAG retrieves external project context/);
 });
 
 test('harness load initializes AGENTS.md from legacy system prompt', async (t) => {

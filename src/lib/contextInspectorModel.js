@@ -106,7 +106,7 @@ export function buildContextInspectorModel({
   messages = [],
   tools = [],
 } = {}) {
-  const systemRows = (promptAssembly.sections || [])
+  const sentPromptSections = (promptAssembly.sections || [])
     .filter(section => section?.sentToModel !== false && section?.target === 'system')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map(section => ({
@@ -115,6 +115,21 @@ export function buildContextInspectorModel({
       subtitle: `${section.source || 'unknown'} · ${section.lifecycle || 'pinned'} · ${formatContextSize(section.chars || section.content?.length || 0)}`,
       target: section.target,
       lifecycle: section.lifecycle || 'pinned',
+      chars: section.chars || String(section.content || '').length,
+      content: section.content || '',
+      kind: 'prompt_section',
+      cacheImpact: section.cacheImpact || '',
+    }));
+  const systemRows = sentPromptSections;
+  const dynamicRows = (promptAssembly.sections || [])
+    .filter(section => section?.sentToModel !== false && section?.target && section.target !== 'system')
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(section => ({
+      id: section.id,
+      label: section.label || section.id,
+      subtitle: `${section.target || 'messages'} · ${section.lifecycle || 'dynamic'} · ${formatContextSize(section.chars || section.content?.length || 0)}`,
+      target: section.target || 'messages',
+      lifecycle: section.lifecycle || 'dynamic',
       chars: section.chars || String(section.content || '').length,
       content: section.content || '',
       kind: 'prompt_section',
@@ -137,9 +152,10 @@ export function buildContextInspectorModel({
 
   const groups = [
     { id: 'system', label: 'System Prompt', rows: systemRows },
+    { id: 'dynamic', label: 'Dynamic Context', rows: dynamicRows },
     { id: 'messages', label: 'Messages Payload', rows: messageRows },
     { id: 'tools', label: 'Provider Tool Schema', rows: toolRows },
-  ];
+  ].filter(group => group.id === 'dynamic' ? group.rows.length > 0 : true);
   const firstRow = groups.flatMap(group => group.rows)[0] || null;
 
   return {

@@ -32,6 +32,16 @@ test('buildContextInspectorModel groups sent model context only', () => {
           chars: 8,
           sentToModel: false,
         },
+        {
+          id: 'mounted_knowledge',
+          label: 'Mounted Knowledge',
+          target: 'user',
+          lifecycle: 'dynamic',
+          source: 'knowledge',
+          content: '<mounted_knowledge>docs</mounted_knowledge>',
+          chars: 37,
+          sentToModel: true,
+        },
       ],
     },
     messages: [
@@ -42,8 +52,9 @@ test('buildContextInspectorModel groups sent model context only', () => {
     ],
   });
 
-  assert.deepEqual(model.groups.map(group => group.id), ['system', 'messages', 'tools']);
+  assert.deepEqual(model.groups.map(group => group.id), ['system', 'dynamic', 'messages', 'tools']);
   assert.deepEqual(model.groups[0].rows.map(row => row.id), ['agent_guidance']);
+  assert.deepEqual(model.groups[1].rows.map(row => row.id), ['mounted_knowledge']);
   assert.equal(JSON.stringify(model).includes('memory_candidate_queue'), false);
   assert.equal(model.defaultSelectionId, 'agent_guidance');
 });
