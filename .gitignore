@@ -45,3 +45,5 @@ harnesses/*
 .offloaded/
 scratch/
 .memory/
+docs/reference/*
+guidance/*
