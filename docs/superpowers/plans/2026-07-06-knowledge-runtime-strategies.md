@@ -73,7 +73,7 @@
 - Produces: `resolveKnowledgeRuntime(features) -> { enabled, strategy, manifestEnabled, autoRetrieve, knowledgeTools, topK, maxChars, scoreThreshold }`
 - Consumes: Existing `parseFeatures(features)` behavior.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add `src/lib/knowledgeRuntime.test.js`:
 
@@ -144,7 +144,7 @@ test('custom settings preserve numeric retrieval bounds', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm failure**
+- [x] **Step 2: Run tests and confirm failure**
 
 Run:
 
@@ -154,7 +154,7 @@ node --test src/lib/knowledgeRuntime.test.js
 
 Expected: fails because `src/lib/knowledgeRuntime.js` does not exist.
 
-- [ ] **Step 3: Implement schema and pure functions**
+- [x] **Step 3: Implement schema and pure functions**
 
 Create `src/lib/knowledgeRuntime.js`:
 
@@ -294,7 +294,7 @@ knowledge_bases: {
 },
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -304,7 +304,7 @@ node --test src/lib/knowledgeRuntime.test.js
 
 Expected: pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/FeatureSchema.js src/lib/knowledgeRuntime.js src/lib/knowledgeRuntime.test.js
@@ -324,7 +324,7 @@ git commit -m "feat: add knowledge runtime strategy presets"
 - Produces: `buildMountedKnowledgeManifest({ knowledgeBases }) -> string`
 - Produces: `buildRetrievedKnowledgeBlock({ query, chunks }) -> string`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Update `server/agent/plugins/KnowledgePlugin.test.js` with:
 
@@ -429,7 +429,7 @@ function createKnowledgeContext({ features = {}, retrievalChunks = [{
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm failure**
+- [x] **Step 2: Run tests and confirm failure**
 
 Run:
 
@@ -439,7 +439,7 @@ node --test server/agent/plugins/KnowledgePlugin.test.js
 
 Expected: fails because the current plugin still uses the combined `<mounted_knowledge>` block.
 
-- [ ] **Step 3: Implement split assembly**
+- [x] **Step 3: Implement split assembly**
 
 Refactor `server/agent/plugins/KnowledgePlugin.js`:
 
@@ -485,7 +485,7 @@ In `preLLM`:
 - If auto retrieval is enabled, retrieve and inject `retrieved_knowledge` into latest user text only when block is non-empty.
 - Strip only old retrieved blocks from `apiMessages`; do not strip pinned manifest from system prompt.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -495,7 +495,7 @@ node --test server/agent/plugins/KnowledgePlugin.test.js
 
 Expected: pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/agent/plugins/KnowledgePlugin.js server/agent/plugins/KnowledgePlugin.test.js
@@ -519,7 +519,7 @@ git commit -m "feat: split knowledge manifest and retrieval context"
 - Produces tool names: `list_mounted_knowledge_bases`, `query_knowledge_base`
 - Consumes runtime: `features.knowledge_bases.knowledge_tools`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 In `server/agent/toolPool.test.js`, add:
 
@@ -585,7 +585,7 @@ test('KnowledgePlugin handles query_knowledge_base tool calls with bounded sourc
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm failure**
+- [x] **Step 2: Run tests and confirm failure**
 
 Run:
 
@@ -595,7 +595,7 @@ node --test server/agent/toolPool.test.js server/agent/plugins/KnowledgePlugin.t
 
 Expected: fails because tools are not registered or handled.
 
-- [ ] **Step 3: Create tool schemas**
+- [x] **Step 3: Create tool schemas**
 
 Create `server/tools/list_mounted_knowledge_bases.js`:
 
@@ -636,7 +636,7 @@ export default {
 
 Update `server/tools/index.js` imports and registry entries for both tools.
 
-- [ ] **Step 4: Mount tools and handle calls**
+- [x] **Step 4: Mount tools and handle calls**
 
 In `server/agent/toolPool.js`, append knowledge tools when the runtime has `knowledge_tools: true` and role is lead:
 
@@ -682,7 +682,7 @@ async preToolUse(context, tool) {
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -692,7 +692,7 @@ node --test server/agent/toolPool.test.js server/agent/plugins/KnowledgePlugin.t
 
 Expected: pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/tools/list_mounted_knowledge_bases.js server/tools/query_knowledge_base.js server/tools/index.js server/agent/toolPool.js server/agent/toolPool.test.js server/agent/plugins/KnowledgePlugin.js server/agent/plugins/KnowledgePlugin.test.js
@@ -717,7 +717,7 @@ git commit -m "feat: add agentic knowledge tools"
   - `knowledge_manifest`
   - `retrieved_knowledge`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 In `src/lib/contextInspectorModel.test.js`, add:
 
@@ -800,7 +800,7 @@ test('harness dry-run for agentic_rag includes manifest without automatic retrie
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm failure**
+- [x] **Step 2: Run tests and confirm failure**
 
 Run:
 
@@ -810,7 +810,7 @@ node --test src/lib/contextInspectorModel.test.js server/routes/harnessRoutes.te
 
 Expected: fails until grouping and dry-run strategy behavior are updated.
 
-- [ ] **Step 3: Implement grouping**
+- [x] **Step 3: Implement grouping**
 
 In `src/lib/contextInspectorModel.js`, route knowledge section ids into dedicated groups:
 
@@ -834,7 +834,7 @@ const groups = [
 
 Ensure `systemRows` excludes `mounted_knowledge_manifest` so it does not appear twice.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -844,7 +844,7 @@ node --test src/lib/contextInspectorModel.test.js server/routes/harnessRoutes.te
 
 Expected: pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/contextInspectorModel.js src/lib/contextInspectorModel.test.js server/routes/harnessRoutes.js server/routes/harnessRoutes.test.js
@@ -865,7 +865,7 @@ git commit -m "feat: split knowledge context inspector views"
 - Consumes: `KNOWLEDGE_RUNTIME_STRATEGIES`, `applyKnowledgeRuntimeStrategy`, `resolveKnowledgeRuntime`
 - Produces: UI events that save updated harness features through existing harness save route or existing parent config path.
 
-- [ ] **Step 1: Extract UI-safe labels test**
+- [x] **Step 1: Extract UI-safe labels test**
 
 Create `src/lib/knowledgeRuntimeUi.test.js`:
 
@@ -891,7 +891,7 @@ test('getKnowledgeStrategySummary returns concise display copy', () => {
 });
 ```
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -901,7 +901,7 @@ node --test src/lib/knowledgeRuntimeUi.test.js
 
 Expected: fails because `getKnowledgeStrategySummary` is missing.
 
-- [ ] **Step 3: Add summary helper**
+- [x] **Step 3: Add summary helper**
 
 Add to `src/lib/knowledgeRuntime.js`:
 
@@ -917,7 +917,7 @@ export function getKnowledgeStrategySummary(strategyId = 'agentic_rag') {
 }
 ```
 
-- [ ] **Step 4: Update Knowledge UI**
+- [x] **Step 4: Update Knowledge UI**
 
 In `src/pages/KnowledgePage.jsx`, add a "Runtime Strategy" section above the library shell:
 
@@ -954,7 +954,7 @@ async function updateKnowledgeStrategy(strategyId) {
 
 If `KnowledgePage` does not currently receive a harness update callback, add `onHarnessUpdated` prop in `src/App.jsx` and update local harness state after save.
 
-- [ ] **Step 5: Update compact mount panel**
+- [x] **Step 5: Update compact mount panel**
 
 In `src/components/KnowledgeMountPanel.jsx`, show current strategy summary:
 
@@ -974,7 +974,7 @@ Display:
 
 Pass `harness.features` into `KnowledgeMountPanel` from `ConfigPanel.jsx`.
 
-- [ ] **Step 6: Add CSS**
+- [x] **Step 6: Add CSS**
 
 In `src/App.css`, add:
 
@@ -1016,7 +1016,7 @@ In `src/App.css`, add:
 }
 ```
 
-- [ ] **Step 7: Run tests and build**
+- [x] **Step 7: Run tests and build**
 
 Run:
 
@@ -1027,7 +1027,7 @@ npm run build
 
 Expected: pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/pages/KnowledgePage.jsx src/components/KnowledgeMountPanel.jsx src/components/ConfigPanel.jsx src/App.jsx src/App.css src/lib/knowledgeRuntime.js src/lib/knowledgeRuntimeUi.test.js
@@ -1048,7 +1048,7 @@ git commit -m "feat: add knowledge runtime strategy controls"
 - Consumes all previous task outputs.
 - Produces user-facing explanation and regression coverage.
 
-- [ ] **Step 1: Run full automated verification**
+- [x] **Step 1: Run full automated verification**
 
 Run:
 
@@ -1062,7 +1062,7 @@ Expected:
 - `npm test` passes with all tests green.
 - `npm run build` completes Vite production build.
 
-- [ ] **Step 2: Manual browser verification**
+- [x] **Step 2: Manual browser verification**
 
 Start dev server:
 
@@ -1094,7 +1094,7 @@ Open the Vite URL printed by the terminal and verify:
 
 Stop the dev server with `Ctrl+C`.
 
-- [ ] **Step 3: Update docs**
+- [x] **Step 3: Update docs**
 
 In `docs/DEVELOPMENT_SPEC.md`, update "知识库与挂载资源" to say:
 
@@ -1122,7 +1122,7 @@ LLM-Space supports three experimental knowledge runtime strategies:
 - Manual Lab: retrieval testing in the Knowledge page without changing chat context.
 ```
 
-- [ ] **Step 4: Run final verification**
+- [x] **Step 4: Run final verification**
 
 Run:
 
@@ -1138,7 +1138,7 @@ Expected:
 - Build passes.
 - `git status --short` lists only intended documentation changes before commit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/DEVELOPMENT_SPEC.md docs/DEVELOPMENT_SPEC.en.md README.md README.zh-CN.md

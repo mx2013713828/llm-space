@@ -159,19 +159,22 @@ Jobs are scoped to a harness and run through the same agent executor path. If th
 
 ### Knowledge Bases
 
-Task 15 adds a local RAG Knowledge Base MVP.
+Task 15 adds a local RAG Knowledge Base MVP plus selectable runtime strategies.
 
-Users can create local knowledge bases, import Markdown/text/JSON files, generate bounded chunks and a lightweight keyword index, preview retrieval, and mount selected knowledge into a conversation as source-labeled context. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
+Users can create local knowledge bases, import Markdown/text/JSON files, generate bounded chunks and a lightweight keyword index, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
 Current shape:
 
 - local knowledge store and metadata
 - bounded ingestion and chunking
 - retrieval preview with source labels
-- harness-level mount and `<mounted_knowledge>` injection
-- Context Inspector can inspect the exact injected message payload
+- harness-level mounting
+- Auto RAG: automatic retrieval from mounted bases on each user turn
+- Agentic RAG: pinned mounted manifest plus `list_mounted_knowledge_bases` / `query_knowledge_base` tools
+- Manual Lab: retrieval testing in the Knowledge page without changing chat context
+- Context Inspector separates Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema
 
-Next RAG work focuses on richer retrieval quality: more file types, configurable embedding providers, vector/hybrid retrieval, rerank, and dedicated Context Inspector retrieval visualization.
+Next RAG work focuses on richer retrieval quality: more file types, configurable embedding providers, vector/hybrid retrieval, rerank, and retrieval evaluation hooks.
 
 ## Developer Workflow
 

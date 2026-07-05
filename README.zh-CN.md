@@ -159,7 +159,7 @@ Cron Scheduler 暴露：
 
 ### 知识库
 
-Task 15 已加入本地 RAG 知识库 MVP。
+Task 15 已加入本地 RAG 知识库 MVP，并支持可切换的知识库运行策略。
 
 用户可以创建本地知识库，导入 Markdown/text/JSON 文件，生成有边界的 chunks 和轻量关键词索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
@@ -168,10 +168,13 @@ Task 15 已加入本地 RAG 知识库 MVP。
 - 本地知识库 metadata 与存储
 - 有边界的 ingestion 与 chunking
 - 带来源标签的检索预览
-- Harness 级挂载与 `<mounted_knowledge>` 注入
-- Context Inspector 可以查看实际注入的 message payload
+- Harness 级挂载
+- Auto RAG：每轮自动从已挂载知识库检索
+- Agentic RAG：稳定挂载清单 + `list_mounted_knowledge_bases` / `query_knowledge_base` 工具
+- Manual Lab：只在 Knowledge 页面测试检索，不改变对话上下文
+- Context Inspector 分层展示 Mounted Knowledge Manifest、Retrieved Knowledge、Messages Payload 和 Provider Tool Schema
 
-下一步 RAG 工作会聚焦检索质量增强：更多文件类型、可配置 embedding provider、向量/混合检索、rerank，以及 Context Inspector 中专门的检索可视化。
+下一步 RAG 工作会聚焦检索质量增强：更多文件类型、可配置 embedding provider、向量/混合检索、rerank，以及检索评估钩子。
 
 ## 开发工作流
 

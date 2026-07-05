@@ -54,7 +54,9 @@ The Context Inspector is not a general runtime dashboard. Its job is to clearly 
 ### 6. Knowledge Bases and Mountable Resources
 External knowledge bases, skills, project documents, and future MCP resources should be treated as mountable resources, not hard-coded prompt text:
 - Users should be able to upload/generate knowledge bases and explicitly mount them in a conversation.
-- Model injection must be bounded and source-labeled. For example, `<mounted_knowledge>` should include only retrieved, limited snippets.
+- Knowledge runtime strategy should be configurable: Auto RAG retrieves every turn, Agentic RAG exposes tools for model-driven retrieval, and Manual Lab keeps retrieval in the lab surface.
+- Mounted Knowledge Manifest belongs to stable pinned context; Retrieved Knowledge belongs to per-turn dynamic context and is injected only when chunks match.
+- Model injection must be bounded and source-labeled. Dynamic retrieval content should use clear boundaries such as `<retrieved_knowledge>` and must never push complete files directly into the prompt.
 - Large file contents must not be pushed directly into trajectory or messages. They should enter context through indexing, retrieval, and traceable citations.
 - Knowledge mounting should reuse the Context Inspector prompt assembly mechanism so users can see exactly which knowledge snippets were injected.
 
@@ -146,5 +148,6 @@ LLM-Space is an experimental platform and should not fully black-box commercial-
 ### 5. Current Development Status
 - Task 13 (Pinned Strategy + Context Assembly Inspector) is complete: execution strategy is pinned into system prompt assembly, and Context Inspector now acts as a static payload inspector.
 - Task 14 (Multi-layer Guidance Composition) is intentionally skipped for now.
-- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import Markdown/text/JSON, chunk/index them, preview retrieval, mount them to a harness, and inject source-labeled `<mounted_knowledge>` during pre-LLM assembly.
+- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import Markdown/text/JSON, chunk/index them, preview retrieval, and mount them to a harness.
+- Knowledge Runtime Strategies are complete: Auto RAG, Agentic RAG, and Manual Lab are supported; Mounted Knowledge Manifest and Retrieved Knowledge are split; Agentic RAG exposes `list_mounted_knowledge_bases` / `query_knowledge_base`; Context Inspector shows the actual knowledge context sent to the model in separate layers.
 - The next priority is Task 16 (RAG Retrieval Quality Extensions): dedicated Context Inspector retrieval visualization, more file types, configurable embedding providers, vector/hybrid retrieval, rerank adapters, and evaluation hooks.

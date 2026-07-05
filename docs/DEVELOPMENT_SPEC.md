@@ -54,7 +54,9 @@ Context Inspector 的目标不是展示所有运行时状态，而是清晰、�
 ### 6. 知识库与挂载资源 (Mountable Knowledge)
 外部知识库、技能、项目文档、未来 MCP 资源都应被视为可挂载资源，而不是直接塞进固定 prompt：
 - 用户可以选择上传/生成知识库，并在对话时显式挂载。
-- 注入模型时必须有边界、来源标签和引用信息，例如 `<mounted_knowledge>` 只包含检索到的有限片段。
+- 知识库运行策略应可配置：Auto RAG 每轮自动检索，Agentic RAG 暴露工具由模型按需查询，Manual Lab 仅用于实验室调试。
+- Mounted Knowledge Manifest 属于稳定配置层，应作为 pinned context 展示；Retrieved Knowledge 属于本轮动态层，只在命中 chunk 时注入。
+- 注入模型时必须有边界、来源标签和引用信息；动态检索内容应使用 `<retrieved_knowledge>` 等明确边界，不得把完整文件直接塞入 prompt。
 - 大文件内容不得直接进入 trajectory 或 messages；应通过索引、检索和可追溯 citation 进入上下文。
 - 知识挂载应复用 Context Inspector 的 prompt assembly 机制，让用户看到到底注入了哪些知识片段。
 
@@ -146,5 +148,6 @@ LLM-Space 是实验平台，不应把商业 Agent 的“智能执行模式”完
 ### 5. 当前开发状态
 - Task 13（Pinned Strategy + Context Assembly Inspector）已完成：执行策略已固定在 system prompt 组装层，Context Inspector 已改为静态 payload inspector。
 - Task 14（Multi-layer Guidance Composition）暂时跳过。
-- Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入 Markdown/text/JSON、chunk/index、检索预览、挂载到 harness，并在 pre-LLM 阶段注入带来源标签的 `<mounted_knowledge>`。
+- Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入 Markdown/text/JSON、chunk/index、检索预览、挂载到 harness。
+- Knowledge Runtime Strategies 已完成：支持 Auto RAG、Agentic RAG、Manual Lab；Mounted Knowledge Manifest 与 Retrieved Knowledge 已拆分，Agentic RAG 暴露 `list_mounted_knowledge_bases` / `query_knowledge_base` 工具，Context Inspector 可分层查看实际发送给模型的知识上下文。
 - 下一阶段优先进入 Task 16（RAG Retrieval Quality Extensions）：补齐专门的 Context Inspector 检索可视化、更多文件类型、可配置 embedding provider、向量/混合检索、rerank 与评估钩子。

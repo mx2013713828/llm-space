@@ -102,9 +102,9 @@ Stage 7: Unified runtime resource layer: resource mount registry and experiment 
 Stage 8: Runtime quality: tests, observability, E2E, maintainability
 ```
 
-Current closure point: **Stage 1 through Stage 5 Task 15 MVP are minimally closed and tested**. Task 9, Task 10, and Task 14 remain intentionally deferred because protocol approval, worktree isolation, and multi-layer guidance composition are heavier follow-up features.
+Current closure point: **Stage 1 through Stage 5 Task 15 plus Knowledge Runtime Strategies are minimally closed and tested**. Task 9, Task 10, and Task 14 remain intentionally deferred because protocol approval, worktree isolation, and multi-layer guidance composition are heavier follow-up features.
 
-The recommended next task is **Task 16: RAG Retrieval Quality Extensions**. Task 11 through Task 13 closed the first Stage 5 foundations: automatic memory quality gating, `AGENTS.md` explicit guidance, and the static Context Assembly Inspector. Task 15 now provides a local Knowledge Base MVP with create/import/index/retrieve/mount/inject flow.
+The recommended next task is **Task 16: RAG Retrieval Quality Extensions**. Task 11 through Task 13 closed the first Stage 5 foundations: automatic memory quality gating, `AGENTS.md` explicit guidance, and the static Context Assembly Inspector. Task 15 now provides a local Knowledge Base MVP with create/import/index/retrieve/mount flow, and Knowledge Runtime Strategies add Auto RAG, Agentic RAG, Manual Lab, split manifest/retrieval context, and agent-controlled knowledge tools.
 
 ---
 
@@ -619,7 +619,7 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Goal:** Let users create local Knowledge Bases from selected files, generate a lightweight RAG database, test retrieval, and mount selected bases into conversations as bounded, source-labeled context.
 
-**Status:** MVP implemented. The first closure supports local metadata storage, Markdown/text/JSON parsing, bounded chunking, keyword indexing, retrieval preview, harness-level mounting, and `<mounted_knowledge>` injection. Rename/delete management, richer per-file inspection, embedding providers, and dedicated Context Inspector retrieval visualizations remain follow-up work.
+**Status:** MVP plus runtime strategy layer implemented. The first closure supports local metadata storage, Markdown/text/JSON parsing, bounded chunking, keyword indexing, retrieval preview, harness-level mounting, Auto RAG, Agentic RAG, Manual Lab, pinned Mounted Knowledge Manifest, per-turn Retrieved Knowledge, and agent-controlled list/query knowledge tools. Embedding providers, richer file parsers, vector/hybrid retrieval, rerank, and retrieval evaluation remain follow-up work.
 
 **Why:** Dify's knowledge workflow shows that RAG should be a visible data pipeline, not a hidden "upload to vector DB" button. LLM-Space should start with a lightweight local MVP while preserving the final architecture for multiple file types, configurable embedding providers, hybrid retrieval, rerank, and parent-child retrieval.
 
@@ -636,8 +636,11 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - Users can run retrieval tests against a Knowledge Base without starting an agent loop.
 - Ingestion and retrieval expose lightweight pipeline progress: parse, clean, chunk, index, retrieve, inject.
 - Users can mount one or more Knowledge Bases to a harness/conversation.
-- `KnowledgePlugin` retrieves relevant chunks during pre-LLM and injects bounded `<mounted_knowledge>` with source labels.
-- Context Inspector shows mounted Knowledge Bases, query text, retrieved chunks, scores, source metadata, and exact injected prompt text.
+- `KnowledgePlugin` supports three runtime strategies: Auto RAG, Agentic RAG, and Manual Lab.
+- Mounted Knowledge Manifest is pinned as stable system context when strategy requires it.
+- Retrieved Knowledge is injected into the latest user turn only when matching chunks exist.
+- Agentic RAG exposes `list_mounted_knowledge_bases` and `query_knowledge_base` through the runtime tool pool.
+- Context Inspector separates System Prompt, Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema.
 
 **Final RAG direction:**
 
@@ -697,9 +700,11 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - [x] Write retrieval tests for keyword ranking, mounted-base filtering, `topK`, `maxChars`, `scoreThreshold`, and source labels.
 - [x] Add lightweight pipeline trace tests for parse, chunk, index, and retrieve stages.
 - [x] Add Knowledge Base API routes and route-level validation.
-- [x] Add bounded `<mounted_knowledge>` injection with source labels and prompt assembly section metadata.
-- [x] Add lightweight frontend UI for create/import/test/mount without embedding large file contents into the trajectory.
-- [ ] Add dedicated Context Inspector retrieval visualization beyond the exact injected message payload.
+- [x] Add stable Mounted Knowledge Manifest and dynamic Retrieved Knowledge prompt assembly sections.
+- [x] Add Auto RAG, Agentic RAG, and Manual Lab runtime strategies.
+- [x] Add agentic knowledge list/query tools and tool-pool integration.
+- [x] Add lightweight frontend UI for create/import/test/mount and runtime strategy selection without embedding large file contents into the trajectory.
+- [x] Split Context Inspector knowledge sections for model-bound manifest and retrieved chunks.
 - [ ] Verify and commit with `feat: add local rag knowledge bases`.
 
 ### Task 16: RAG Retrieval Quality Extensions
