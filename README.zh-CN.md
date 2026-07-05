@@ -157,19 +157,21 @@ Cron Scheduler 暴露：
 
 任务按 Harness 作用域隔离，并复用同一条 AgentExecutor 路径执行。如果目标 Harness 忙碌，定时事件会排队，避免同一个 session 上并发启动多个 agent loop。
 
-### 知识库：下一阶段
+### 知识库
 
-下一个主要阶段是 **Task 15: Mountable Knowledge Bases**。
+Task 15 已加入本地 RAG 知识库 MVP。
 
-目标是让用户上传文件、生成本地知识库，并在对话中显式挂载选中的知识库。知识应该像可挂载资源一样工作，而不是硬编码进 prompt。
+用户可以创建本地知识库，导入 Markdown/text/JSON 文件，生成有边界的 chunks 和轻量关键词索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
-计划形态：
+当前形态：
 
 - 本地知识库 metadata 与存储
 - 有边界的 ingestion 与 chunking
-- 带来源标签和引用的检索
-- Pre-LLM 阶段注入 `<mounted_knowledge>`
-- Context Inspector 展示实际注入的知识片段
+- 带来源标签的检索预览
+- Harness 级挂载与 `<mounted_knowledge>` 注入
+- Context Inspector 可以查看实际注入的 message payload
+
+下一步 RAG 工作会聚焦检索质量增强：更多文件类型、可配置 embedding provider、向量/混合检索、rerank，以及 Context Inspector 中专门的检索可视化。
 
 ## 开发工作流
 

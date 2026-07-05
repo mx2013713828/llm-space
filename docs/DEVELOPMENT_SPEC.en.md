@@ -146,4 +146,5 @@ LLM-Space is an experimental platform and should not fully black-box commercial-
 ### 5. Current Development Status
 - Task 13 (Pinned Strategy + Context Assembly Inspector) is complete: execution strategy is pinned into system prompt assembly, and Context Inspector now acts as a static payload inspector.
 - Task 14 (Multi-layer Guidance Composition) is intentionally skipped for now.
-- The next priority is Task 15 (Mountable Knowledge Bases): upload, index, retrieve, mount, and inspect external knowledge sources.
+- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import Markdown/text/JSON, chunk/index them, preview retrieval, mount them to a harness, and inject source-labeled `<mounted_knowledge>` during pre-LLM assembly.
+- The next priority is Task 16 (RAG Retrieval Quality Extensions): dedicated Context Inspector retrieval visualization, more file types, configurable embedding providers, vector/hybrid retrieval, rerank adapters, and evaluation hooks.

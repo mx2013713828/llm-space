@@ -2,8 +2,10 @@
 
 import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
 import { formatExtraBodyForEditor, updateExtraBodyDraft } from '../lib/modelConfigExtras.js';
+import { KnowledgeBasePanel } from './KnowledgeBasePanel.jsx';
 
 export function ConfigPanel({
+  harness,
   models,
   selectedModel,
   setSelectedModel,
@@ -201,6 +203,8 @@ export function ConfigPanel({
           <span className="param-value" style={{ width: 44 }}>{maxTokens}</span>
         </div>
       </div>
+
+      {harness?.id && <KnowledgeBasePanel harnessId={harness.id} />}
 
       {/* Agent Guidance */}
       <div className="card prompt-card" style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>

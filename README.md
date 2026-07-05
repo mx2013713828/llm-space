@@ -157,19 +157,21 @@ Cron Scheduler exposes:
 
 Jobs are scoped to a harness and run through the same agent executor path. If the target harness is busy, scheduled events are queued instead of launching concurrent loops against the same session.
 
-### Knowledge Bases: Next Stage
+### Knowledge Bases
 
-The next major stage is **Task 15: Mountable Knowledge Bases**.
+Task 15 adds a local RAG Knowledge Base MVP.
 
-The goal is to let users upload files, create local knowledge bases, and mount selected knowledge into a conversation as bounded, source-labeled context. Knowledge should behave like a mounted resource, not hard-coded prompt text.
+Users can create local knowledge bases, import Markdown/text/JSON files, generate bounded chunks and a lightweight keyword index, preview retrieval, and mount selected knowledge into a conversation as source-labeled context. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
-Planned shape:
+Current shape:
 
 - local knowledge store and metadata
 - bounded ingestion and chunking
-- retrieval with source labels and citations
-- `<mounted_knowledge>` injection during pre-LLM assembly
-- Context Inspector visibility for injected knowledge snippets
+- retrieval preview with source labels
+- harness-level mount and `<mounted_knowledge>` injection
+- Context Inspector can inspect the exact injected message payload
+
+Next RAG work focuses on richer retrieval quality: more file types, configurable embedding providers, vector/hybrid retrieval, rerank, and dedicated Context Inspector retrieval visualization.
 
 ## Developer Workflow
 

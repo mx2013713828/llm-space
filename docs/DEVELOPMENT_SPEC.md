@@ -146,4 +146,5 @@ LLM-Space 是实验平台，不应把商业 Agent 的“智能执行模式”完
 ### 5. 当前开发状态
 - Task 13（Pinned Strategy + Context Assembly Inspector）已完成：执行策略已固定在 system prompt 组装层，Context Inspector 已改为静态 payload inspector。
 - Task 14（Multi-layer Guidance Composition）暂时跳过。
-- 下一阶段优先进入 Task 15（Mountable Knowledge Bases）：实现外部知识库上传、索引、检索、挂载与 Context Inspector 可观察性。
+- Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入 Markdown/text/JSON、chunk/index、检索预览、挂载到 harness，并在 pre-LLM 阶段注入带来源标签的 `<mounted_knowledge>`。
+- 下一阶段优先进入 Task 16（RAG Retrieval Quality Extensions）：补齐专门的 Context Inspector 检索可视化、更多文件类型、可配置 embedding provider、向量/混合检索、rerank 与评估钩子。
