@@ -34,6 +34,7 @@ test('createServerApp installs runtime middleware and core route groups', () => 
       'GET /api/harnesses/:harnessId/knowledge-bases',
       'GET /api/knowledge-bases',
       'GET /api/knowledge-bases/:knowledgeBaseId',
+      'GET /api/knowledge-bases/:knowledgeBaseId/files',
       'GET /api/knowledge-bases/:knowledgeBaseId/traces/:runId',
       'GET /api/memory/:harnessId',
       'GET /api/memory/:harnessId/candidates',

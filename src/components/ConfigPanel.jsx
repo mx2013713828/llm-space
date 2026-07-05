@@ -2,7 +2,7 @@
 
 import { DEFAULT_CONTEXT_WINDOW } from '../lib/modelContext.js';
 import { formatExtraBodyForEditor, updateExtraBodyDraft } from '../lib/modelConfigExtras.js';
-import { KnowledgeBasePanel } from './KnowledgeBasePanel.jsx';
+import { KnowledgeMountPanel } from './KnowledgeMountPanel.jsx';
 
 export function ConfigPanel({
   harness,
@@ -204,7 +204,7 @@ export function ConfigPanel({
         </div>
       </div>
 
-      {harness?.id && <KnowledgeBasePanel harnessId={harness.id} />}
+      {harness?.id && <KnowledgeMountPanel harnessId={harness.id} />}
 
       {/* Agent Guidance */}
       <div className="card prompt-card" style={{ flex: 1, minHeight: 220, display: 'flex', flexDirection: 'column' }}>

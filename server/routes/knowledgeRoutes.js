@@ -1,6 +1,7 @@
 import {
 	createKnowledgeBase,
 	deleteKnowledgeBase,
+	loadKnowledgeFiles,
 	listKnowledgeBases,
 	listMountedKnowledgeBases,
 	loadKnowledgeBase,
@@ -39,6 +40,17 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 	app.get('/api/knowledge-bases/:knowledgeBaseId', async (req, res) => {
 		try {
 			res.json(await loadKnowledgeBase({ knowledgeBaseId: req.params.knowledgeBaseId, knowledgeRoot }));
+		} catch (err) {
+			res.status(404).json({ error: err.message });
+		}
+	});
+
+	app.get('/api/knowledge-bases/:knowledgeBaseId/files', async (req, res) => {
+		try {
+			res.json(await loadKnowledgeFiles({
+				knowledgeBaseId: req.params.knowledgeBaseId,
+				knowledgeRoot,
+			}));
 		} catch (err) {
 			res.status(404).json({ error: err.message });
 		}

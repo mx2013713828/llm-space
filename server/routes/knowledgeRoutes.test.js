@@ -39,6 +39,10 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   assert.equal(ingestRes.body.knowledgeBase.fileCount, 1);
   assert.equal(ingestRes.body.knowledgeBase.chunkCount, 1);
 
+  const filesRes = await dispatchJson(app, 'GET', `/api/knowledge-bases/${createRes.body.id}/files`);
+  assert.equal(filesRes.status, 200);
+  assert.deepEqual(filesRes.body.map(file => file.filename), ['notes.md']);
+
   const retrieveRes = await dispatchJson(app, 'POST', '/api/knowledge-bases/retrieve', {
     body: { knowledgeBaseIds: [createRes.body.id], query: 'observable rag' },
   });
@@ -54,4 +58,7 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   const mountedRes = await dispatchJson(app, 'GET', '/api/harnesses/alpha/knowledge-bases');
   assert.equal(mountedRes.status, 200);
   assert.deepEqual(mountedRes.body.map(item => item.id), [createRes.body.id]);
+
+  const deleteRes = await dispatchJson(app, 'DELETE', `/api/knowledge-bases/${createRes.body.id}`);
+  assert.equal(deleteRes.status, 200);
 });
