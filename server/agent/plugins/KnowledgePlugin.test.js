@@ -5,6 +5,8 @@ import {
 	KnowledgePlugin,
 	buildMountedKnowledgeManifest,
 	buildRetrievedKnowledgeBlock,
+	formatKnowledgeToolResults,
+	formatMountedKnowledgeList,
 } from './KnowledgePlugin.js';
 
 test('buildMountedKnowledgeManifest wraps mounted bases as stable metadata', () => {
@@ -44,6 +46,41 @@ test('buildRetrievedKnowledgeBlock wraps retrieved chunks as data-only source-la
 test('buildRetrievedKnowledgeBlock returns empty string when retrieval has no chunks', () => {
 	assert.equal(buildRetrievedKnowledgeBlock({ query: 'empty', chunks: [] }), '');
 	assert.equal(buildRetrievedKnowledgeBlock({ query: 'empty' }), '');
+});
+
+test('formatMountedKnowledgeList gives a concise mounted KB inventory', () => {
+	const output = formatMountedKnowledgeList({
+		harnessId: 'alpha',
+		knowledgeBases: [{
+			id: 'kb_docs',
+			name: 'Docs',
+			description: 'Project docs',
+			fileCount: 1,
+			chunkCount: 2,
+		}],
+	});
+
+	assert.match(output, /Mounted knowledge bases for harness alpha/);
+	assert.match(output, /kb_docs: Docs \(1 file, 2 chunks\)/);
+	assert.match(output, /Project docs/);
+});
+
+test('formatKnowledgeToolResults emits source-labeled results', () => {
+	const output = formatKnowledgeToolResults({
+		query: 'rag',
+		chunks: [{
+			id: 'chk_1',
+			score: 1.5,
+			text: 'RAG retrieves external context.',
+			source: { filename: 'rag.md', chunkIndex: 2 },
+			knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+		}],
+	});
+
+	assert.match(output, /Retrieved 1 knowledge source/);
+	assert.match(output, /source #1/);
+	assert.match(output, /knowledge_base=Docs/);
+	assert.match(output, /RAG retrieves external context/);
 });
 
 test('KnowledgePlugin pins manifest to system prompt without adding it to user text', async () => {
@@ -127,6 +164,55 @@ test('KnowledgePlugin leaves payload unchanged in manual_lab strategy', async ()
 	assert.equal(context.promptAssemblySections.length, 0);
 });
 
+test('KnowledgePlugin lists mounted knowledge bases through tool interception', async () => {
+	const context = createToolContext({
+		toolName: 'list_mounted_knowledge_bases',
+	});
+
+	await KnowledgePlugin.preToolUse(context);
+
+	assert.equal(context.tool.handled, true);
+	assert.match(context.tool.toolOutput, /Mounted knowledge bases for harness alpha/);
+	assert.match(context.tool.toolOutput, /kb_docs: Docs/);
+});
+
+test('KnowledgePlugin queries mounted knowledge bases through tool interception', async () => {
+	const context = createToolContext({
+		toolName: 'query_knowledge_base',
+		toolInput: {
+			query: 'What is RAG?',
+			knowledgeBaseIds: ['kb_docs', 'kb_missing'],
+			topK: 2,
+		},
+	});
+
+	await KnowledgePlugin.preToolUse(context);
+
+	assert.equal(context.tool.handled, true);
+	assert.match(context.tool.toolOutput, /Retrieved 1 knowledge source/);
+	assert.match(context.tool.toolOutput, /source #1/);
+	assert.match(context.tool.toolOutput, /RAG retrieves external context/);
+});
+
+test('KnowledgePlugin rejects knowledge tools when current strategy disables them', async () => {
+	const context = createToolContext({
+		toolName: 'query_knowledge_base',
+		toolInput: { query: 'RAG' },
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
+		},
+	});
+
+	await KnowledgePlugin.preToolUse(context);
+
+	assert.equal(context.tool.handled, true);
+	assert.match(context.tool.toolOutput, /disabled/);
+});
+
 function createKnowledgeContext({
 	features = {},
 	retrievalChunks = [{
@@ -171,5 +257,63 @@ function createKnowledgeContext({
 			content: [{ type: 'text', text: 'What is RAG?' }],
 		}],
 		promptAssemblySections: [],
+	};
+}
+
+function createToolContext({
+	toolName,
+	toolInput = {},
+	features = {
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'agentic_rag',
+			auto_retrieve: false,
+			knowledge_tools: true,
+		},
+	},
+	retrievalChunks = [{
+		id: 'chk_1',
+		score: 3,
+		text: 'RAG retrieves external context.',
+		source: { filename: 'rag.md', chunkIndex: 0 },
+		knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+	}],
+} = {}) {
+	return {
+		executor: {
+			harnessId: 'alpha',
+			features,
+			knowledgeDependencies: {
+				async listMountedKnowledgeBases({ harnessId }) {
+					assert.equal(harnessId, 'alpha');
+					return ['kb_docs'];
+				},
+				async loadKnowledgeBase({ knowledgeBaseId }) {
+					assert.equal(knowledgeBaseId, 'kb_docs');
+					return {
+						id: 'kb_docs',
+						name: 'Docs',
+						description: 'Project docs',
+						fileCount: 1,
+						chunkCount: 1,
+					};
+				},
+				async retrieveKnowledge({ knowledgeBaseIds, query, topK }) {
+					assert.deepEqual(knowledgeBaseIds, ['kb_docs']);
+					assert.equal(query, 'What is RAG?');
+					assert.equal(topK, 2);
+					return {
+						query,
+						chunks: retrievalChunks,
+					};
+				},
+			},
+		},
+		tool: {
+			toolName,
+			toolInput,
+			handled: false,
+			toolOutput: '',
+		},
 	};
 }

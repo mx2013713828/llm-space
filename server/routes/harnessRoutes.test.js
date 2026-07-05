@@ -121,6 +121,8 @@ test('harness dry-run returns compact tool pool summary from runtime tools', asy
     'claim_task',
     'complete_task',
     'sub_agent',
+    'list_mounted_knowledge_bases',
+    'query_knowledge_base',
     'get_current_time',
   ]);
   assert.deepEqual(

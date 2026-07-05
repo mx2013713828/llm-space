@@ -57,6 +57,45 @@ export function buildRetrievedKnowledgeBlock({ query = '', chunks = [] } = {}) {
 	].join('\n');
 }
 
+export function formatMountedKnowledgeList({ harnessId = '', knowledgeBases = [] } = {}) {
+	const bases = Array.isArray(knowledgeBases) ? knowledgeBases : [];
+	if (bases.length === 0) {
+		return `No knowledge bases are mounted for harness ${harnessId || 'current'}.`;
+	}
+
+	const lines = [
+		`Mounted knowledge bases for harness ${harnessId || 'current'}:`,
+		...bases.map(base => {
+			const fileLabel = Number(base.fileCount || 0) === 1 ? 'file' : 'files';
+			const chunkLabel = Number(base.chunkCount || 0) === 1 ? 'chunk' : 'chunks';
+			const description = base.description ? ` - ${base.description}` : '';
+			return `- ${base.id}: ${base.name || base.id} (${Number(base.fileCount || 0)} ${fileLabel}, ${Number(base.chunkCount || 0)} ${chunkLabel})${description}`;
+		}),
+	];
+	return lines.join('\n');
+}
+
+export function formatKnowledgeToolResults({ query = '', chunks = [] } = {}) {
+	const safeChunks = Array.isArray(chunks) ? chunks : [];
+	if (safeChunks.length === 0) {
+		return `No matching knowledge chunks were found for query: ${query}`;
+	}
+
+	return [
+		`Retrieved ${safeChunks.length} knowledge source(s) for query: ${query}`,
+		...safeChunks.map((chunk, index) => {
+			const source = chunk.source || {};
+			const kbName = chunk.knowledgeBase?.name || chunk.knowledgeBase?.id || 'unknown';
+			const filename = source.filename || 'unknown';
+			const score = Number(chunk.score || 0).toFixed(4);
+			return [
+				`source #${index + 1} | knowledge_base=${kbName} | file=${filename} | chunk=${source.chunkIndex ?? chunk.chunkIndex ?? 0} | score=${score}`,
+				String(chunk.text || ''),
+			].join('\n');
+		}),
+	].join('\n\n');
+}
+
 export const KnowledgePlugin = {
 	name: 'KnowledgePlugin',
 
@@ -113,6 +152,64 @@ export const KnowledgePlugin = {
 			},
 		});
 	},
+
+	async preToolUse(context) {
+		const { executor, tool } = context;
+		if (!executor?.harnessId || !tool || tool.handled) return;
+
+		const toolName = tool.toolName;
+		if (!['list_mounted_knowledge_bases', 'query_knowledge_base'].includes(toolName)) return;
+
+		const runtime = resolveKnowledgeRuntime(executor.features || {});
+		if (!runtime.enabled || !runtime.knowledgeTools) {
+			tool.toolOutput = 'Knowledge tools are disabled by the current knowledge runtime strategy.';
+			tool.handled = true;
+			return;
+		}
+
+		const deps = getKnowledgeDependencies(executor);
+		const mountedIds = await deps.listMountedKnowledgeBases({ harnessId: executor.harnessId });
+		const knowledgeBases = await loadMountedKnowledgeBases({ mountedIds, loadBase: deps.loadKnowledgeBase });
+
+		if (toolName === 'list_mounted_knowledge_bases') {
+			tool.toolOutput = formatMountedKnowledgeList({
+				harnessId: executor.harnessId,
+				knowledgeBases,
+			});
+			tool.handled = true;
+			return;
+		}
+
+		const args = tool.toolInput || {};
+		const query = String(args.query || '').trim();
+		if (!query) {
+			tool.toolOutput = 'query_knowledge_base requires a non-empty query.';
+			tool.handled = true;
+			return;
+		}
+
+		const requestedIds = normalizeRequestedKnowledgeBaseIds(args.knowledgeBaseIds ?? args.knowledge_base_ids);
+		const mountedSet = new Set(mountedIds);
+		const targetIds = requestedIds.length > 0
+			? requestedIds.filter(id => mountedSet.has(id))
+			: mountedIds;
+
+		if (requestedIds.length > 0 && targetIds.length === 0) {
+			tool.toolOutput = `None of the requested knowledge bases are mounted. Mounted ids: ${mountedIds.join(', ') || '(none)'}`;
+			tool.handled = true;
+			return;
+		}
+
+		const retrieval = await deps.retrieveKnowledge({
+			knowledgeBaseIds: targetIds,
+			query,
+			topK: normalizeOptionalNumber(args.topK, runtime.topK),
+			maxChars: normalizeOptionalNumber(args.maxChars, runtime.maxChars),
+			scoreThreshold: normalizeOptionalNumber(args.scoreThreshold, runtime.scoreThreshold),
+		});
+		tool.toolOutput = formatKnowledgeToolResults(retrieval);
+		tool.handled = true;
+	},
 };
 
 function getKnowledgeDependencies(executor) {
@@ -168,6 +265,16 @@ function findLatestUserTextBlock(apiMessages = []) {
 		if (textBlock) return textBlock;
 	}
 	return null;
+}
+
+function normalizeRequestedKnowledgeBaseIds(value) {
+	if (!Array.isArray(value)) return [];
+	return [...new Set(value.map(id => String(id || '').trim()).filter(Boolean))];
+}
+
+function normalizeOptionalNumber(value, fallback) {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function escapeXmlText(value) {
