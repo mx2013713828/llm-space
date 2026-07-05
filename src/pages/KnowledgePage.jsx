@@ -328,14 +328,24 @@ export function KnowledgePage({ harness }) {
 											<input className="input" type="number" min="0" max="1000" value={settings.overlap} onChange={event => setSettings(prev => ({ ...prev, overlap: event.target.value }))} />
 										</label>
 									</div>
-									<input
-										className="input"
-										type="file"
-										accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json"
-										onChange={event => setSelectedFile(event.target.files?.[0] || null)}
-									/>
+									<div className="knowledge-file-picker">
+										<input
+											id={`knowledge-file-${selectedBase.id}`}
+											className="knowledge-file-input"
+											type="file"
+											accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json"
+											onChange={event => setSelectedFile(event.target.files?.[0] || null)}
+										/>
+										<label className="btn btn-ghost knowledge-file-select" htmlFor={`knowledge-file-${selectedBase.id}`}>
+											Choose File
+										</label>
+										<div className="knowledge-file-summary">
+											<strong>{selectedFile ? selectedFile.name : 'No file selected'}</strong>
+											<span>{selectedFile ? formatKnowledgeFileSize(selectedFile.size) : 'Markdown, text, or JSON'}</span>
+										</div>
+									</div>
 									<div className="knowledge-file-action">
-										<span>{selectedFile ? `${selectedFile.name} · ${formatKnowledgeFileSize(selectedFile.size)}` : 'Choose .md, .txt, or .json'}</span>
+										<span>Chunk settings are applied when this file is indexed.</span>
 										<button className="btn btn-primary" onClick={uploadFile} disabled={!selectedFile || isIndexing}>{isIndexing ? 'Indexing...' : 'Index'}</button>
 									</div>
 								</div>

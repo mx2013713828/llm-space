@@ -595,6 +595,52 @@
   color: var(--text-muted);
 }
 
+.knowledge-file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.knowledge-file-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(5, 12, 24, 0.42);
+}
+
+.knowledge-file-select {
+  min-width: 104px;
+  justify-content: center;
+}
+
+.knowledge-file-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.knowledge-file-summary strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-file-summary span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .knowledge-file-action {
   display: flex;
   justify-content: space-between;

@@ -11,7 +11,7 @@ import { registerSessionRoutes } from '../routes/sessionRoutes.js';
 
 export function createServerApp({
   app = express(),
-  corsMiddleware = cors({ origin: ['http://localhost:5174', 'http://127.0.0.1:5174'] }),
+  corsMiddleware = cors({ origin: allowLocalDevOrigins }),
   accessGuard = createAccessGuard(),
   rateLimiter = createRateLimiter(),
   jsonMiddleware = express.json({ limit: '4mb' }),
@@ -45,4 +45,12 @@ export function createServerApp({
   registerExtraRoutes?.(app);
 
   return app;
+}
+
+export function allowLocalDevOrigins(origin, callback) {
+  if (!origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(null, false);
 }

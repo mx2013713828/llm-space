@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createActiveJobRegistry } from '../agent/activeJobs.js';
-import { createServerApp } from './createServerApp.js';
+import { allowLocalDevOrigins, createServerApp } from './createServerApp.js';
 import { createRouteApp } from '../routes/routeTestUtils.js';
 
 test('createServerApp installs runtime middleware and core route groups', () => {
@@ -60,3 +60,22 @@ test('createServerApp installs runtime middleware and core route groups', () => 
     ].sort(),
   );
 });
+
+test('allowLocalDevOrigins accepts Vite fallback ports during local development', async () => {
+  const result = await evaluateCorsOrigin('http://localhost:5176');
+  assert.deepEqual(result, { error: null, allowed: true });
+
+  const loopbackResult = await evaluateCorsOrigin('http://127.0.0.1:5188');
+  assert.deepEqual(loopbackResult, { error: null, allowed: true });
+
+  const rejectedResult = await evaluateCorsOrigin('https://example.com');
+  assert.deepEqual(rejectedResult, { error: null, allowed: false });
+});
+
+function evaluateCorsOrigin(origin) {
+  return new Promise(resolve => {
+    allowLocalDevOrigins(origin, (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+}

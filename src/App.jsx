@@ -43,12 +43,15 @@ const TABS = [
   },
 ];
 
+const TOP_LEVEL_TAB_KEYS = new Set(TABS.map(tab => tab.key));
+
 function AppContent() {
   const { harnessId, tab } = useParams();
   const navigate = useNavigate();
 
-  const activeTab = tab || 'trajectory';
-  const activeHarnessId = harnessId || '';
+  const routeStartsWithTab = TOP_LEVEL_TAB_KEYS.has(harnessId || '');
+  const activeTab = routeStartsWithTab ? harnessId : (tab || 'trajectory');
+  const activeHarnessId = routeStartsWithTab ? '' : (harnessId || '');
 
   const [harnessFiles, setHarnessFiles] = useState([]);
   const [harness, setHarness] = useState(null);
@@ -153,10 +156,10 @@ function AppContent() {
 
   // 当列表加载完毕且 URL 中缺失 harnessId 时，自动重定向到第一个有效 Harness
   useEffect(() => {
-    if (harnessFiles.length > 0 && !harnessId) {
+    if (harnessFiles.length > 0 && !activeHarnessId && activeTab !== 'knowledge') {
       navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
     }
-  }, [harnessFiles, harnessId, activeTab, navigate]);
+  }, [harnessFiles, activeHarnessId, activeTab, navigate]);
 
   // 加载特定文件及常驻 Session
   useEffect(() => {
@@ -255,7 +258,7 @@ function AppContent() {
             <button
               key={tab.key}
               className={`topbar-tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => navigate(`/${activeHarnessId}/${tab.key}`)}
+              onClick={() => navigate(activeHarnessId ? `/${activeHarnessId}/${tab.key}` : `/${tab.key}`)}
               id={`tab-${tab.key}`}
             >
               {tab.icon}
@@ -424,7 +427,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'knowledge' && harness && (
+          {activeTab === 'knowledge' && (
             <KnowledgePage
               key={activeHarnessId}
               harness={harness}
