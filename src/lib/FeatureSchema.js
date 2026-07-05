@@ -285,6 +285,70 @@ When task-system tracking is warranted:
       },
     },
   },
+  knowledge_bases: {
+    type: 'group',
+    label: 'Knowledge Bases',
+    description: 'Mount local knowledge bases and choose how they enter the agent runtime.',
+    defaultValue: true,
+    failSafeValue: false,
+    preserveChildrenWhenDisabled: true,
+    children: {
+      strategy: {
+        type: 'select',
+        section: 'Runtime Strategy',
+        label: 'Knowledge Runtime Strategy',
+        description: 'Choose how mounted knowledge is exposed to the model.',
+        defaultValue: 'agentic_rag',
+        failSafeValue: 'manual_lab',
+        options: [
+          { value: 'agentic_rag', label: 'Agentic RAG' },
+          { value: 'auto_rag', label: 'Auto RAG' },
+          { value: 'manual_lab', label: 'Manual Lab' },
+          { value: 'custom', label: 'Custom' },
+        ],
+      },
+      auto_retrieve: {
+        type: 'boolean',
+        section: 'Runtime Primitives',
+        label: 'Auto Retrieve',
+        description: 'Automatically retrieve matching chunks from mounted knowledge bases before each model call.',
+        defaultValue: false,
+        failSafeValue: false,
+      },
+      knowledge_tools: {
+        type: 'boolean',
+        section: 'Runtime Primitives',
+        label: 'Knowledge Tools',
+        description: 'Expose list/query knowledge tools so the agent can decide when to inspect mounted bases.',
+        defaultValue: true,
+        failSafeValue: false,
+      },
+      topK: {
+        type: 'number',
+        section: 'Retrieval Bounds',
+        label: 'Top K',
+        description: 'Maximum number of chunks returned by runtime retrieval.',
+        defaultValue: 5,
+        failSafeValue: 5,
+      },
+      maxChars: {
+        type: 'number',
+        section: 'Retrieval Bounds',
+        label: 'Max Retrieved Chars',
+        description: 'Maximum total characters injected from retrieved knowledge chunks.',
+        defaultValue: 8000,
+        failSafeValue: 8000,
+      },
+      scoreThreshold: {
+        type: 'number',
+        section: 'Retrieval Bounds',
+        label: 'Score Threshold',
+        description: 'Minimum keyword retrieval score required before a chunk can be injected.',
+        defaultValue: 0,
+        failSafeValue: 0,
+      },
+    },
+  },
   error_recovery: {
     type: 'group',
     label: 'Self-Healing & Disaster Recovery',
@@ -397,6 +461,12 @@ export function parseFeatures(inputFeatures) {
             const rawValue = subVal !== undefined ? subVal : subMeta.defaultValue;
             parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
               ? rawValue
+              : subMeta.defaultValue;
+          } else if (subMeta.type === 'number') {
+            const rawValue = subVal !== undefined ? subVal : subMeta.defaultValue;
+            const numericValue = Number(rawValue);
+            parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
+              ? (Number.isFinite(numericValue) ? numericValue : subMeta.defaultValue)
               : subMeta.defaultValue;
           } else {
             parsed[key][subKey] = (isGroupEnabled || meta.preserveChildrenWhenDisabled)
