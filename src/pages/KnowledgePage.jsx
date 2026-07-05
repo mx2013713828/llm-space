@@ -62,13 +62,14 @@ export function KnowledgePage({ harness }) {
 	const [selectedFile, setSelectedFile] = useState(null);
 	const [query, setQuery] = useState('');
 	const [retrieval, setRetrieval] = useState(null);
+	const [showCreateForm, setShowCreateForm] = useState(false);
 	const [status, setStatus] = useState('');
 	const [error, setError] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
-	const selectedBase = bases.find(base => base.id === selectedId) || bases[0] || null;
+	const selectedBase = bases.find(base => base.id === selectedId) || null;
 	const selectedRawBase = knowledgeBases.find(base => base.id === selectedBase?.id) || null;
 
 	const loadBases = useCallback(async () => {
@@ -79,7 +80,7 @@ export function KnowledgePage({ harness }) {
 			if (!res.ok) throw new Error(`Failed to load knowledge bases (${res.status})`);
 			const data = await res.json();
 			setKnowledgeBases(Array.isArray(data) ? data : []);
-			setSelectedId(current => current || data?.[0]?.id || '');
+			setSelectedId(current => data?.some?.(base => base.id === current) ? current : '');
 		} catch (err) {
 			setError(err.message || 'Failed to load knowledge bases.');
 		} finally {
@@ -135,6 +136,7 @@ export function KnowledgePage({ harness }) {
 			setSelectedId(created.id);
 			setNewName('');
 			setNewDescription('');
+			setShowCreateForm(false);
 			setStatus(`Created ${created.name}.`);
 		} catch (err) {
 			setError(err.message || 'Failed to create knowledge base.');
@@ -223,53 +225,76 @@ export function KnowledgePage({ harness }) {
 				<div>
 					<div className="knowledge-eyebrow">Local RAG Workspace</div>
 					<h1>Knowledge Bases</h1>
-					<p>Create, index, inspect, and test local knowledge before mounting it into an agent run.</p>
+					<p>Keep local knowledge organized as mountable resources. Open a base to inspect files, settings, and retrieval behavior.</p>
 				</div>
 				<div className="knowledge-hero-stats">
 					<Metric label="bases" value={bases.length} />
-					<Metric label="mounted here" value={harness?.id ? 'select in run' : '-'} />
+					<Metric label="current harness" value={harness?.name || '-'} />
 					<Metric label="formats" value="MD TXT JSON" />
 				</div>
 			</section>
 
-			<div className="knowledge-workbench">
-				<aside className="knowledge-list-panel">
-					<div className="knowledge-panel-title">Library</div>
-					<div className="knowledge-create-box">
-						<input className="input" placeholder="Knowledge base name" value={newName} onChange={event => setNewName(event.target.value)} />
-						<textarea className="textarea" placeholder="Short description" value={newDescription} onChange={event => setNewDescription(event.target.value)} />
-						<button className="btn btn-primary" onClick={createKnowledgeBase} disabled={isLoading}>Create Knowledge Base</button>
+			<div className="knowledge-library-shell">
+				<div className="knowledge-library-toolbar">
+					<div>
+						<div className="knowledge-panel-title">Library</div>
+						<p>{selectedBase ? 'Inspecting one knowledge base.' : 'Select an existing base or create a new one.'}</p>
 					</div>
+					<div style={{ display: 'flex', gap: 8 }}>
+						{selectedBase && (
+							<button className="btn btn-ghost" onClick={() => setSelectedId('')}>Back to Library</button>
+						)}
+						<button className="btn btn-primary" onClick={() => setShowCreateForm(value => !value)}>
+							{showCreateForm ? 'Close' : 'Create'}
+						</button>
+					</div>
+				</div>
 
-					<div className="knowledge-list">
-						{bases.map(base => {
-							const selected = selectedBase?.id === base.id;
-							return (
-								<button
-									key={base.id}
-									type="button"
-									className={`knowledge-list-item ${selected ? 'active' : ''}`}
-									onClick={() => setSelectedId(base.id)}
-								>
-									<div className="knowledge-list-item-main">
-										<span>{base.name}</span>
-										<small>{base.fileCount} files · {base.chunkCount} chunks</small>
-									</div>
+				{showCreateForm && (
+					<div className="knowledge-create-box knowledge-create-inline">
+						<div>
+							<div className="knowledge-section-title"><span>Create Knowledge Base</span></div>
+							<p>Start with a name and description. Files can be added after creation.</p>
+						</div>
+						<div className="knowledge-create-fields">
+							<input className="input" placeholder="Knowledge base name" value={newName} onChange={event => setNewName(event.target.value)} />
+							<input className="input" placeholder="Short description" value={newDescription} onChange={event => setNewDescription(event.target.value)} />
+							<button className="btn btn-primary" onClick={createKnowledgeBase} disabled={isLoading}>Create Base</button>
+						</div>
+					</div>
+				)}
+
+				{!selectedBase ? (
+					<div className="knowledge-card-grid">
+						{bases.map(base => (
+							<button
+								key={base.id}
+								type="button"
+								className="knowledge-base-card"
+								onClick={() => setSelectedId(base.id)}
+							>
+								<div className="knowledge-base-card-top">
+									<span className="knowledge-base-monogram">KB</span>
 									<span className="knowledge-list-status">{getKnowledgeBaseStatusSummary(base, false)}</span>
-								</button>
-							);
-						})}
+								</div>
+								<div>
+									<h2>{base.name}</h2>
+									<p>{base.description || 'No description provided.'}</p>
+								</div>
+								<div className="knowledge-base-card-meta">
+									<span>{base.fileCount} files</span>
+									<span>{base.chunkCount} chunks</span>
+									<span>{formatDate(base.updatedAt)}</span>
+								</div>
+							</button>
+						))}
 						{bases.length === 0 && (
-							<EmptyPanel title="No knowledge yet" body="Create a base, then index Markdown, text, or JSON files." />
+							<EmptyPanel title="No knowledge bases yet" body="Create a base first. Then open it to add files and test retrieval." />
 						)}
 					</div>
-				</aside>
-
-				<section className="knowledge-detail-panel">
-					{!selectedBase ? (
-						<EmptyPanel title="Select or create a Knowledge Base" body="The detail workspace will show files, indexing settings, and retrieval experiments." />
-					) : (
-						<>
+				) : (
+					<div className="knowledge-detail-panel">
+						<div className="knowledge-detail-layout">
 							<div className="knowledge-detail-header">
 								<div>
 									<div className="knowledge-eyebrow">Selected Base</div>
@@ -283,6 +308,8 @@ export function KnowledgePage({ harness }) {
 								<Metric label="files" value={selectedBase.fileCount} />
 								<Metric label="chunks" value={selectedBase.chunkCount} />
 								<Metric label="updated" value={formatDate(selectedBase.updatedAt)} />
+								<Metric label="chunk size" value={selectedRawBase?.settings?.chunkSize || settings.chunkSize} />
+								<Metric label="overlap" value={selectedRawBase?.settings?.overlap || settings.overlap} />
 							</div>
 
 							<div className="knowledge-section-grid">
@@ -359,9 +386,9 @@ export function KnowledgePage({ harness }) {
 									)}
 								</div>
 							</div>
-						</>
-					)}
-				</section>
+						</div>
+					</div>
+				)}
 			</div>
 
 			{status && <div className="knowledge-toast success">{status}</div>}
