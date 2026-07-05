@@ -11,6 +11,19 @@ function copyToClipboard(text) {
   navigator.clipboard.writeText(text);
 }
 
+function getRoleTone(role) {
+  if (role === 'user') {
+    return { color: '#2563eb', background: 'rgba(37, 99, 235, 0.10)', border: 'rgba(37, 99, 235, 0.22)' };
+  }
+  if (role === 'assistant') {
+    return { color: '#059669', background: 'rgba(5, 150, 105, 0.10)', border: 'rgba(5, 150, 105, 0.22)' };
+  }
+  if (role === 'tool') {
+    return { color: '#d97706', background: 'rgba(217, 119, 6, 0.10)', border: 'rgba(217, 119, 6, 0.22)' };
+  }
+  return { color: 'var(--text-secondary)', background: 'var(--bg-surface)', border: 'var(--border)' };
+}
+
 export function ContextInspector({
   harness,
   messages,
@@ -125,6 +138,8 @@ export function ContextInspector({
   const inspectorModel = useMemo(() => buildContextInspectorModel(alignedData), [alignedData]);
   const rows = inspectorModel.groups.flatMap(group => group.rows);
   const selectedRow = rows.find(row => row.id === selectedSectionId) || rows[0] || null;
+  const selectedIsMessages = selectedSectionId === 'messages_transcript' || selectedRow?.kind === 'message';
+  const selectedMessageId = selectedRow?.kind === 'message' ? selectedRow.id : '';
   const fullContext = {
     system: alignedData.system || '(None)',
     tools: alignedData.tools || [],
@@ -197,11 +212,33 @@ export function ContextInspector({
             <aside style={{ borderRight: '1px solid var(--border)', overflow: 'auto', padding: 12, background: 'var(--bg-surface)' }}>
               {inspectorModel.groups.map(group => (
                 <div key={group.id} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 0, marginBottom: 7 }}>
-                    {group.label} · {group.rows.length}
-                  </div>
+                  {group.id === 'messages' ? (
+                    <button
+                      onClick={() => setSelectedSectionId('messages_transcript')}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        color: selectedIsMessages ? 'var(--blue)' : 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: 0,
+                        marginBottom: 7,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {group.label} · {group.rows.length}
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 0, marginBottom: 7 }}>
+                      {group.label} · {group.rows.length}
+                    </div>
+                  )}
                   {group.rows.map(row => {
-                    const active = selectedRow?.id === row.id;
+                    const active = selectedRow?.id === row.id && selectedSectionId !== 'messages_transcript';
                     return (
                       <button
                         key={row.id}
@@ -229,7 +266,88 @@ export function ContextInspector({
             </aside>
 
             <section style={{ minWidth: 0, overflow: 'auto', padding: 16 }}>
-              {selectedRow ? (
+              {selectedIsMessages ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 850, color: 'var(--text-primary)', marginBottom: 4 }}>Messages Payload</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
+                        messages · payload · {inspectorModel.messageTranscript.items.length} message(s) · {inspectorModel.messageTranscript.items.reduce((total, item) => total + item.blocks.length, 0)} block(s)
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => copyToClipboard(inspectorModel.messageTranscript.content || '')}
+                      style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}
+                    >
+                      Copy Transcript
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 8 }}>
+                    {inspectorModel.messageTranscript.items.length > 0 ? inspectorModel.messageTranscript.items.map(item => {
+                      const tone = getRoleTone(item.role);
+                      const selected = item.id === selectedMessageId;
+                      return (
+                        <article
+                          key={item.id}
+                          style={{
+                            border: selected ? '1px solid var(--blue)' : '1px solid var(--border)',
+                            background: selected ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-primary)',
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                              <span
+                                style={{
+                                  padding: '2px 7px',
+                                  borderRadius: 999,
+                                  border: `1px solid ${tone.border}`,
+                                  background: tone.background,
+                                  color: tone.color,
+                                  fontSize: 10,
+                                  fontWeight: 850,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: 0,
+                                }}
+                              >
+                                {item.role}
+                              </span>
+                              <span style={{ fontSize: 12, fontWeight: 750, color: 'var(--text-primary)' }}>#{item.index + 1}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.blocks.length} block(s) · {item.chars.toLocaleString()} chars
+                              </span>
+                            </div>
+                            <button
+                              className="btn btn-ghost"
+                              onClick={() => copyToClipboard(item.content || '')}
+                              style={{ padding: '3px 8px', fontSize: 10, flexShrink: 0 }}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {item.blocks.map(block => (
+                              <div key={block.id} style={{ border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-base)', overflow: 'hidden' }}>
+                                <div style={{ padding: '5px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 10, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                                  {block.type} · {block.chars.toLocaleString()} chars
+                                </div>
+                                <pre style={{ margin: 0, padding: 10, color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)' }}>
+                                  {block.text || '(empty)'}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
+                        </article>
+                      );
+                    }) : (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No messages are currently sent to the model.</div>
+                    )}
+                  </div>
+                </>
+              ) : selectedRow ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
                     <div style={{ minWidth: 0 }}>

@@ -11,24 +11,54 @@ function getBlockText(block) {
   return JSON.stringify(block ?? {}, null, 2);
 }
 
-function createMessageRow(message, index) {
-  const blocks = Array.isArray(message.content)
+function normalizeMessageBlocks(message) {
+  return Array.isArray(message.content)
     ? message.content
     : [{ type: 'text', text: String(message.content || '') }];
+}
+
+function createTranscriptBlock(block, index) {
+  const type = block?.type || 'unknown';
+  const text = getBlockText(block);
+  return {
+    id: `block_${index}`,
+    type,
+    text,
+    chars: text.length,
+  };
+}
+
+function createMessageTranscriptItem(message, index) {
+  const blocks = normalizeMessageBlocks(message).map(createTranscriptBlock);
   const content = blocks.map((block, blockIndex) => {
-    const type = block?.type || 'unknown';
-    return `#${blockIndex + 1} ${type}\n${getBlockText(block)}`;
+    return `#${blockIndex + 1} ${block.type}\n${block.text}`;
   }).join('\n\n');
 
   return {
     id: `message_${index}`,
     label: `${message.role || 'message'} #${index + 1}`,
+    role: message.role || 'message',
+    index,
     subtitle: `${blocks.length} block(s) · ${formatContextSize(content.length)}`,
-    target: 'messages',
-    lifecycle: 'payload',
+    blocks,
     chars: content.length,
     content,
+  };
+}
+
+function createMessageRow(message, index) {
+  const item = createMessageTranscriptItem(message, index);
+
+  return {
+    id: item.id,
+    label: item.label,
+    subtitle: item.subtitle,
+    target: 'messages',
+    lifecycle: 'payload',
+    chars: item.chars,
+    content: item.content,
     kind: 'message',
+    messageIndex: index,
   };
 }
 
@@ -66,7 +96,18 @@ export function buildContextInspectorModel({
       cacheImpact: section.cacheImpact || '',
     }));
 
-  const messageRows = (messages || []).map(createMessageRow);
+  const messageTranscriptItems = (messages || []).map(createMessageTranscriptItem);
+  const messageRows = messageTranscriptItems.map(item => ({
+    id: item.id,
+    label: item.label,
+    subtitle: item.subtitle,
+    target: 'messages',
+    lifecycle: 'payload',
+    chars: item.chars,
+    content: item.content,
+    kind: 'message',
+    messageIndex: item.index,
+  }));
   const toolRows = (tools || []).map(createToolRow);
 
   const groups = [
@@ -79,5 +120,12 @@ export function buildContextInspectorModel({
   return {
     groups,
     defaultSelectionId: firstRow?.id || '',
+    messageTranscript: {
+      items: messageTranscriptItems,
+      content: messageTranscriptItems.map(item => {
+        return `#${item.index + 1} ${item.role}\n${item.content}`;
+      }).join('\n\n---\n\n'),
+      chars: messageTranscriptItems.reduce((total, item) => total + item.chars, 0),
+    },
   };
 }
