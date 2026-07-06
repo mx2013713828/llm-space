@@ -4,6 +4,8 @@ import { promises as fs } from 'fs';
 const DEFAULT_KNOWLEDGE_ROOT = path.join(process.cwd(), '.knowledge');
 const KB_ID_PATTERN = /^kb_[a-z0-9][a-z0-9_-]*$/;
 const HARNESS_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const SUPPORTED_INDEX_METHODS = new Set(['keyword']);
+const SUPPORTED_RETRIEVAL_STRATEGIES = new Set(['keyword']);
 
 export function getKnowledgeRoot({ knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	return path.resolve(knowledgeRoot);
@@ -194,18 +196,24 @@ export function normalizeKnowledgeSettings(settings = {}) {
 	return {
 		chunkSize: normalizeInteger(input.chunkSize, 1000),
 		overlap: normalizeInteger(input.overlap, 150),
-		topK: normalizeInteger(input.topK, 5),
-		maxChars: normalizeInteger(input.maxChars, 8000),
+		topK: normalizeInteger(input.topK, 5, { min: 1, max: 50 }),
+		maxChars: normalizeInteger(input.maxChars, 8000, { min: 500, max: 100000 }),
 		scoreThreshold: Number.isFinite(Number(input.scoreThreshold)) ? Number(input.scoreThreshold) : 0,
 		parser: String(input.parser || 'auto'),
-		indexMethod: String(input.indexMethod || 'keyword'),
+		indexMethod: normalizeEnum(input.indexMethod, 'keyword', SUPPORTED_INDEX_METHODS),
+		retrievalStrategy: normalizeEnum(input.retrievalStrategy, 'keyword', SUPPORTED_RETRIEVAL_STRATEGIES),
 	};
 }
 
-function normalizeInteger(value, fallback) {
+function normalizeInteger(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
 	const parsed = Number(value);
 	if (!Number.isFinite(parsed)) return fallback;
-	return Math.floor(parsed);
+	return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function normalizeEnum(value, fallback, allowedValues) {
+	const normalized = String(value || fallback).trim();
+	return allowedValues.has(normalized) ? normalized : fallback;
 }
 
 async function exists(filePath) {

@@ -26,6 +26,23 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   assert.equal(createRes.status, 200);
   assert.equal(createRes.body.name, 'Docs');
 
+  const updateRes = await dispatchJson(app, 'PATCH', `/api/knowledge-bases/${createRes.body.id}`, {
+    body: {
+      settings: {
+        topK: 3,
+        maxChars: 1600,
+        scoreThreshold: 0.5,
+        retrievalStrategy: 'keyword',
+      },
+    },
+  });
+  assert.equal(updateRes.status, 200);
+  assert.equal(updateRes.body.id, createRes.body.id);
+  assert.equal(updateRes.body.settings.topK, 3);
+  assert.equal(updateRes.body.settings.maxChars, 1600);
+  assert.equal(updateRes.body.settings.scoreThreshold, 0.5);
+  assert.equal(updateRes.body.settings.retrievalStrategy, 'keyword');
+
   const ingestRes = await dispatchJson(app, 'POST', `/api/knowledge-bases/${createRes.body.id}/files`, {
     body: {
       filename: 'notes.md',

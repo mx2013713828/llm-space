@@ -37,6 +37,9 @@ test('createKnowledgeBase persists path-safe metadata and lists summaries', asyn
   assert.equal(kb.name, 'Project Docs');
   assert.equal(kb.description, 'Internal project documents');
   assert.equal(kb.settings.chunkSize, 800);
+  assert.equal(kb.settings.indexMethod, 'keyword');
+  assert.equal(kb.settings.retrievalStrategy, 'keyword');
+  assert.equal(kb.settings.topK, 5);
   assert.equal(kb.fileCount, 0);
   assert.equal(kb.chunkCount, 0);
 
@@ -45,6 +48,28 @@ test('createKnowledgeBase persists path-safe metadata and lists summaries', asyn
 
   const list = await listKnowledgeBases({ knowledgeRoot: rootDir });
   assert.deepEqual(list.map(item => item.id), ['kb_project-docs']);
+});
+
+test('normalize settings clamps retrieval quality options to supported MVP values', async (t) => {
+  const { rootDir } = await createFixture(t);
+
+  const kb = await createKnowledgeBase({
+    name: 'Quality',
+    settings: {
+      indexMethod: 'vector',
+      retrievalStrategy: 'hybrid',
+      topK: 0,
+      maxChars: -20,
+      scoreThreshold: '0.75',
+    },
+    knowledgeRoot: rootDir,
+  });
+
+  assert.equal(kb.settings.indexMethod, 'keyword');
+  assert.equal(kb.settings.retrievalStrategy, 'keyword');
+  assert.equal(kb.settings.topK, 1);
+  assert.equal(kb.settings.maxChars, 500);
+  assert.equal(kb.settings.scoreThreshold, 0.75);
 });
 
 test('createKnowledgeBase avoids id collisions and rejects unsafe ids on load/delete', async (t) => {

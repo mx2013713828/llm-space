@@ -6,6 +6,7 @@ import {
 	listMountedKnowledgeBases,
 	loadKnowledgeBase,
 	mountKnowledgeBases,
+	updateKnowledgeBaseMetadata,
 } from '../knowledge/knowledgeStore.js';
 import {
 	ingestKnowledgeFile,
@@ -42,6 +43,22 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 			res.json(await loadKnowledgeBase({ knowledgeBaseId: req.params.knowledgeBaseId, knowledgeRoot }));
 		} catch (err) {
 			res.status(404).json({ error: err.message });
+		}
+	});
+
+	app.patch('/api/knowledge-bases/:knowledgeBaseId', async (req, res) => {
+		try {
+			const patch = {};
+			if (Object.hasOwn(req.body || {}, 'name')) patch.name = req.body.name;
+			if (Object.hasOwn(req.body || {}, 'description')) patch.description = req.body.description || '';
+			if (Object.hasOwn(req.body || {}, 'settings')) patch.settings = req.body.settings || {};
+			res.json(await updateKnowledgeBaseMetadata({
+				knowledgeBaseId: req.params.knowledgeBaseId,
+				patch,
+				knowledgeRoot,
+			}));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
 		}
 	});
 

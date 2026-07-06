@@ -12,6 +12,7 @@ export async function retrieveKnowledge({
 	topK,
 	maxChars,
 	scoreThreshold,
+	strategy,
 	knowledgeRoot,
 	runId = `run_${Date.now().toString(36)}`,
 	now = () => new Date(),
@@ -19,6 +20,12 @@ export async function retrieveKnowledge({
 	const ids = [...new Set(Array.isArray(knowledgeBaseIds) ? knowledgeBaseIds : [])];
 	const chunks = [];
 	const sources = [];
+	const effectiveSettings = {
+		strategy: strategy || 'keyword',
+		topK: topK ?? 5,
+		maxChars: maxChars ?? 8000,
+		scoreThreshold: scoreThreshold ?? 0,
+	};
 
 	for (const knowledgeBaseId of ids) {
 		let kb;
@@ -30,12 +37,17 @@ export async function retrieveKnowledge({
 		const effectiveTopK = topK ?? kb.settings?.topK ?? 5;
 		const effectiveMaxChars = maxChars ?? kb.settings?.maxChars ?? 8000;
 		const effectiveScoreThreshold = scoreThreshold ?? kb.settings?.scoreThreshold ?? 0;
+		const effectiveStrategy = strategy || kb.settings?.retrievalStrategy || 'keyword';
+		effectiveSettings.strategy = effectiveStrategy;
+		effectiveSettings.topK = effectiveTopK;
+		effectiveSettings.maxChars = effectiveMaxChars;
+		effectiveSettings.scoreThreshold = effectiveScoreThreshold;
 		await recordKnowledgePipelineEvent({
 			knowledgeBaseId,
 			runId,
 			stage: 'retrieve',
 			status: 'running',
-			summary: `Retrieving for query: ${query}`,
+			summary: `Retrieving for query: ${query} (${effectiveStrategy})`,
 			knowledgeRoot,
 			now,
 		});
@@ -57,7 +69,7 @@ export async function retrieveKnowledge({
 			},
 		}));
 		chunks.push(...results);
-		sources.push({ id: kb.id, name: kb.name, resultCount: results.length });
+		sources.push({ id: kb.id, name: kb.name, strategy: effectiveStrategy, resultCount: results.length });
 
 		await recordKnowledgePipelineEvent({
 			knowledgeBaseId,
@@ -79,6 +91,7 @@ export async function retrieveKnowledge({
 	return {
 		query: String(query || ''),
 		knowledgeBaseIds: ids,
+		effectiveSettings,
 		sources,
 		chunks: bounded,
 	};
