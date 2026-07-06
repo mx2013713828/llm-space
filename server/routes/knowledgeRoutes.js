@@ -89,6 +89,7 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				filename: req.body?.filename,
 				mimeType: req.body?.mimeType,
 				content: req.body?.content,
+				contentBase64: req.body?.contentBase64,
 				settings: req.body?.settings || {},
 			}));
 		} catch (err) {
@@ -103,6 +104,7 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				filename: req.body?.filename,
 				mimeType: req.body?.mimeType,
 				content: req.body?.content,
+				contentBase64: req.body?.contentBase64,
 				settings: req.body?.settings || {},
 				knowledgeRoot,
 			});

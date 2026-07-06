@@ -18,9 +18,10 @@ export async function previewKnowledgeChunks({
 	filename,
 	mimeType,
 	content,
+	contentBase64,
 	settings = {},
 } = {}) {
-	const parsed = loadKnowledgeDocument({ filename, mimeType, content, loaderConfig: settings });
+	const parsed = await loadKnowledgeDocument({ filename, mimeType, content, contentBase64, loaderConfig: settings });
 	return createKnowledgeChunks({
 		knowledgeBaseId: 'kb_preview',
 		fileId: 'preview',
@@ -37,6 +38,7 @@ export async function ingestKnowledgeFile({
 	filename,
 	mimeType,
 	content,
+	contentBase64,
 	settings = {},
 	knowledgeRoot,
 	now = () => new Date(),
@@ -54,7 +56,7 @@ export async function ingestKnowledgeFile({
 		knowledgeRoot,
 		now,
 	});
-	const parsed = loadKnowledgeDocument({ filename, mimeType, content, loaderConfig: effectiveSettings });
+	const parsed = await loadKnowledgeDocument({ filename, mimeType, content, contentBase64, loaderConfig: effectiveSettings });
 	await recordKnowledgePipelineEvent({
 		knowledgeBaseId,
 		runId,
@@ -66,12 +68,12 @@ export async function ingestKnowledgeFile({
 	});
 
 	const file = {
-		id: createFileId({ filename: parsed.metadata.filename, content }),
+		id: createFileId({ filename: parsed.metadata.filename, content, contentBase64 }),
 		filename: parsed.metadata.filename,
 		mimeType: parsed.metadata.mimeType || String(mimeType || ''),
 		parser: parsed.metadata.parser,
 		loader: parsed.metadata.loader || parsed.metadata.parser,
-		size: String(content ?? '').length,
+		size: parsed.metadata.byteLength || Buffer.byteLength(String(content ?? ''), 'utf-8'),
 		importedAt: toIsoString(now()),
 		settings: effectiveSettings,
 	};
@@ -149,10 +151,11 @@ export async function ingestKnowledgeFile({
 	};
 }
 
-function createFileId({ filename, content }) {
+function createFileId({ filename, content, contentBase64 }) {
 	const hash = crypto
 		.createHash('sha1')
 		.update(`${filename}\n${String(content ?? '')}`)
+		.update(String(contentBase64 || ''))
 		.digest('hex')
 		.slice(0, 12);
 	return `file_${hash}`;

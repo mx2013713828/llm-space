@@ -28,10 +28,14 @@ const ACCEPTED_KNOWLEDGE_FILE_TYPES = [
 	'.txt',
 	'.json',
 	'.csv',
+	'.pdf',
+	'.docx',
 	'text/markdown',
 	'text/plain',
 	'text/csv',
 	'application/json',
+	'application/pdf',
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ].join(',');
 
 function compactSnippet(text = '', maxLength = 320) {
@@ -51,6 +55,17 @@ function formatDate(value) {
 	} catch {
 		return String(value);
 	}
+}
+
+async function readFileAsBase64(file) {
+	const buffer = await file.arrayBuffer();
+	let binary = '';
+	const bytes = new Uint8Array(buffer);
+	const batchSize = 0x8000;
+	for (let index = 0; index < bytes.length; index += batchSize) {
+		binary += String.fromCharCode(...bytes.subarray(index, index + batchSize));
+	}
+	return btoa(binary);
 }
 
 function Metric({ label, value }) {
@@ -301,14 +316,14 @@ export function KnowledgePage({ harness, onSave }) {
 	async function uploadFile() {
 		if (!selectedBase || !selectedFile) return;
 		if (!isSupportedKnowledgeFile(selectedFile.name)) {
-			setError('Only .md, .markdown, .txt, and .json files are supported in this MVP.');
+			setError('Only .md, .markdown, .txt, .json, .csv, .pdf, and .docx files are supported.');
 			return;
 		}
 		setIsIndexing(true);
 		setError('');
 		try {
-			const content = await selectedFile.text();
-			const payload = buildKnowledgeFilePayload({ file: selectedFile, content, settings });
+			const contentBase64 = await readFileAsBase64(selectedFile);
+			const payload = buildKnowledgeFilePayload({ file: selectedFile, contentBase64, settings });
 			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(selectedBase.id)}/files`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -557,7 +572,7 @@ export function KnowledgePage({ harness, onSave }) {
 										</label>
 										<div className="knowledge-file-summary">
 											<strong>{selectedFile ? selectedFile.name : 'No file selected'}</strong>
-											<span>{selectedFile ? formatKnowledgeFileSize(selectedFile.size) : 'Markdown, text, JSON, or CSV'}</span>
+											<span>{selectedFile ? formatKnowledgeFileSize(selectedFile.size) : 'Markdown, text, JSON, CSV, PDF, or DOCX'}</span>
 										</div>
 									</div>
 									<div className="knowledge-file-action">

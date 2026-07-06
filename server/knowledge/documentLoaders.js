@@ -1,25 +1,38 @@
 import path from 'path';
 
-const SUPPORTED_LOADERS = new Set(['markdown', 'text', 'json', 'csv']);
-const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json', '.csv']);
+import mammoth from 'mammoth';
+import { PDFParse } from 'pdf-parse';
 
-export function loadKnowledgeDocument({
+const SUPPORTED_LOADERS = new Set(['markdown', 'text', 'json', 'csv', 'pdf', 'docx']);
+const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json', '.csv', '.pdf', '.docx']);
+
+export async function loadKnowledgeDocument({
 	filename,
 	mimeType = '',
 	content = '',
+	contentBase64 = '',
 	loaderConfig = {},
 } = {}) {
 	const safeFilename = sanitizeFilename(filename);
 	const extension = path.extname(safeFilename).toLowerCase();
 	const loader = resolveDocumentLoader({ extension, mimeType, loaderConfig });
-	const raw = String(content ?? '');
+	const buffer = normalizeContentBuffer({ content, contentBase64 });
+	const raw = buffer.toString('utf-8');
 
 	if (loader === 'json') {
-		return loadJsonDocument({ raw, filename: safeFilename, mimeType, loader });
+		return loadJsonDocument({ raw, filename: safeFilename, mimeType, loader, byteLength: buffer.length });
 	}
 
 	if (loader === 'csv') {
-		return loadCsvDocument({ raw, filename: safeFilename, mimeType, loader });
+		return loadCsvDocument({ raw, filename: safeFilename, mimeType, loader, byteLength: buffer.length });
+	}
+
+	if (loader === 'pdf') {
+		return loadPdfDocument({ buffer, filename: safeFilename, mimeType, loader });
+	}
+
+	if (loader === 'docx') {
+		return loadDocxDocument({ buffer, filename: safeFilename, mimeType, loader });
 	}
 
 	if (loader === 'markdown' || loader === 'text') {
@@ -28,6 +41,7 @@ export function loadKnowledgeDocument({
 			filename: safeFilename,
 			mimeType,
 			loader,
+			extraMetadata: { byteLength: buffer.length },
 		});
 	}
 
@@ -49,6 +63,8 @@ export function resolveDocumentLoader({ extension = '', mimeType = '', loaderCon
 
 	if (extension === '.json' || /json/i.test(mimeType)) return 'json';
 	if (extension === '.csv' || /csv/i.test(mimeType)) return 'csv';
+	if (extension === '.pdf' || /pdf/i.test(mimeType)) return 'pdf';
+	if (extension === '.docx' || /wordprocessingml\.document/i.test(mimeType)) return 'docx';
 	if (extension === '.md' || extension === '.markdown' || /markdown/i.test(mimeType)) return 'markdown';
 	if (extension === '.txt' || /^text\//i.test(mimeType)) return 'text';
 	if (!SUPPORTED_EXTENSIONS.has(extension)) {
@@ -57,20 +73,28 @@ export function resolveDocumentLoader({ extension = '', mimeType = '', loaderCon
 	return 'text';
 }
 
-function loadJsonDocument({ raw, filename, mimeType, loader }) {
+export function normalizeContentBuffer({ content = '', contentBase64 = '' } = {}) {
+	if (contentBase64) return Buffer.from(String(contentBase64), 'base64');
+	if (Buffer.isBuffer(content)) return content;
+	if (content instanceof Uint8Array) return Buffer.from(content);
+	return Buffer.from(String(content ?? ''), 'utf-8');
+}
+
+function loadJsonDocument({ raw, filename, mimeType, loader, byteLength }) {
 	try {
 		return buildLoadedDocument({
 			text: JSON.stringify(JSON.parse(raw), null, 2),
 			filename,
 			mimeType,
 			loader,
+			extraMetadata: { byteLength },
 		});
 	} catch (err) {
 		throw new Error(`Invalid JSON knowledge file: ${err.message}`, { cause: err });
 	}
 }
 
-function loadCsvDocument({ raw, filename, mimeType, loader }) {
+function loadCsvDocument({ raw, filename, mimeType, loader, byteLength }) {
 	const rows = parseCsvRows(raw);
 	const text = rows.map((row, index) => {
 		if (index === 0) return `Columns: ${row.join(', ')}`;
@@ -82,10 +106,51 @@ function loadCsvDocument({ raw, filename, mimeType, loader }) {
 		mimeType,
 		loader,
 		extraMetadata: {
+			byteLength,
 			rowCount: Math.max(0, rows.length - 1),
 			columnCount: rows[0]?.length || 0,
 		},
 	});
+}
+
+async function loadPdfDocument({ buffer, filename, mimeType, loader }) {
+	let parser;
+	try {
+		parser = new PDFParse({ data: buffer });
+		const result = await parser.getText();
+		return buildLoadedDocument({
+			text: result.text,
+			filename,
+			mimeType,
+			loader,
+			extraMetadata: {
+				byteLength: buffer.length,
+				pageCount: result.total || result.pages?.length || 0,
+			},
+		});
+	} catch (err) {
+		throw new Error(`Failed to extract PDF text: ${err.message}`, { cause: err });
+	} finally {
+		if (parser) await parser.destroy();
+	}
+}
+
+async function loadDocxDocument({ buffer, filename, mimeType, loader }) {
+	try {
+		const result = await mammoth.extractRawText({ buffer });
+		return buildLoadedDocument({
+			text: result.value,
+			filename,
+			mimeType,
+			loader,
+			extraMetadata: {
+				byteLength: buffer.length,
+				warningCount: result.messages?.length || 0,
+			},
+		});
+	} catch (err) {
+		throw new Error(`Failed to extract DOCX text: ${err.message}`, { cause: err });
+	}
 }
 
 function parseCsvRows(raw) {

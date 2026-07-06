@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import { parseKnowledgeFile } from './knowledgeParsers.js';
 
-test('parseKnowledgeFile extracts markdown and text content with safe metadata', () => {
-  const parsed = parseKnowledgeFile({
+test('parseKnowledgeFile extracts markdown and text content with safe metadata', async () => {
+  const parsed = await parseKnowledgeFile({
     filename: '../Design Notes.md',
     mimeType: 'text/markdown',
     content: '# Title\n\nBody text',
@@ -16,8 +16,8 @@ test('parseKnowledgeFile extracts markdown and text content with safe metadata',
   assert.equal(parsed.metadata.parser, 'markdown');
 });
 
-test('parseKnowledgeFile turns JSON into searchable pretty text', () => {
-  const parsed = parseKnowledgeFile({
+test('parseKnowledgeFile turns JSON into searchable pretty text', async () => {
+  const parsed = await parseKnowledgeFile({
     filename: 'config.json',
     mimeType: 'application/json',
     content: '{"model":"deepseek","contextWindow":1000000}',
@@ -28,12 +28,12 @@ test('parseKnowledgeFile turns JSON into searchable pretty text', () => {
   assert.equal(parsed.metadata.parser, 'json');
 });
 
-test('parseKnowledgeFile rejects unsupported formats and invalid JSON', () => {
-  assert.throws(
-    () => parseKnowledgeFile({ filename: 'report.pdf', mimeType: 'application/pdf', content: 'x' }),
+test('parseKnowledgeFile rejects unsupported formats and invalid JSON', async () => {
+  await assert.rejects(
+    () => parseKnowledgeFile({ filename: 'report.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', content: 'x' }),
     /Unsupported knowledge file type/,
   );
-  assert.throws(
+  await assert.rejects(
     () => parseKnowledgeFile({ filename: 'broken.json', mimeType: 'application/json', content: '{"x"' }),
     /Invalid JSON knowledge file/,
   );

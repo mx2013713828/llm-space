@@ -23,7 +23,9 @@ test('isSupportedKnowledgeFile accepts MVP document types only', () => {
 	assert.equal(isSupportedKnowledgeFile('policy.txt'), true);
 	assert.equal(isSupportedKnowledgeFile('schema.json'), true);
 	assert.equal(isSupportedKnowledgeFile('table.csv'), true);
-	assert.equal(isSupportedKnowledgeFile('report.pdf'), false);
+	assert.equal(isSupportedKnowledgeFile('report.pdf'), true);
+	assert.equal(isSupportedKnowledgeFile('notes.docx'), true);
+	assert.equal(isSupportedKnowledgeFile('book.epub'), false);
 	assert.equal(isSupportedKnowledgeFile(''), false);
 });
 
@@ -87,6 +89,7 @@ test('buildKnowledgeFilePayload trims settings and preserves file metadata', () 
 			size: 1234,
 		},
 		content: '  hello  ',
+		contentBase64: 'ICBoZWxsbyAg',
 		settings: {
 			chunkSize: '1200',
 			overlap: '200',
@@ -96,6 +99,7 @@ test('buildKnowledgeFilePayload trims settings and preserves file metadata', () 
 		mimeType: 'text/markdown',
 		size: 1234,
 		content: '  hello  ',
+		contentBase64: 'ICBoZWxsbyAg',
 		settings: {
 			chunkSize: 1200,
 			overlap: 200,

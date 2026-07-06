@@ -1,4 +1,4 @@
-const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json', '.csv']);
+const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json', '.csv', '.pdf', '.docx']);
 
 function getExtension(filename = '') {
 	const trimmed = String(filename || '').trim().toLowerCase();
@@ -53,12 +53,13 @@ export function getKnowledgeBaseStatusSummary(knowledgeBase = {}, mounted = fals
 	return 'empty';
 }
 
-export function buildKnowledgeFilePayload({ file, content, settings = {} }) {
+export function buildKnowledgeFilePayload({ file, content, contentBase64, settings = {} }) {
 	return {
 		filename: file?.name || 'document.txt',
 		mimeType: file?.type || '',
 		size: toFiniteNumber(file?.size, 0),
 		content: String(content ?? ''),
+		...(contentBase64 ? { contentBase64: String(contentBase64) } : {}),
 		settings: {
 			chunkSize: toFiniteNumber(settings.chunkSize, 1000),
 			overlap: toFiniteNumber(settings.overlap, 150),

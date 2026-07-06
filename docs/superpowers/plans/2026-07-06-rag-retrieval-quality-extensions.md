@@ -87,6 +87,9 @@ Those come after the retrieval settings and observability contract is stable.
 - [x] Add `documentLoaders.js`.
 - [x] Route current Markdown/text/JSON through loader adapters.
 - [x] Add CSV loader behind tests and UI file selection.
+- [x] Add lightweight PDF text extraction through `pdf-parse`.
+- [x] Add lightweight DOCX text extraction through `mammoth`.
+- [x] Send file uploads as base64 so binary formats are not corrupted in transit.
 - [x] Preserve compatibility through `parseKnowledgeFile`.
 - [x] Run `npm test` and `npm run build`.
 
