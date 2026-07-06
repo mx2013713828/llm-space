@@ -1,0 +1,104 @@
+# RAG Retrieval Quality Extensions Plan
+
+> Task 16 implementation plan. Keep each slice independently testable and removable. Do not turn the local Knowledge Base MVP into a heavyweight RAG platform in one step.
+
+## Goal
+
+Improve retrieval quality while preserving LLM Space's experimental-platform principle: every retrieval mechanism should be configurable, observable, and easy to swap.
+
+## Architecture Direction
+
+Task 16 extends the existing keyword RAG MVP in layers:
+
+1. Retrieval settings contract and UI.
+2. Retrieval records and pipeline observability.
+3. Document loader adapters for richer file formats.
+4. Embedding provider abstraction.
+5. Vector index abstraction.
+6. Hybrid retrieval and rerank adapters.
+7. Parent-child retrieval and evaluation hooks.
+
+The agent loop must not know provider-specific embedding details. It should continue calling `retrieveKnowledge(...)`; retrieval internals decide keyword/vector/hybrid behavior.
+
+## Phase 1 MVP
+
+Phase 1 deliberately avoids external embedding calls. It makes the existing keyword path more explicit and prepares interfaces for later vector work.
+
+### Deliverables
+
+- Knowledge Base metadata stores retrieval settings:
+  - `retrievalStrategy`: initially `keyword`
+  - `indexMethod`: initially `keyword`
+  - `topK`
+  - `maxChars`
+  - `scoreThreshold`
+- Add a Knowledge Base settings update API.
+- Retrieval returns effective settings in its response.
+- Retrieval lab and runtime retrieval record bounded metadata:
+  - query
+  - strategy
+  - target knowledge base ids
+  - result count
+  - source file names
+  - created timestamp
+- Knowledge page exposes per-base retrieval settings and recent retrieval records.
+
+### Non-Goals For Phase 1
+
+- Real embedding provider calls.
+- Vector index persistence.
+- Hybrid ranking.
+- Rerank model adapters.
+- PDF/DOCX parsing.
+
+Those come after the retrieval settings and observability contract is stable.
+
+## Phase 1 File Targets
+
+- Modify `server/knowledge/knowledgeStore.js`
+- Modify `server/knowledge/knowledgeRetrieve.js`
+- Create `server/knowledge/knowledgeRetrievalRecords.js`
+- Test `server/knowledge/knowledgeRetrievalRecords.test.js`
+- Modify `server/routes/knowledgeRoutes.js`
+- Test `server/routes/knowledgeRoutes.test.js`
+- Modify `src/pages/KnowledgePage.jsx`
+- Modify `src/lib/knowledgeBases.js`
+- Test `src/lib/knowledgeBases.test.js`
+- Modify `src/App.css`
+
+## Phase 1 Steps
+
+- [ ] Add retrieval settings defaults and normalization tests.
+- [ ] Add PATCH Knowledge Base settings route.
+- [ ] Add retrieval records store and tests.
+- [ ] Make `retrieveKnowledge` return `effectiveSettings` and optionally record retrieval metadata.
+- [ ] Add Knowledge page controls for per-base retrieval settings.
+- [ ] Add recent retrieval records panel.
+- [ ] Run `npm test` and `npm run build`.
+- [ ] Commit with `feat: add rag retrieval quality controls`.
+
+## Later Phases
+
+### Phase 2: Document Loaders
+
+- Add `documentLoaders.js`.
+- Route current Markdown/text/JSON through loader adapters.
+- Add at least one richer format behind tests before UI exposure.
+
+### Phase 3: Embedding Providers
+
+- Add `embeddingProviders.js`.
+- Support OpenAI-compatible embedding API with fake HTTP tests.
+- Store provider config as metadata references, not raw secrets in KB files.
+
+### Phase 4: Vector And Hybrid Index
+
+- Add `vectorIndex.js`.
+- Store vectors separately from chunks.
+- Add `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid' })`.
+
+### Phase 5: Rerank And Evaluation
+
+- Add rerank adapter interface.
+- Add retrieval evaluation records and comparison view.
+- Keep rerank optional and bounded.
