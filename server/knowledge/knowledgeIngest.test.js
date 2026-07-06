@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { createKnowledgeBase, loadKnowledgeBase } from './knowledgeStore.js';
+import { createKnowledgeBase, loadKnowledgeBase, loadKnowledgeVectorIndex } from './knowledgeStore.js';
 import { ingestKnowledgeFile, previewKnowledgeChunks } from './knowledgeIngest.js';
 import { retrieveKnowledge } from './knowledgeRetrieve.js';
 
@@ -87,4 +87,46 @@ test('ingestKnowledgeFile loads CSV through document loader adapters', async (t)
   });
   assert.equal(retrieval.chunks.length, 1);
   assert.equal(retrieval.chunks[0].source.filename, 'models.csv');
+});
+
+test('ingestKnowledgeFile builds vector index when embedding provider is enabled', async (t) => {
+  const { rootDir } = await createFixture(t);
+  const kb = await createKnowledgeBase({
+    name: 'Vector Docs',
+    settings: {
+      embeddingProvider: 'local_hash',
+      indexMethod: 'vector',
+      retrievalStrategy: 'vector',
+    },
+    knowledgeRoot: rootDir,
+  });
+
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'models.md',
+    mimeType: 'text/markdown',
+    content: '# Models\n\nDeepSeek context window supports long prompts.',
+    settings: {
+      chunkSize: 300,
+      overlap: 0,
+      embeddingProvider: 'local_hash',
+      indexMethod: 'vector',
+      retrievalStrategy: 'vector',
+    },
+    knowledgeRoot: rootDir,
+  });
+
+  const vectorIndex = await loadKnowledgeVectorIndex({ knowledgeBaseId: kb.id, knowledgeRoot: rootDir });
+  assert.equal(vectorIndex.embeddingProvider, 'local_hash');
+  assert.equal(vectorIndex.vectorCount, 1);
+
+  const retrieval = await retrieveKnowledge({
+    knowledgeBaseIds: [kb.id],
+    query: 'DeepSeek long context',
+    strategy: 'vector',
+    knowledgeRoot: rootDir,
+  });
+  assert.equal(retrieval.effectiveSettings.strategy, 'vector');
+  assert.equal(retrieval.chunks.length, 1);
+  assert.equal(retrieval.chunks[0].scoreType, 'vector');
 });

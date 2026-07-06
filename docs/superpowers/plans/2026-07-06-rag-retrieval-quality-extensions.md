@@ -95,15 +95,21 @@ Those come after the retrieval settings and observability contract is stable.
 
 ### Phase 3: Embedding Providers
 
-- Add `embeddingProviders.js`.
-- Support OpenAI-compatible embedding API with fake HTTP tests.
-- Store provider config as metadata references, not raw secrets in KB files.
+- [x] Add `embeddingProviders.js`.
+- [x] Add deterministic local embedding provider: `local_hash`.
+- [x] Store embedding provider/model in KB metadata.
+- [x] Build vector index during ingest when embeddings are enabled.
+- [x] Add Knowledge UI controls for embedding provider, index method, and retrieval strategy.
+- [x] Add unit and ingest tests for embedding/vector behavior.
+- [ ] Support OpenAI-compatible embedding API with fake HTTP tests.
+- [ ] Store remote provider config as references, not raw secrets in KB files.
 
 ### Phase 4: Vector And Hybrid Index
 
-- Add `vectorIndex.js`.
-- Store vectors separately from chunks.
-- Add `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid' })`.
+- [x] Add `vectorIndex.js`.
+- [x] Store vectors separately from chunks in `vector-index.json`.
+- [x] Add `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid' })`.
+- [ ] Add stronger hybrid weighting controls and comparison records.
 
 ### Phase 5: Rerank And Evaluation
 

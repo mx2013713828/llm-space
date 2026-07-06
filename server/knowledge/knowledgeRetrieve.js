@@ -2,8 +2,11 @@ import {
 	loadKnowledgeBase,
 	loadKnowledgeChunks,
 	loadKnowledgeIndex,
+	loadKnowledgeVectorIndex,
 } from './knowledgeStore.js';
+import { embedKnowledgeTexts } from './embeddingProviders.js';
 import { retrieveFromKeywordIndex } from './knowledgeIndex.js';
+import { retrieveFromVectorIndex } from './vectorIndex.js';
 import { recordKnowledgePipelineEvent } from './knowledgePipelineTrace.js';
 import { recordKnowledgeRetrieval } from './knowledgeRetrievalRecords.js';
 
@@ -56,29 +59,34 @@ export async function retrieveKnowledge({
 
 		const kbChunks = await loadKnowledgeChunks({ knowledgeBaseId, knowledgeRoot });
 		const index = await loadKnowledgeIndex({ knowledgeBaseId, knowledgeRoot });
-		const results = retrieveFromKeywordIndex({
+		const results = await retrieveForStrategy({
+			strategy: effectiveStrategy,
 			query,
 			chunks: kbChunks,
-			index,
+			keywordIndex: index,
+			knowledgeBaseId,
+			settings: kb.settings,
 			topK: effectiveTopK,
 			maxChars: effectiveMaxChars,
 			scoreThreshold: effectiveScoreThreshold,
-		}).map(chunk => ({
+			knowledgeRoot,
+		});
+		const enrichedResults = results.map(chunk => ({
 			...chunk,
 			knowledgeBase: {
 				id: kb.id,
 				name: kb.name,
 			},
 		}));
-		chunks.push(...results);
-		sources.push({ id: kb.id, name: kb.name, strategy: effectiveStrategy, resultCount: results.length });
+		chunks.push(...enrichedResults);
+		sources.push({ id: kb.id, name: kb.name, strategy: effectiveStrategy, resultCount: enrichedResults.length });
 		if (recordRetrieval) {
 			await recordKnowledgeRetrieval({
 				knowledgeBaseId: kb.id,
 				query,
 				strategy: effectiveStrategy,
-				resultCount: results.length,
-				sources: summarizeResultSources(results),
+				resultCount: enrichedResults.length,
+				sources: summarizeResultSources(enrichedResults),
 				knowledgeRoot,
 				now,
 			});
@@ -89,7 +97,7 @@ export async function retrieveKnowledge({
 			runId,
 			stage: 'retrieve',
 			status: 'completed',
-			summary: `Retrieved ${results.length} chunks`,
+			summary: `Retrieved ${enrichedResults.length} chunks`,
 			knowledgeRoot,
 			now,
 		});
@@ -108,6 +116,87 @@ export async function retrieveKnowledge({
 		sources,
 		chunks: bounded,
 	};
+}
+
+async function retrieveForStrategy({
+	strategy,
+	query,
+	chunks,
+	keywordIndex,
+	knowledgeBaseId,
+	settings,
+	topK,
+	maxChars,
+	scoreThreshold,
+	knowledgeRoot,
+}) {
+	if (strategy === 'vector') {
+		return retrieveVector({ query, chunks, knowledgeBaseId, settings, topK, maxChars, scoreThreshold, knowledgeRoot });
+	}
+	if (strategy === 'hybrid') {
+		const keywordResults = retrieveFromKeywordIndex({
+			query,
+			chunks,
+			index: keywordIndex,
+			topK,
+			maxChars,
+			scoreThreshold,
+		});
+		const vectorResults = await retrieveVector({ query, chunks, knowledgeBaseId, settings, topK, maxChars, scoreThreshold, knowledgeRoot });
+		return mergeHybridResults({ keywordResults, vectorResults, topK, maxChars });
+	}
+	return retrieveFromKeywordIndex({
+		query,
+		chunks,
+		index: keywordIndex,
+		topK,
+		maxChars,
+		scoreThreshold,
+	});
+}
+
+async function retrieveVector({ query, chunks, knowledgeBaseId, settings, topK, maxChars, scoreThreshold, knowledgeRoot }) {
+	if (settings?.embeddingProvider === 'none') return [];
+	const vectorIndex = await loadKnowledgeVectorIndex({ knowledgeBaseId, knowledgeRoot });
+	if (!vectorIndex?.vectorCount) return [];
+	const embedding = await embedKnowledgeTexts({
+		texts: [query],
+		settings,
+	});
+	return retrieveFromVectorIndex({
+		queryVector: embedding.vectors[0],
+		chunks,
+		index: vectorIndex,
+		topK,
+		maxChars,
+		scoreThreshold,
+	});
+}
+
+function mergeHybridResults({ keywordResults = [], vectorResults = [], topK, maxChars }) {
+	const byId = new Map();
+	for (const result of keywordResults) {
+		byId.set(result.id, {
+			...result,
+			keywordScore: result.score,
+			vectorScore: 0,
+		});
+	}
+	for (const result of vectorResults) {
+		const existing = byId.get(result.id);
+		byId.set(result.id, {
+			...(existing || result),
+			scoreType: 'hybrid',
+			keywordScore: existing?.keywordScore || 0,
+			vectorScore: result.score,
+		});
+	}
+	const merged = [...byId.values()].map(result => ({
+		...result,
+		scoreType: 'hybrid',
+		score: (Number(result.keywordScore || 0) * 0.5) + (Number(result.vectorScore || 0) * 0.5),
+	})).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+	return boundCombinedResults({ chunks: merged, topK, maxChars });
 }
 
 function summarizeResultSources(chunks = []) {

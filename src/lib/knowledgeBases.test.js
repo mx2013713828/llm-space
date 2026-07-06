@@ -51,6 +51,8 @@ test('normalizeKnowledgeBaseSummary returns stable display defaults', () => {
 			scoreThreshold: 0,
 			indexMethod: 'keyword',
 			retrievalStrategy: 'keyword',
+			embeddingProvider: 'none',
+			embeddingModel: '',
 		},
 		updatedAt: '2026-06-01T00:00:00.000Z',
 	});
@@ -71,6 +73,8 @@ test('normalizeRetrievalSettings returns stable retrieval quality defaults', () 
 		scoreThreshold: 0.5,
 		indexMethod: 'keyword',
 		retrievalStrategy: 'keyword',
+		embeddingProvider: 'none',
+		embeddingModel: '',
 	});
 });
 
@@ -103,6 +107,9 @@ test('buildKnowledgeFilePayload trims settings and preserves file metadata', () 
 		settings: {
 			chunkSize: 1200,
 			overlap: 200,
+			embeddingProvider: 'none',
+			indexMethod: 'keyword',
+			retrievalStrategy: 'keyword',
 		},
 	});
 });

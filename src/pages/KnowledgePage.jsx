@@ -299,6 +299,8 @@ export function KnowledgePage({ harness, onSave }) {
 						scoreThreshold: Number(baseRetrievalDraft.scoreThreshold) || 0,
 						indexMethod: baseRetrievalDraft.indexMethod || 'keyword',
 						retrievalStrategy: baseRetrievalDraft.retrievalStrategy || 'keyword',
+						embeddingProvider: baseRetrievalDraft.embeddingProvider || 'none',
+						embeddingModel: baseRetrievalDraft.embeddingProvider === 'local_hash' ? 'local-hash-v1' : '',
 					},
 				}),
 			});
@@ -323,7 +325,16 @@ export function KnowledgePage({ harness, onSave }) {
 		setError('');
 		try {
 			const contentBase64 = await readFileAsBase64(selectedFile);
-			const payload = buildKnowledgeFilePayload({ file: selectedFile, contentBase64, settings });
+			const payload = buildKnowledgeFilePayload({
+				file: selectedFile,
+				contentBase64,
+				settings: {
+					...settings,
+					embeddingProvider: baseRetrievalDraft?.embeddingProvider || selectedBase.settings?.embeddingProvider || 'none',
+					indexMethod: baseRetrievalDraft?.indexMethod || selectedBase.settings?.indexMethod || 'keyword',
+					retrievalStrategy: baseRetrievalDraft?.retrievalStrategy || selectedBase.settings?.retrievalStrategy || 'keyword',
+				},
+			});
 			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(selectedBase.id)}/files`, {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
@@ -382,7 +393,7 @@ export function KnowledgePage({ harness, onSave }) {
 				<div className="knowledge-hero-stats">
 					<Metric label="bases" value={bases.length} />
 					<Metric label="current harness" value={harness?.name || '-'} />
-					<Metric label="formats" value="MD TXT JSON" />
+					<Metric label="formats" value="MD TXT JSON CSV PDF DOCX" />
 				</div>
 			</section>
 
@@ -512,19 +523,30 @@ export function KnowledgePage({ harness, onSave }) {
 							<div className="knowledge-quality-panel">
 								<div className="knowledge-section-title">
 									<span>Retrieval Quality</span>
-									<small>Applies to retrieval, not indexing.</small>
+									<small>Vector settings apply when files are indexed.</small>
 								</div>
 								<div className="knowledge-quality-grid">
 									<label>
 										<span>Retrieval strategy</span>
 										<select className="input" value={baseRetrievalDraft?.retrievalStrategy || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), retrievalStrategy: event.target.value }))}>
 											<option value="keyword">Keyword</option>
+											<option value="vector">Vector</option>
+											<option value="hybrid">Hybrid</option>
 										</select>
 									</label>
 									<label>
 										<span>Index method</span>
 										<select className="input" value={baseRetrievalDraft?.indexMethod || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), indexMethod: event.target.value }))}>
 											<option value="keyword">Keyword</option>
+											<option value="vector">Vector</option>
+											<option value="hybrid">Hybrid</option>
+										</select>
+									</label>
+									<label>
+										<span>Embedding provider</span>
+										<select className="input" value={baseRetrievalDraft?.embeddingProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingProvider: event.target.value }))}>
+											<option value="none">None</option>
+											<option value="local_hash">Local Hash</option>
 										</select>
 									</label>
 									<label>

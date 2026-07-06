@@ -4,8 +4,9 @@ import { promises as fs } from 'fs';
 const DEFAULT_KNOWLEDGE_ROOT = path.join(process.cwd(), '.knowledge');
 const KB_ID_PATTERN = /^kb_[a-z0-9][a-z0-9_-]*$/;
 const HARNESS_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const SUPPORTED_INDEX_METHODS = new Set(['keyword']);
-const SUPPORTED_RETRIEVAL_STRATEGIES = new Set(['keyword']);
+const SUPPORTED_INDEX_METHODS = new Set(['keyword', 'vector', 'hybrid']);
+const SUPPORTED_RETRIEVAL_STRATEGIES = new Set(['keyword', 'vector', 'hybrid']);
+const SUPPORTED_EMBEDDING_PROVIDERS = new Set(['none', 'local_hash']);
 
 export function getKnowledgeRoot({ knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	return path.resolve(knowledgeRoot);
@@ -52,6 +53,7 @@ export async function createKnowledgeBase({
 	await writeJson(path.join(getKnowledgeBaseDir(id, { knowledgeRoot: root }), 'files.json'), []);
 	await writeJson(path.join(getKnowledgeBaseDir(id, { knowledgeRoot: root }), 'chunks.json'), []);
 	await writeJson(path.join(getKnowledgeBaseDir(id, { knowledgeRoot: root }), 'index.json'), { schema: 'llm-space.knowledge_index.keyword.v1', terms: {}, chunkLengths: {} });
+	await writeJson(path.join(getKnowledgeBaseDir(id, { knowledgeRoot: root }), 'vector-index.json'), createEmptyVectorIndex());
 	return knowledgeBase;
 }
 
@@ -128,6 +130,14 @@ export async function saveKnowledgeIndex({ knowledgeBaseId, index, knowledgeRoot
 	await writeJson(path.join(getKnowledgeBaseDir(knowledgeBaseId, { knowledgeRoot }), 'index.json'), index || { terms: {}, chunkLengths: {} });
 }
 
+export async function loadKnowledgeVectorIndex({ knowledgeBaseId, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
+	return readJson(path.join(getKnowledgeBaseDir(knowledgeBaseId, { knowledgeRoot }), 'vector-index.json'), createEmptyVectorIndex());
+}
+
+export async function saveKnowledgeVectorIndex({ knowledgeBaseId, index, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
+	await writeJson(path.join(getKnowledgeBaseDir(knowledgeBaseId, { knowledgeRoot }), 'vector-index.json'), index || createEmptyVectorIndex());
+}
+
 export async function mountKnowledgeBases({ harnessId, knowledgeBaseIds = [], knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	if (!HARNESS_ID_PATTERN.test(String(harnessId || ''))) {
 		return { harnessId, knowledgeBaseIds: [] };
@@ -202,7 +212,26 @@ export function normalizeKnowledgeSettings(settings = {}) {
 		parser: String(input.parser || 'auto'),
 		indexMethod: normalizeEnum(input.indexMethod, 'keyword', SUPPORTED_INDEX_METHODS),
 		retrievalStrategy: normalizeEnum(input.retrievalStrategy, 'keyword', SUPPORTED_RETRIEVAL_STRATEGIES),
+		embeddingProvider: normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS),
+		embeddingModel: normalizeEmbeddingModel(input),
 	};
+}
+
+function createEmptyVectorIndex() {
+	return {
+		schema: 'llm-space.knowledge_index.vector.v1',
+		embeddingProvider: 'none',
+		embeddingModel: '',
+		embeddingDimensions: 0,
+		vectorCount: 0,
+		items: [],
+	};
+}
+
+function normalizeEmbeddingModel(input) {
+	const provider = normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS);
+	if (provider === 'local_hash') return String(input.embeddingModel || 'local-hash-v1');
+	return '';
 }
 
 function normalizeInteger(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {

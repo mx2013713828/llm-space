@@ -43,6 +43,8 @@ export function normalizeRetrievalSettings(settings = {}) {
 		scoreThreshold: toFiniteNumber(settings.scoreThreshold, 0),
 		indexMethod: String(settings.indexMethod || 'keyword'),
 		retrievalStrategy: String(settings.retrievalStrategy || 'keyword'),
+		embeddingProvider: String(settings.embeddingProvider || 'none'),
+		embeddingModel: String(settings.embeddingModel || ''),
 	};
 }
 
@@ -63,6 +65,9 @@ export function buildKnowledgeFilePayload({ file, content, contentBase64, settin
 		settings: {
 			chunkSize: toFiniteNumber(settings.chunkSize, 1000),
 			overlap: toFiniteNumber(settings.overlap, 150),
+			embeddingProvider: String(settings.embeddingProvider || 'none'),
+			indexMethod: String(settings.indexMethod || 'keyword'),
+			retrievalStrategy: String(settings.retrievalStrategy || 'keyword'),
 		},
 	};
 }

@@ -39,6 +39,8 @@ test('createKnowledgeBase persists path-safe metadata and lists summaries', asyn
   assert.equal(kb.settings.chunkSize, 800);
   assert.equal(kb.settings.indexMethod, 'keyword');
   assert.equal(kb.settings.retrievalStrategy, 'keyword');
+  assert.equal(kb.settings.embeddingProvider, 'none');
+  assert.equal(kb.settings.embeddingModel, '');
   assert.equal(kb.settings.topK, 5);
   assert.equal(kb.fileCount, 0);
   assert.equal(kb.chunkCount, 0);
@@ -58,6 +60,7 @@ test('normalize settings clamps retrieval quality options to supported MVP value
     settings: {
       indexMethod: 'vector',
       retrievalStrategy: 'hybrid',
+      embeddingProvider: 'local_hash',
       topK: 0,
       maxChars: -20,
       scoreThreshold: '0.75',
@@ -65,8 +68,10 @@ test('normalize settings clamps retrieval quality options to supported MVP value
     knowledgeRoot: rootDir,
   });
 
-  assert.equal(kb.settings.indexMethod, 'keyword');
-  assert.equal(kb.settings.retrievalStrategy, 'keyword');
+  assert.equal(kb.settings.indexMethod, 'vector');
+  assert.equal(kb.settings.retrievalStrategy, 'hybrid');
+  assert.equal(kb.settings.embeddingProvider, 'local_hash');
+  assert.equal(kb.settings.embeddingModel, 'local-hash-v1');
   assert.equal(kb.settings.topK, 1);
   assert.equal(kb.settings.maxChars, 500);
   assert.equal(kb.settings.scoreThreshold, 0.75);
