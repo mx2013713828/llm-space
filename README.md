@@ -29,6 +29,7 @@ Requirements:
 
 - Node.js 18 or newer
 - npm
+- Docker Desktop (optional; required for local Qdrant vector-store testing)
 
 Install and run:
 
@@ -49,6 +50,21 @@ npm test
 npm run build
 ```
 
+To test vector retrieval, start local Qdrant first:
+
+```bash
+docker compose --env-file docker/qdrant.env up -d qdrant
+curl http://localhost:6333/collections
+```
+
+The dedicated `docker/qdrant.env` file prevents Docker Compose from parsing the app `.env`, which may contain multiline `MODELS_CONFIG` JSON.
+
+Qdrant Dashboard:
+
+```text
+http://localhost:6333/dashboard
+```
+
 ## Model Configuration
 
 Create `.env` from `.env.example`, or add models through the UI.
@@ -58,6 +74,8 @@ Typical `.env` entries:
 ```dotenv
 PORT=3001
 TAVILY_API_KEY=tvly-your-key-here
+ZHIPU_API_KEY=your-zhipu-key-here
+QDRANT_API_KEY=
 MODELS_CONFIG=[]
 ```
 
@@ -159,9 +177,9 @@ Jobs are scoped to a harness and run through the same agent executor path. If th
 
 ### Knowledge Bases
 
-Task 15 adds a local RAG Knowledge Base MVP plus selectable runtime strategies.
+Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, and keyword / vector / hybrid retrieval strategies.
 
-Users can create local knowledge bases, import Markdown/text/JSON files, generate bounded chunks and a lightweight keyword index, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
+Users can create local knowledge bases, import Markdown/text/JSON/CSV/PDF/DOCX files, generate bounded chunks and indexes, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
 Current shape:
 
@@ -174,7 +192,33 @@ Current shape:
 - Manual Lab: retrieval testing in the Knowledge page without changing chat context
 - Context Inspector separates Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema
 
-Next RAG work focuses on richer retrieval quality: more file types, configurable embedding providers, vector/hybrid retrieval, rerank, and retrieval evaluation hooks.
+Recommended real-vector test configuration:
+
+```text
+Retrieval strategy: Hybrid
+Index method: Hybrid
+Embedding provider: Zhipu embedding-3
+Embedding model: embedding-3
+Dimensions: 1024
+Embedding URL: https://open.bigmodel.cn/api/paas/v4/embeddings
+API key env: ZHIPU_API_KEY
+Vector store: Qdrant
+Qdrant URL: http://localhost:6333
+Qdrant collection: leave empty for auto naming, or use rag_test
+Qdrant key env: empty for local Qdrant; QDRANT_API_KEY for Qdrant Cloud
+```
+
+Test flow:
+
+1. Set `ZHIPU_API_KEY` in `.env`, then restart `npm run dev`.
+2. Run `docker compose --env-file docker/qdrant.env up -d qdrant`.
+3. Create or open a Knowledge Base in the Knowledge page.
+4. Fill the Retrieval Quality settings above and click `Test Embedding`.
+5. Click `Save Retrieval Settings`.
+6. Select files again and click `Index`. Existing files are not automatically re-vectorized after switching vector stores.
+7. Compare `Keyword`, `Vector`, and `Hybrid` in Retrieval Test.
+
+Note: with vector retrieval, Auto RAG can return the nearest chunk even for unrelated queries. For unrelated-query testing, set `Score threshold` to `0.45` or higher so low-confidence chunks are not injected into chat context.
 
 ## Developer Workflow
 

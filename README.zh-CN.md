@@ -29,6 +29,7 @@ LLM Space 是一个用于实验 AI Agent Harness 的可视化白盒工作台。
 
 - Node.js 18 或更高版本
 - npm
+- Docker Desktop（可选；测试 Qdrant 向量数据库时需要）
 
 安装并启动：
 
@@ -49,6 +50,21 @@ npm test
 npm run build
 ```
 
+如果要测试向量检索，先启动本地 Qdrant：
+
+```bash
+docker compose --env-file docker/qdrant.env up -d qdrant
+curl http://localhost:6333/collections
+```
+
+这里使用专用 `docker/qdrant.env`，避免 Docker Compose 误读应用 `.env` 中的多行 `MODELS_CONFIG`。
+
+Qdrant Dashboard：
+
+```text
+http://localhost:6333/dashboard
+```
+
 ## 模型配置
 
 可以从 `.env.example` 创建 `.env`，也可以直接通过 UI 添加模型。
@@ -58,6 +74,8 @@ npm run build
 ```dotenv
 PORT=3001
 TAVILY_API_KEY=tvly-your-key-here
+ZHIPU_API_KEY=your-zhipu-key-here
+QDRANT_API_KEY=
 MODELS_CONFIG=[]
 ```
 
@@ -159,9 +177,9 @@ Cron Scheduler 暴露：
 
 ### 知识库
 
-Task 15 已加入本地 RAG 知识库 MVP，并支持可切换的知识库运行策略。
+Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储，以及 keyword / vector / hybrid 检索策略。
 
-用户可以创建本地知识库，导入 Markdown/text/JSON 文件，生成有边界的 chunks 和轻量关键词索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
+用户可以创建本地知识库，导入 Markdown/text/JSON/CSV/PDF/DOCX 文件，生成有边界的 chunks 和索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
 当前形态：
 
@@ -174,7 +192,33 @@ Task 15 已加入本地 RAG 知识库 MVP，并支持可切换的知识库运行
 - Manual Lab：只在 Knowledge 页面测试检索，不改变对话上下文
 - Context Inspector 分层展示 Mounted Knowledge Manifest、Retrieved Knowledge、Messages Payload 和 Provider Tool Schema
 
-下一步 RAG 工作会聚焦检索质量增强：更多文件类型、可配置 embedding provider、向量/混合检索、rerank，以及检索评估钩子。
+推荐的真实向量化测试配置：
+
+```text
+Retrieval strategy: Hybrid
+Index method: Hybrid
+Embedding provider: Zhipu embedding-3
+Embedding model: embedding-3
+Dimensions: 1024
+Embedding URL: https://open.bigmodel.cn/api/paas/v4/embeddings
+API key env: ZHIPU_API_KEY
+Vector store: Qdrant
+Qdrant URL: http://localhost:6333
+Qdrant collection: 留空自动生成，或填写 rag_test
+Qdrant key env: 本地留空；Qdrant Cloud 填 QDRANT_API_KEY
+```
+
+测试步骤：
+
+1. 在 `.env` 中配置 `ZHIPU_API_KEY`，然后重启 `npm run dev`。
+2. 运行 `docker compose --env-file docker/qdrant.env up -d qdrant`。
+3. 在 Knowledge 页面创建或打开一个 Knowledge Base。
+4. 填写上面的 Retrieval Quality 配置，点击 `Test Embedding`。
+5. 点击 `Save Retrieval Settings`。
+6. 重新选择文件并点击 `Index`。切换向量存储后，旧文件不会自动补向量。
+7. 用 Retrieval Test 比较 `Keyword`、`Vector`、`Hybrid`。
+
+注意：Auto RAG 使用向量检索时，低相关 query 也可能返回“最相近”的 chunk。测试无关问题时建议把 `Score threshold` 调到 `0.45` 或更高，避免低置信结果被注入对话上下文。
 
 ## 开发工作流
 

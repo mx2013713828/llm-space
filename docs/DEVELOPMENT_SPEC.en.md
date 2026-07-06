@@ -59,6 +59,8 @@ External knowledge bases, skills, project documents, and future MCP resources sh
 - Model injection must be bounded and source-labeled. Dynamic retrieval content should use clear boundaries such as `<retrieved_knowledge>` and must never push complete files directly into the prompt.
 - Large file contents must not be pushed directly into trajectory or messages. They should enter context through indexing, retrieval, and traceable citations.
 - Knowledge mounting should reuse the Context Inspector prompt assembly mechanism so users can see exactly which knowledge snippets were injected.
+- Real vectorization development should use Docker Compose-managed Qdrant via `docker compose --env-file docker/qdrant.env up -d qdrant`. Embedding API keys must be referenced through environment variable names such as `ZHIPU_API_KEY`; raw secrets must not be stored in KB metadata or frontend state.
+- Auto RAG dynamic injection must respect relevance thresholds. Low-score nearest neighbors may be shown in retrieval previews, but should not automatically pollute chat context.
 
 ---
 
@@ -148,6 +150,7 @@ LLM-Space is an experimental platform and should not fully black-box commercial-
 ### 5. Current Development Status
 - Task 13 (Pinned Strategy + Context Assembly Inspector) is complete: execution strategy is pinned into system prompt assembly, and Context Inspector now acts as a static payload inspector.
 - Task 14 (Multi-layer Guidance Composition) is intentionally skipped for now.
-- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import Markdown/text/JSON, chunk/index them, preview retrieval, and mount them to a harness.
+- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import files, chunk/index them, preview retrieval, and mount them to a harness.
 - Knowledge Runtime Strategies are complete: Auto RAG, Agentic RAG, and Manual Lab are supported; Mounted Knowledge Manifest and Retrieved Knowledge are split; Agentic RAG exposes `list_mounted_knowledge_bases` / `query_knowledge_base`; Context Inspector shows the actual knowledge context sent to the model in separate layers.
-- The next priority is Task 16 (RAG Retrieval Quality Extensions): dedicated Context Inspector retrieval visualization, more file types, configurable embedding providers, vector/hybrid retrieval, rerank adapters, and evaluation hooks.
+- Task 16 (RAG Retrieval Quality Extensions) is complete through the real-vectorization loop: Markdown/text/JSON/CSV/PDF/DOCX loaders, Zhipu `embedding-3` / OpenAI-compatible embedding providers, Local JSON / Qdrant vector stores, keyword/vector/hybrid retrieval, Retrieval Records, and Context Inspector knowledge-context layers.
+- The next priority is Auto RAG confidence gating, rerank adapters, retrieval evaluation, and comparison views.

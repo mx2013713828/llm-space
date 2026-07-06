@@ -59,6 +59,8 @@ Context Inspector 的目标不是展示所有运行时状态，而是清晰、�
 - 注入模型时必须有边界、来源标签和引用信息；动态检索内容应使用 `<retrieved_knowledge>` 等明确边界，不得把完整文件直接塞入 prompt。
 - 大文件内容不得直接进入 trajectory 或 messages；应通过索引、检索和可追溯 citation 进入上下文。
 - 知识挂载应复用 Context Inspector 的 prompt assembly 机制，让用户看到到底注入了哪些知识片段。
+- 真实向量化开发环境以 Docker Compose 管理 Qdrant，默认命令为 `docker compose --env-file docker/qdrant.env up -d qdrant`。Embedding API 密钥只通过环境变量引用（如 `ZHIPU_API_KEY`），不得写入 KB metadata 或前端状态。
+- Auto RAG 的动态注入必须考虑相关性阈值；低分最近邻只能作为检索预览，不应默认污染对话上下文。
 
 ---
 
@@ -148,6 +150,7 @@ LLM-Space 是实验平台，不应把商业 Agent 的“智能执行模式”完
 ### 5. 当前开发状态
 - Task 13（Pinned Strategy + Context Assembly Inspector）已完成：执行策略已固定在 system prompt 组装层，Context Inspector 已改为静态 payload inspector。
 - Task 14（Multi-layer Guidance Composition）暂时跳过。
-- Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入 Markdown/text/JSON、chunk/index、检索预览、挂载到 harness。
+- Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入文件、chunk/index、检索预览、挂载到 harness。
 - Knowledge Runtime Strategies 已完成：支持 Auto RAG、Agentic RAG、Manual Lab；Mounted Knowledge Manifest 与 Retrieved Knowledge 已拆分，Agentic RAG 暴露 `list_mounted_knowledge_bases` / `query_knowledge_base` 工具，Context Inspector 可分层查看实际发送给模型的知识上下文。
-- 下一阶段优先进入 Task 16（RAG Retrieval Quality Extensions）：补齐专门的 Context Inspector 检索可视化、更多文件类型、可配置 embedding provider、向量/混合检索、rerank 与评估钩子。
+- Task 16（RAG Retrieval Quality Extensions）已完成到真实向量化闭环：支持 Markdown/text/JSON/CSV/PDF/DOCX loader、智谱 `embedding-3` / OpenAI-compatible embedding provider、Local JSON / Qdrant 向量存储、keyword/vector/hybrid 检索、Retrieval Records 与 Context Inspector 知识上下文分层。
+- 下一阶段优先处理 Auto RAG 注入置信门、rerank adapter、检索评估与对比视图。
