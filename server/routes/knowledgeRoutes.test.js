@@ -66,7 +66,14 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
     body: { knowledgeBaseIds: [createRes.body.id], query: 'observable rag' },
   });
   assert.equal(retrieveRes.status, 200);
+  assert.equal(retrieveRes.body.effectiveSettings.strategy, 'keyword');
   assert.equal(retrieveRes.body.chunks[0].source.filename, 'notes.md');
+
+  const recordsRes = await dispatchJson(app, 'GET', `/api/knowledge-bases/${createRes.body.id}/retrieval-records`);
+  assert.equal(recordsRes.status, 200);
+  assert.equal(recordsRes.body.length, 1);
+  assert.equal(recordsRes.body[0].query, 'observable rag');
+  assert.equal(recordsRes.body[0].resultCount, 1);
 
   const mountRes = await dispatchJson(app, 'POST', '/api/harnesses/alpha/knowledge-bases', {
     body: { knowledgeBaseIds: [createRes.body.id] },

@@ -14,6 +14,7 @@ import {
 } from '../knowledge/knowledgeIngest.js';
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getKnowledgePipelineTrace } from '../knowledge/knowledgePipelineTrace.js';
+import { listKnowledgeRetrievalRecords } from '../knowledge/knowledgeRetrievalRecords.js';
 
 export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 	app.get('/api/knowledge-bases', async (_req, res) => {
@@ -128,7 +129,21 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				topK: req.body?.topK,
 				maxChars: req.body?.maxChars,
 				scoreThreshold: req.body?.scoreThreshold,
+				strategy: req.body?.strategy,
+				recordRetrieval: req.body?.recordRetrieval !== false,
 				knowledgeRoot,
+			}));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
+	app.get('/api/knowledge-bases/:knowledgeBaseId/retrieval-records', async (req, res) => {
+		try {
+			res.json(await listKnowledgeRetrievalRecords({
+				knowledgeBaseId: req.params.knowledgeBaseId,
+				knowledgeRoot,
+				limit: req.query?.limit,
 			}));
 		} catch (err) {
 			res.status(400).json({ error: err.message });

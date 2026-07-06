@@ -5,6 +5,7 @@ import {
 } from './knowledgeStore.js';
 import { retrieveFromKeywordIndex } from './knowledgeIndex.js';
 import { recordKnowledgePipelineEvent } from './knowledgePipelineTrace.js';
+import { recordKnowledgeRetrieval } from './knowledgeRetrievalRecords.js';
 
 export async function retrieveKnowledge({
 	knowledgeBaseIds = [],
@@ -14,6 +15,7 @@ export async function retrieveKnowledge({
 	scoreThreshold,
 	strategy,
 	knowledgeRoot,
+	recordRetrieval = false,
 	runId = `run_${Date.now().toString(36)}`,
 	now = () => new Date(),
 } = {}) {
@@ -70,6 +72,17 @@ export async function retrieveKnowledge({
 		}));
 		chunks.push(...results);
 		sources.push({ id: kb.id, name: kb.name, strategy: effectiveStrategy, resultCount: results.length });
+		if (recordRetrieval) {
+			await recordKnowledgeRetrieval({
+				knowledgeBaseId: kb.id,
+				query,
+				strategy: effectiveStrategy,
+				resultCount: results.length,
+				sources: summarizeResultSources(results),
+				knowledgeRoot,
+				now,
+			});
+		}
 
 		await recordKnowledgePipelineEvent({
 			knowledgeBaseId,
@@ -95,6 +108,16 @@ export async function retrieveKnowledge({
 		sources,
 		chunks: bounded,
 	};
+}
+
+function summarizeResultSources(chunks = []) {
+	const counts = new Map();
+	for (const chunk of chunks) {
+		const filename = chunk?.source?.filename;
+		if (!filename) continue;
+		counts.set(filename, (counts.get(filename) || 0) + 1);
+	}
+	return [...counts.entries()].map(([filename, chunkCount]) => ({ filename, chunkCount }));
 }
 
 function boundCombinedResults({ chunks, topK, maxChars }) {
