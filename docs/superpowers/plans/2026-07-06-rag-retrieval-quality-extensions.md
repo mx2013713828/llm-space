@@ -68,14 +68,17 @@ Those come after the retrieval settings and observability contract is stable.
 
 ## Phase 1 Steps
 
-- [ ] Add retrieval settings defaults and normalization tests.
-- [ ] Add PATCH Knowledge Base settings route.
-- [ ] Add retrieval records store and tests.
-- [ ] Make `retrieveKnowledge` return `effectiveSettings` and optionally record retrieval metadata.
-- [ ] Add Knowledge page controls for per-base retrieval settings.
-- [ ] Add recent retrieval records panel.
-- [ ] Run `npm test` and `npm run build`.
-- [ ] Commit with `feat: add rag retrieval quality controls`.
+- [x] Add retrieval settings defaults and normalization tests.
+- [x] Add PATCH Knowledge Base settings route.
+- [x] Add retrieval records store and tests.
+- [x] Make `retrieveKnowledge` return `effectiveSettings` and optionally record retrieval metadata.
+- [x] Add Knowledge page controls for per-base retrieval settings.
+- [x] Add recent retrieval records panel.
+- [x] Run `npm test` and `npm run build`.
+- [x] Commit implementation slices:
+  - `feat: add knowledge retrieval settings contract`
+  - `feat: record knowledge retrieval metadata`
+  - `feat: expose rag retrieval quality controls`
 
 ## Later Phases
 
