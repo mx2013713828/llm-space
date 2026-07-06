@@ -7,6 +7,7 @@ import {
 	getKnowledgeBaseStatusSummary,
 	isSupportedKnowledgeFile,
 	normalizeKnowledgeBaseSummary,
+	normalizeRetrievalSettings,
 } from '../lib/knowledgeBases.js';
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import {
@@ -63,6 +64,7 @@ export function KnowledgePage({ harness, onSave }) {
 	const [knowledgeBases, setKnowledgeBases] = useState([]);
 	const [selectedId, setSelectedId] = useState('');
 	const [files, setFiles] = useState([]);
+	const [retrievalRecords, setRetrievalRecords] = useState([]);
 	const [newName, setNewName] = useState('');
 	const [newDescription, setNewDescription] = useState('');
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -76,6 +78,7 @@ export function KnowledgePage({ harness, onSave }) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
 	const [runtimeDraft, setRuntimeDraft] = useState(null);
+	const [baseRetrievalDraft, setBaseRetrievalDraft] = useState(null);
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
 	const selectedBase = bases.find(base => base.id === selectedId) || null;
@@ -91,6 +94,14 @@ export function KnowledgePage({ harness, onSave }) {
 			scoreThreshold: knowledgeRuntime.scoreThreshold,
 		});
 	}, [knowledgeRuntime.topK, knowledgeRuntime.maxChars, knowledgeRuntime.scoreThreshold]);
+
+	useEffect(() => {
+		if (!selectedBase) {
+			setBaseRetrievalDraft(null);
+			return;
+		}
+		setBaseRetrievalDraft(normalizeRetrievalSettings(selectedBase.settings || selectedRawBase?.settings || {}));
+	}, [selectedBase?.id, selectedRawBase?.settings]);
 
 	const loadBases = useCallback(async () => {
 		setIsLoading(true);
@@ -125,6 +136,22 @@ export function KnowledgePage({ harness, onSave }) {
 		}
 	}, []);
 
+	const loadRetrievalRecords = useCallback(async (knowledgeBaseId) => {
+		if (!knowledgeBaseId) {
+			setRetrievalRecords([]);
+			return;
+		}
+		try {
+			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/retrieval-records`);
+			if (!res.ok) throw new Error(`Failed to load retrieval records (${res.status})`);
+			const data = await res.json();
+			setRetrievalRecords(Array.isArray(data) ? data : []);
+		} catch (err) {
+			setRetrievalRecords([]);
+			setError(err.message || 'Failed to load retrieval records.');
+		}
+	}, []);
+
 	useEffect(() => {
 		void Promise.resolve().then(loadBases);
 	}, [loadBases]);
@@ -132,6 +159,10 @@ export function KnowledgePage({ harness, onSave }) {
 	useEffect(() => {
 		void Promise.resolve().then(() => loadFiles(selectedBase?.id));
 	}, [loadFiles, selectedBase?.id]);
+
+	useEffect(() => {
+		void Promise.resolve().then(() => loadRetrievalRecords(selectedBase?.id));
+	}, [loadRetrievalRecords, selectedBase?.id]);
 
 	async function createKnowledgeBase() {
 		const name = newName.trim();
@@ -225,6 +256,36 @@ export function KnowledgePage({ harness, onSave }) {
 		}
 	}
 
+	async function saveBaseRetrievalSettings() {
+		if (!selectedBase || !baseRetrievalDraft) return;
+		setIsLoading(true);
+		setError('');
+		try {
+			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(selectedBase.id)}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					settings: {
+						...(selectedRawBase?.settings || {}),
+						topK: Number(baseRetrievalDraft.topK) || 5,
+						maxChars: Number(baseRetrievalDraft.maxChars) || 8000,
+						scoreThreshold: Number(baseRetrievalDraft.scoreThreshold) || 0,
+						indexMethod: baseRetrievalDraft.indexMethod || 'keyword',
+						retrievalStrategy: baseRetrievalDraft.retrievalStrategy || 'keyword',
+					},
+				}),
+			});
+			if (!res.ok) throw new Error((await res.json()).error || `Settings update failed (${res.status})`);
+			const updated = await res.json();
+			setKnowledgeBases(prev => prev.map(base => base.id === updated.id ? updated : base));
+			setStatus('Retrieval quality settings saved.');
+		} catch (err) {
+			setError(err.message || 'Failed to save retrieval settings.');
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
 	async function uploadFile() {
 		if (!selectedBase || !selectedFile) return;
 		if (!isSupportedKnowledgeFile(selectedFile.name)) {
@@ -266,12 +327,15 @@ export function KnowledgePage({ harness, onSave }) {
 				body: JSON.stringify({
 					knowledgeBaseIds: [selectedBase.id],
 					query,
-					topK: 5,
-					maxChars: 4000,
+					topK: baseRetrievalDraft?.topK || selectedBase.settings?.topK || 5,
+					maxChars: baseRetrievalDraft?.maxChars || selectedBase.settings?.maxChars || 4000,
+					scoreThreshold: baseRetrievalDraft?.scoreThreshold || selectedBase.settings?.scoreThreshold || 0,
+					strategy: baseRetrievalDraft?.retrievalStrategy || selectedBase.settings?.retrievalStrategy || 'keyword',
 				}),
 			});
 			if (!res.ok) throw new Error((await res.json()).error || `Retrieve failed (${res.status})`);
 			setRetrieval(await res.json());
+			await loadRetrievalRecords(selectedBase.id);
 			setStatus('Retrieval preview updated.');
 		} catch (err) {
 			setError(err.message || 'Failed to retrieve knowledge.');
@@ -418,6 +482,40 @@ export function KnowledgePage({ harness, onSave }) {
 								<Metric label="overlap" value={selectedRawBase?.settings?.overlap || settings.overlap} />
 							</div>
 
+							<div className="knowledge-quality-panel">
+								<div className="knowledge-section-title">
+									<span>Retrieval Quality</span>
+									<small>Applies to retrieval, not indexing.</small>
+								</div>
+								<div className="knowledge-quality-grid">
+									<label>
+										<span>Retrieval strategy</span>
+										<select className="input" value={baseRetrievalDraft?.retrievalStrategy || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), retrievalStrategy: event.target.value }))}>
+											<option value="keyword">Keyword</option>
+										</select>
+									</label>
+									<label>
+										<span>Index method</span>
+										<select className="input" value={baseRetrievalDraft?.indexMethod || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), indexMethod: event.target.value }))}>
+											<option value="keyword">Keyword</option>
+										</select>
+									</label>
+									<label>
+										<span>Top K</span>
+										<input className="input" type="number" min="1" max="50" value={baseRetrievalDraft?.topK ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />
+									</label>
+									<label>
+										<span>Max chars</span>
+										<input className="input" type="number" min="500" max="100000" value={baseRetrievalDraft?.maxChars ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), maxChars: event.target.value }))} />
+									</label>
+									<label>
+										<span>Score threshold</span>
+										<input className="input" type="number" min="0" step="0.1" value={baseRetrievalDraft?.scoreThreshold ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), scoreThreshold: event.target.value }))} />
+									</label>
+									<button className="btn btn-ghost" onClick={saveBaseRetrievalSettings} disabled={isLoading}>Save Retrieval Settings</button>
+								</div>
+							</div>
+
 							<div className="knowledge-section-grid">
 								<div className="knowledge-section">
 									<div className="knowledge-section-title">
@@ -481,7 +579,7 @@ export function KnowledgePage({ harness, onSave }) {
 							<div className="knowledge-retrieval-panel">
 								<div className="knowledge-section-title">
 									<span>Retrieval Test</span>
-									<small>Query this base without starting an agent loop.</small>
+									<small>{baseRetrievalDraft?.retrievalStrategy || 'keyword'} · top {baseRetrievalDraft?.topK || 5}</small>
 								</div>
 								<div className="knowledge-query-row">
 									<textarea className="textarea" placeholder="Ask a question this knowledge base should answer..." value={query} onChange={event => setQuery(event.target.value)} />
@@ -499,6 +597,27 @@ export function KnowledgePage({ harness, onSave }) {
 									))}
 									{retrieval && retrieval.chunks?.length === 0 && (
 										<div className="knowledge-muted-box">No matching chunks found.</div>
+									)}
+								</div>
+							</div>
+
+							<div className="knowledge-retrieval-panel">
+								<div className="knowledge-section-title">
+									<span>Recent Retrieval Records</span>
+									<small>{retrievalRecords.length} record{retrievalRecords.length === 1 ? '' : 's'}</small>
+								</div>
+								<div className="knowledge-record-list">
+									{retrievalRecords.map(record => (
+										<div key={record.id} className="knowledge-record-row">
+											<div>
+												<strong>{record.query || '(empty query)'}</strong>
+												<small>{record.strategy} · {record.resultCount} result{record.resultCount === 1 ? '' : 's'} · {formatDate(record.createdAt)}</small>
+											</div>
+											<span>{(record.sources || []).map(source => source.filename).join(', ') || 'no sources'}</span>
+										</div>
+									))}
+									{retrievalRecords.length === 0 && (
+										<div className="knowledge-muted-box">No retrieval records yet. Run a retrieval test or ask the agent to query this base.</div>
 									)}
 								</div>
 							</div>

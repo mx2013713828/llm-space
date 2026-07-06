@@ -29,7 +29,20 @@ export function normalizeKnowledgeBaseSummary(knowledgeBase = {}) {
 		description: String(knowledgeBase.description || ''),
 		fileCount: toFiniteNumber(knowledgeBase.fileCount, 0),
 		chunkCount: toFiniteNumber(knowledgeBase.chunkCount, 0),
+		settings: normalizeRetrievalSettings(knowledgeBase.settings || {}),
 		updatedAt: knowledgeBase.updatedAt || knowledgeBase.createdAt || '',
+	};
+}
+
+export function normalizeRetrievalSettings(settings = {}) {
+	return {
+		chunkSize: toFiniteNumber(settings.chunkSize, 1000),
+		overlap: toFiniteNumber(settings.overlap, 150),
+		topK: toFiniteNumber(settings.topK, 5),
+		maxChars: toFiniteNumber(settings.maxChars, 8000),
+		scoreThreshold: toFiniteNumber(settings.scoreThreshold, 0),
+		indexMethod: String(settings.indexMethod || 'keyword'),
+		retrievalStrategy: String(settings.retrievalStrategy || 'keyword'),
 	};
 }
 

@@ -7,6 +7,7 @@ import {
 	getKnowledgeBaseStatusSummary,
 	isSupportedKnowledgeFile,
 	normalizeKnowledgeBaseSummary,
+	normalizeRetrievalSettings,
 } from './knowledgeBases.js';
 
 test('formatKnowledgeFileSize formats small UI-friendly sizes', () => {
@@ -39,7 +40,34 @@ test('normalizeKnowledgeBaseSummary returns stable display defaults', () => {
 		description: '',
 		fileCount: 2,
 		chunkCount: 8,
+		settings: {
+			chunkSize: 1000,
+			overlap: 150,
+			topK: 5,
+			maxChars: 8000,
+			scoreThreshold: 0,
+			indexMethod: 'keyword',
+			retrievalStrategy: 'keyword',
+		},
 		updatedAt: '2026-06-01T00:00:00.000Z',
+	});
+});
+
+test('normalizeRetrievalSettings returns stable retrieval quality defaults', () => {
+	assert.deepEqual(normalizeRetrievalSettings({
+		topK: '3',
+		maxChars: '1600',
+		scoreThreshold: '0.5',
+		indexMethod: 'keyword',
+		retrievalStrategy: 'keyword',
+	}), {
+		chunkSize: 1000,
+		overlap: 150,
+		topK: 3,
+		maxChars: 1600,
+		scoreThreshold: 0.5,
+		indexMethod: 'keyword',
+		retrievalStrategy: 'keyword',
 	});
 });
 
