@@ -45,6 +45,13 @@ export function normalizeRetrievalSettings(settings = {}) {
 		retrievalStrategy: String(settings.retrievalStrategy || 'keyword'),
 		embeddingProvider: String(settings.embeddingProvider || 'none'),
 		embeddingModel: String(settings.embeddingModel || ''),
+		embeddingDimensions: toFiniteNumber(settings.embeddingDimensions, 0),
+		embeddingBaseUrl: String(settings.embeddingBaseUrl || ''),
+		embeddingApiKeyEnv: String(settings.embeddingApiKeyEnv || ''),
+		vectorStore: String(settings.vectorStore || 'local_json'),
+		qdrantUrl: String(settings.qdrantUrl || 'http://localhost:6333'),
+		qdrantCollection: String(settings.qdrantCollection || ''),
+		qdrantApiKeyEnv: String(settings.qdrantApiKeyEnv || ''),
 	};
 }
 
@@ -66,8 +73,16 @@ export function buildKnowledgeFilePayload({ file, content, contentBase64, settin
 			chunkSize: toFiniteNumber(settings.chunkSize, 1000),
 			overlap: toFiniteNumber(settings.overlap, 150),
 			embeddingProvider: String(settings.embeddingProvider || 'none'),
+			embeddingModel: String(settings.embeddingModel || ''),
+			embeddingDimensions: toFiniteNumber(settings.embeddingDimensions, 0),
+			embeddingBaseUrl: String(settings.embeddingBaseUrl || ''),
+			embeddingApiKeyEnv: String(settings.embeddingApiKeyEnv || ''),
 			indexMethod: String(settings.indexMethod || 'keyword'),
 			retrievalStrategy: String(settings.retrievalStrategy || 'keyword'),
+			vectorStore: String(settings.vectorStore || 'local_json'),
+			qdrantUrl: String(settings.qdrantUrl || 'http://localhost:6333'),
+			qdrantCollection: String(settings.qdrantCollection || ''),
+			qdrantApiKeyEnv: String(settings.qdrantApiKeyEnv || ''),
 		},
 	};
 }

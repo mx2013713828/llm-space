@@ -300,7 +300,14 @@ export function KnowledgePage({ harness, onSave }) {
 						indexMethod: baseRetrievalDraft.indexMethod || 'keyword',
 						retrievalStrategy: baseRetrievalDraft.retrievalStrategy || 'keyword',
 						embeddingProvider: baseRetrievalDraft.embeddingProvider || 'none',
-						embeddingModel: baseRetrievalDraft.embeddingProvider === 'local_hash' ? 'local-hash-v1' : '',
+						embeddingModel: baseRetrievalDraft.embeddingModel || '',
+						embeddingDimensions: Number(baseRetrievalDraft.embeddingDimensions) || 0,
+						embeddingBaseUrl: baseRetrievalDraft.embeddingBaseUrl || '',
+						embeddingApiKeyEnv: baseRetrievalDraft.embeddingApiKeyEnv || '',
+						vectorStore: baseRetrievalDraft.vectorStore || 'local_json',
+						qdrantUrl: baseRetrievalDraft.qdrantUrl || 'http://localhost:6333',
+						qdrantCollection: baseRetrievalDraft.qdrantCollection || '',
+						qdrantApiKeyEnv: baseRetrievalDraft.qdrantApiKeyEnv || '',
 					},
 				}),
 			});
@@ -331,8 +338,16 @@ export function KnowledgePage({ harness, onSave }) {
 				settings: {
 					...settings,
 					embeddingProvider: baseRetrievalDraft?.embeddingProvider || selectedBase.settings?.embeddingProvider || 'none',
+					embeddingModel: baseRetrievalDraft?.embeddingModel || selectedBase.settings?.embeddingModel || '',
+					embeddingDimensions: baseRetrievalDraft?.embeddingDimensions || selectedBase.settings?.embeddingDimensions || 0,
+					embeddingBaseUrl: baseRetrievalDraft?.embeddingBaseUrl || selectedBase.settings?.embeddingBaseUrl || '',
+					embeddingApiKeyEnv: baseRetrievalDraft?.embeddingApiKeyEnv || selectedBase.settings?.embeddingApiKeyEnv || '',
 					indexMethod: baseRetrievalDraft?.indexMethod || selectedBase.settings?.indexMethod || 'keyword',
 					retrievalStrategy: baseRetrievalDraft?.retrievalStrategy || selectedBase.settings?.retrievalStrategy || 'keyword',
+					vectorStore: baseRetrievalDraft?.vectorStore || selectedBase.settings?.vectorStore || 'local_json',
+					qdrantUrl: baseRetrievalDraft?.qdrantUrl || selectedBase.settings?.qdrantUrl || 'http://localhost:6333',
+					qdrantCollection: baseRetrievalDraft?.qdrantCollection || selectedBase.settings?.qdrantCollection || '',
+					qdrantApiKeyEnv: baseRetrievalDraft?.qdrantApiKeyEnv || selectedBase.settings?.qdrantApiKeyEnv || '',
 				},
 			});
 			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(selectedBase.id)}/files`, {
@@ -377,6 +392,32 @@ export function KnowledgePage({ harness, onSave }) {
 			setStatus('Retrieval preview updated.');
 		} catch (err) {
 			setError(err.message || 'Failed to retrieve knowledge.');
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	async function testEmbeddingSettings() {
+		if (!baseRetrievalDraft) return;
+		setIsLoading(true);
+		setError('');
+		try {
+			const res = await apiFetch('/api/knowledge-bases/test-embedding', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					text: 'LLM Space embedding test',
+					settings: {
+						...(selectedRawBase?.settings || {}),
+						...baseRetrievalDraft,
+					},
+				}),
+			});
+			if (!res.ok) throw new Error((await res.json()).error || `Embedding test failed (${res.status})`);
+			const result = await res.json();
+			setStatus(`Embedding OK: ${result.embeddingProvider} / ${result.embeddingModel || 'none'} (${result.vectorDimensions} dims).`);
+		} catch (err) {
+			setError(err.message || 'Failed to test embedding settings.');
 		} finally {
 			setIsLoading(false);
 		}
@@ -546,9 +587,46 @@ export function KnowledgePage({ harness, onSave }) {
 										<span>Embedding provider</span>
 										<select className="input" value={baseRetrievalDraft?.embeddingProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingProvider: event.target.value }))}>
 											<option value="none">None</option>
-											<option value="local_hash">Local Hash</option>
+											<option value="zhipu_embedding_3">Zhipu embedding-3</option>
+											<option value="openai_compatible">OpenAI-compatible</option>
 										</select>
 									</label>
+									<label>
+										<span>Embedding model</span>
+										<input className="input" value={baseRetrievalDraft?.embeddingModel ?? ''} placeholder="embedding-3" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingModel: event.target.value }))} />
+									</label>
+									<label>
+										<span>Dimensions</span>
+										<input className="input" type="number" min="1" max="8192" value={baseRetrievalDraft?.embeddingDimensions ?? ''} placeholder="1024" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingDimensions: event.target.value }))} />
+									</label>
+									<label>
+										<span>Embedding URL</span>
+										<input className="input" value={baseRetrievalDraft?.embeddingBaseUrl ?? ''} placeholder="https://open.bigmodel.cn/api/paas/v4/embeddings" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingBaseUrl: event.target.value }))} />
+									</label>
+									<label>
+										<span>API key env</span>
+										<input className="input" value={baseRetrievalDraft?.embeddingApiKeyEnv ?? ''} placeholder="ZHIPU_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingApiKeyEnv: event.target.value }))} />
+									</label>
+									<label>
+										<span>Vector store</span>
+										<select className="input" value={baseRetrievalDraft?.vectorStore || 'local_json'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), vectorStore: event.target.value }))}>
+											<option value="local_json">Local JSON</option>
+											<option value="qdrant">Qdrant</option>
+										</select>
+									</label>
+									<label>
+										<span>Qdrant URL</span>
+										<input className="input" value={baseRetrievalDraft?.qdrantUrl ?? ''} placeholder="http://localhost:6333" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantUrl: event.target.value }))} />
+									</label>
+									<label>
+										<span>Qdrant collection</span>
+										<input className="input" value={baseRetrievalDraft?.qdrantCollection ?? ''} placeholder="auto per KB" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantCollection: event.target.value }))} />
+									</label>
+									<label>
+										<span>Qdrant key env</span>
+										<input className="input" value={baseRetrievalDraft?.qdrantApiKeyEnv ?? ''} placeholder="optional" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantApiKeyEnv: event.target.value }))} />
+									</label>
+									<button className="btn btn-ghost" onClick={testEmbeddingSettings} disabled={isLoading || (baseRetrievalDraft?.embeddingProvider || 'none') === 'none'}>Test Embedding</button>
 									<label>
 										<span>Top K</span>
 										<input className="input" type="number" min="1" max="50" value={baseRetrievalDraft?.topK ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />

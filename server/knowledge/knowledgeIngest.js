@@ -4,7 +4,7 @@ import { createKnowledgeChunks } from './knowledgeChunking.js';
 import { loadKnowledgeDocument } from './documentLoaders.js';
 import { embedKnowledgeTexts } from './embeddingProviders.js';
 import { buildKeywordIndex } from './knowledgeIndex.js';
-import { buildVectorIndex } from './vectorIndex.js';
+import { persistKnowledgeVectors } from './vectorStores.js';
 import {
 	loadKnowledgeBase,
 	loadKnowledgeChunks,
@@ -12,7 +12,6 @@ import {
 	saveKnowledgeChunks,
 	saveKnowledgeFiles,
 	saveKnowledgeIndex,
-	saveKnowledgeVectorIndex,
 	updateKnowledgeBaseMetadata,
 } from './knowledgeStore.js';
 import { recordKnowledgePipelineEvent } from './knowledgePipelineTrace.js';
@@ -131,14 +130,14 @@ export async function ingestKnowledgeFile({
 		texts: nextChunks.map(chunk => chunk.text),
 		settings: effectiveSettings,
 	});
-	const vectorIndex = buildVectorIndex({
+	const vectorIndex = await persistKnowledgeVectors({
+		knowledgeBaseId,
 		chunks: nextChunks,
 		vectors: embeddingResult.vectors,
-		embeddingProvider: embeddingResult.embeddingProvider,
-		embeddingModel: embeddingResult.embeddingModel,
-		embeddingDimensions: embeddingResult.embeddingDimensions,
+		embedding: embeddingResult,
+		settings: effectiveSettings,
+		knowledgeRoot,
 	});
-	await saveKnowledgeVectorIndex({ knowledgeBaseId, index: vectorIndex, knowledgeRoot });
 	await updateKnowledgeBaseMetadata({
 		knowledgeBaseId,
 		patch: {

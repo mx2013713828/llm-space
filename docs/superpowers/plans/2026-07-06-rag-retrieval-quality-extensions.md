@@ -101,14 +101,18 @@ Those come after the retrieval settings and observability contract is stable.
 - [x] Build vector index during ingest when embeddings are enabled.
 - [x] Add Knowledge UI controls for embedding provider, index method, and retrieval strategy.
 - [x] Add unit and ingest tests for embedding/vector behavior.
-- [ ] Support OpenAI-compatible embedding API with fake HTTP tests.
-- [ ] Store remote provider config as references, not raw secrets in KB files.
+- [x] Support OpenAI-compatible embedding API with fake HTTP tests.
+- [x] Add first real provider preset: Zhipu `embedding-3`.
+- [x] Store remote provider config as references, not raw secrets in KB files.
+- [x] Add `test-embedding` API and Knowledge UI test action.
 
 ### Phase 4: Vector And Hybrid Index
 
 - [x] Add `vectorIndex.js`.
 - [x] Store vectors separately from chunks in `vector-index.json`.
 - [x] Add `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid' })`.
+- [x] Add `vectorStores.js` with local JSON and Qdrant adapters.
+- [x] Add Qdrant collection/upsert/search tests with fake HTTP.
 - [ ] Add stronger hybrid weighting controls and comparison records.
 
 ### Phase 5: Rerank And Evaluation

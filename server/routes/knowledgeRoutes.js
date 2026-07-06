@@ -12,6 +12,7 @@ import {
 	ingestKnowledgeFile,
 	previewKnowledgeChunks,
 } from '../knowledge/knowledgeIngest.js';
+import { embedKnowledgeTexts } from '../knowledge/embeddingProviders.js';
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getKnowledgePipelineTrace } from '../knowledge/knowledgePipelineTrace.js';
 import { listKnowledgeRetrievalRecords } from '../knowledge/knowledgeRetrievalRecords.js';
@@ -92,6 +93,24 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				contentBase64: req.body?.contentBase64,
 				settings: req.body?.settings || {},
 			}));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
+	app.post('/api/knowledge-bases/test-embedding', async (req, res) => {
+		try {
+			const result = await embedKnowledgeTexts({
+				texts: [req.body?.text || 'LLM Space embedding test'],
+				settings: req.body?.settings || {},
+			});
+			res.json({
+				embeddingProvider: result.embeddingProvider,
+				embeddingModel: result.embeddingModel,
+				embeddingDimensions: result.embeddingDimensions,
+				vectorCount: result.vectors.length,
+				vectorDimensions: result.vectors[0]?.length || 0,
+			});
 		} catch (err) {
 			res.status(400).json({ error: err.message });
 		}

@@ -6,7 +6,8 @@ const KB_ID_PATTERN = /^kb_[a-z0-9][a-z0-9_-]*$/;
 const HARNESS_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const SUPPORTED_INDEX_METHODS = new Set(['keyword', 'vector', 'hybrid']);
 const SUPPORTED_RETRIEVAL_STRATEGIES = new Set(['keyword', 'vector', 'hybrid']);
-const SUPPORTED_EMBEDDING_PROVIDERS = new Set(['none', 'local_hash']);
+const SUPPORTED_EMBEDDING_PROVIDERS = new Set(['none', 'local_hash', 'zhipu_embedding_3', 'openai_compatible']);
+const SUPPORTED_VECTOR_STORES = new Set(['local_json', 'qdrant']);
 
 export function getKnowledgeRoot({ knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	return path.resolve(knowledgeRoot);
@@ -214,6 +215,13 @@ export function normalizeKnowledgeSettings(settings = {}) {
 		retrievalStrategy: normalizeEnum(input.retrievalStrategy, 'keyword', SUPPORTED_RETRIEVAL_STRATEGIES),
 		embeddingProvider: normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS),
 		embeddingModel: normalizeEmbeddingModel(input),
+		embeddingDimensions: normalizeEmbeddingDimensions(input),
+		embeddingBaseUrl: normalizeEmbeddingBaseUrl(input),
+		embeddingApiKeyEnv: normalizeEnvName(input.embeddingApiKeyEnv),
+		vectorStore: normalizeEnum(input.vectorStore, 'local_json', SUPPORTED_VECTOR_STORES),
+		qdrantUrl: String(input.qdrantUrl || 'http://localhost:6333').replace(/\/+$/, ''),
+		qdrantCollection: String(input.qdrantCollection || '').trim().replace(/[^A-Za-z0-9_-]/g, '_'),
+		qdrantApiKeyEnv: normalizeEnvName(input.qdrantApiKeyEnv),
 	};
 }
 
@@ -231,7 +239,30 @@ function createEmptyVectorIndex() {
 function normalizeEmbeddingModel(input) {
 	const provider = normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS);
 	if (provider === 'local_hash') return String(input.embeddingModel || 'local-hash-v1');
+	if (provider === 'zhipu_embedding_3') return String(input.embeddingModel || 'embedding-3');
+	if (provider === 'openai_compatible') return String(input.embeddingModel || 'text-embedding-3-small');
 	return '';
+}
+
+function normalizeEmbeddingDimensions(input) {
+	const provider = normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS);
+	if (provider === 'local_hash') return 128;
+	if (provider === 'zhipu_embedding_3') return normalizeInteger(input.embeddingDimensions, 1024, { min: 256, max: 2048 });
+	if (provider === 'openai_compatible') return normalizeInteger(input.embeddingDimensions, 1536, { min: 1, max: 8192 });
+	return 0;
+}
+
+function normalizeEmbeddingBaseUrl(input) {
+	const provider = normalizeEnum(input.embeddingProvider || input.embedding_provider, 'none', SUPPORTED_EMBEDDING_PROVIDERS);
+	const value = String(input.embeddingBaseUrl || '').trim();
+	if (value) return value;
+	if (provider === 'zhipu_embedding_3') return 'https://open.bigmodel.cn/api/paas/v4/embeddings';
+	if (provider === 'openai_compatible') return 'https://api.openai.com/v1/embeddings';
+	return '';
+}
+
+function normalizeEnvName(value) {
+	return String(value || '').trim().replace(/[^A-Za-z0-9_]/g, '');
 }
 
 function normalizeInteger(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {

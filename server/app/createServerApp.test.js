@@ -54,6 +54,7 @@ test('createServerApp installs runtime middleware and core route groups', () => 
       'POST /api/knowledge-bases/:knowledgeBaseId/files',
       'POST /api/knowledge-bases/preview-chunks',
       'POST /api/knowledge-bases/retrieve',
+      'POST /api/knowledge-bases/test-embedding',
       'POST /api/memory/:harnessId/candidates/:candidateId/approve',
       'POST /api/memory/:harnessId/candidates/:candidateId/reject',
       'POST /api/models',

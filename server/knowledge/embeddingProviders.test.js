@@ -13,6 +13,8 @@ test('normalizeEmbeddingSettings defaults to disabled embeddings', () => {
 		embeddingProvider: 'none',
 		embeddingModel: '',
 		embeddingDimensions: 0,
+		embeddingBaseUrl: '',
+		embeddingApiKeyEnv: '',
 	});
 	assert.equal(isEmbeddingEnabled({}), false);
 });
@@ -41,5 +43,40 @@ test('unknown embedding providers are safely disabled', () => {
 		embeddingProvider: 'none',
 		embeddingModel: '',
 		embeddingDimensions: 0,
+		embeddingBaseUrl: '',
+		embeddingApiKeyEnv: '',
 	});
+});
+
+test('zhipu_embedding_3 calls an OpenAI-compatible embeddings API without storing raw keys', async () => {
+	const calls = [];
+	const result = await embedKnowledgeTexts({
+		texts: ['alpha', 'beta'],
+		settings: {
+			embeddingProvider: 'zhipu_embedding_3',
+			embeddingApiKeyEnv: 'ZHIPU_API_KEY',
+			embeddingDimensions: 4,
+		},
+		env: { ZHIPU_API_KEY: 'secret-key' },
+		fetchImpl: async (url, options) => {
+			calls.push({ url, options });
+			return {
+				ok: true,
+				json: async () => ({
+					data: [
+						{ index: 1, embedding: [0, 1, 0, 0] },
+						{ index: 0, embedding: [1, 0, 0, 0] },
+					],
+				}),
+			};
+		},
+	});
+
+	assert.equal(result.embeddingProvider, 'zhipu_embedding_3');
+	assert.equal(result.embeddingModel, 'embedding-3');
+	assert.equal(result.embeddingDimensions, 256);
+	assert.deepEqual(result.vectors, [[1, 0, 0, 0], [0, 1, 0, 0]]);
+	assert.equal(calls[0].url, 'https://open.bigmodel.cn/api/paas/v4/embeddings');
+	assert.equal(calls[0].options.headers.authorization, 'Bearer secret-key');
+	assert.equal(JSON.parse(calls[0].options.body).model, 'embedding-3');
 });

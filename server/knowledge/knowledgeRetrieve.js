@@ -2,11 +2,10 @@ import {
 	loadKnowledgeBase,
 	loadKnowledgeChunks,
 	loadKnowledgeIndex,
-	loadKnowledgeVectorIndex,
 } from './knowledgeStore.js';
 import { embedKnowledgeTexts } from './embeddingProviders.js';
 import { retrieveFromKeywordIndex } from './knowledgeIndex.js';
-import { retrieveFromVectorIndex } from './vectorIndex.js';
+import { retrieveKnowledgeVectors } from './vectorStores.js';
 import { recordKnowledgePipelineEvent } from './knowledgePipelineTrace.js';
 import { recordKnowledgeRetrieval } from './knowledgeRetrievalRecords.js';
 
@@ -157,19 +156,19 @@ async function retrieveForStrategy({
 
 async function retrieveVector({ query, chunks, knowledgeBaseId, settings, topK, maxChars, scoreThreshold, knowledgeRoot }) {
 	if (settings?.embeddingProvider === 'none') return [];
-	const vectorIndex = await loadKnowledgeVectorIndex({ knowledgeBaseId, knowledgeRoot });
-	if (!vectorIndex?.vectorCount) return [];
 	const embedding = await embedKnowledgeTexts({
 		texts: [query],
 		settings,
 	});
-	return retrieveFromVectorIndex({
+	return retrieveKnowledgeVectors({
+		knowledgeBaseId,
 		queryVector: embedding.vectors[0],
 		chunks,
-		index: vectorIndex,
+		settings,
 		topK,
 		maxChars,
 		scoreThreshold,
+		knowledgeRoot,
 	});
 }
 
