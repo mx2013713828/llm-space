@@ -88,12 +88,15 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				settings: req.body?.settings || {},
 				knowledgeRoot,
 			});
+			const knowledgeBase = await loadKnowledgeBase({
+				knowledgeBaseId: req.params.knowledgeBaseId,
+				knowledgeRoot,
+			});
 			res.json({
 				...result,
-				knowledgeBase: await loadKnowledgeBase({
-					knowledgeBaseId: req.params.knowledgeBaseId,
-					knowledgeRoot,
-				}),
+				chunkCount: Array.isArray(result.chunks) ? result.chunks.length : 0,
+				totalChunkCount: knowledgeBase.chunkCount,
+				knowledgeBase,
 			});
 		} catch (err) {
 			res.status(400).json({ error: err.message });

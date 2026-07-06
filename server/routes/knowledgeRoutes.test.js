@@ -36,6 +36,8 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   });
   assert.equal(ingestRes.status, 200);
   assert.equal(ingestRes.body.chunks.length, 1);
+  assert.equal(ingestRes.body.chunkCount, 1);
+  assert.equal(ingestRes.body.totalChunkCount, 1);
   assert.equal(ingestRes.body.knowledgeBase.fileCount, 1);
   assert.equal(ingestRes.body.knowledgeBase.chunkCount, 1);
 

@@ -246,7 +246,8 @@ export function KnowledgePage({ harness, onSave }) {
 			setKnowledgeBases(prev => prev.map(base => base.id === result.knowledgeBase.id ? result.knowledgeBase : base));
 			setSelectedFile(null);
 			await loadFiles(selectedBase.id);
-			setStatus(`Indexed ${result.file.filename}: ${result.chunkCount} chunks.`);
+			const indexedChunkCount = Number(result.chunkCount ?? result.chunks?.length ?? 0);
+			setStatus(`Indexed ${result.file.filename}: ${indexedChunkCount} chunks.`);
 		} catch (err) {
 			setError(err.message || 'Failed to index file.');
 		} finally {
