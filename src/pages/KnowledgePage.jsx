@@ -22,6 +22,18 @@ const DEFAULT_SETTINGS = {
 	overlap: 150,
 };
 
+const ACCEPTED_KNOWLEDGE_FILE_TYPES = [
+	'.md',
+	'.markdown',
+	'.txt',
+	'.json',
+	'.csv',
+	'text/markdown',
+	'text/plain',
+	'text/csv',
+	'application/json',
+].join(',');
+
 function compactSnippet(text = '', maxLength = 320) {
 	const compact = String(text || '').replace(/\s+/g, ' ').trim();
 	return compact.length > maxLength ? `${compact.slice(0, maxLength)}...` : compact;
@@ -537,7 +549,7 @@ export function KnowledgePage({ harness, onSave }) {
 											id={`knowledge-file-${selectedBase.id}`}
 											className="knowledge-file-input"
 											type="file"
-											accept=".md,.markdown,.txt,.json,text/markdown,text/plain,application/json"
+											accept={ACCEPTED_KNOWLEDGE_FILE_TYPES}
 											onChange={event => setSelectedFile(event.target.files?.[0] || null)}
 										/>
 										<label className="btn btn-ghost knowledge-file-select" htmlFor={`knowledge-file-${selectedBase.id}`}>
@@ -545,7 +557,7 @@ export function KnowledgePage({ harness, onSave }) {
 										</label>
 										<div className="knowledge-file-summary">
 											<strong>{selectedFile ? selectedFile.name : 'No file selected'}</strong>
-											<span>{selectedFile ? formatKnowledgeFileSize(selectedFile.size) : 'Markdown, text, or JSON'}</span>
+											<span>{selectedFile ? formatKnowledgeFileSize(selectedFile.size) : 'Markdown, text, JSON, or CSV'}</span>
 										</div>
 									</div>
 									<div className="knowledge-file-action">
@@ -564,7 +576,7 @@ export function KnowledgePage({ harness, onSave }) {
 											<div key={file.id} className="knowledge-file-row">
 												<div>
 													<strong>{file.filename}</strong>
-													<small>{file.parser} · {formatDate(file.importedAt)}</small>
+													<small>{file.loader || file.parser} · {formatDate(file.importedAt)}</small>
 												</div>
 												<span>{formatKnowledgeFileSize(file.size)}</span>
 											</div>

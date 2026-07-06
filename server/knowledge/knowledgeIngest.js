@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
 import { createKnowledgeChunks } from './knowledgeChunking.js';
+import { loadKnowledgeDocument } from './documentLoaders.js';
 import { buildKeywordIndex } from './knowledgeIndex.js';
-import { parseKnowledgeFile } from './knowledgeParsers.js';
 import {
 	loadKnowledgeBase,
 	loadKnowledgeChunks,
@@ -20,7 +20,7 @@ export async function previewKnowledgeChunks({
 	content,
 	settings = {},
 } = {}) {
-	const parsed = parseKnowledgeFile({ filename, mimeType, content, parserConfig: settings });
+	const parsed = loadKnowledgeDocument({ filename, mimeType, content, loaderConfig: settings });
 	return createKnowledgeChunks({
 		knowledgeBaseId: 'kb_preview',
 		fileId: 'preview',
@@ -54,7 +54,7 @@ export async function ingestKnowledgeFile({
 		knowledgeRoot,
 		now,
 	});
-	const parsed = parseKnowledgeFile({ filename, mimeType, content, parserConfig: effectiveSettings });
+	const parsed = loadKnowledgeDocument({ filename, mimeType, content, loaderConfig: effectiveSettings });
 	await recordKnowledgePipelineEvent({
 		knowledgeBaseId,
 		runId,
@@ -70,6 +70,7 @@ export async function ingestKnowledgeFile({
 		filename: parsed.metadata.filename,
 		mimeType: parsed.metadata.mimeType || String(mimeType || ''),
 		parser: parsed.metadata.parser,
+		loader: parsed.metadata.loader || parsed.metadata.parser,
 		size: String(content ?? '').length,
 		importedAt: toIsoString(now()),
 		settings: effectiveSettings,

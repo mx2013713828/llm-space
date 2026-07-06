@@ -84,9 +84,11 @@ Those come after the retrieval settings and observability contract is stable.
 
 ### Phase 2: Document Loaders
 
-- Add `documentLoaders.js`.
-- Route current Markdown/text/JSON through loader adapters.
-- Add at least one richer format behind tests before UI exposure.
+- [x] Add `documentLoaders.js`.
+- [x] Route current Markdown/text/JSON through loader adapters.
+- [x] Add CSV loader behind tests and UI file selection.
+- [x] Preserve compatibility through `parseKnowledgeFile`.
+- [x] Run `npm test` and `npm run build`.
 
 ### Phase 3: Embedding Providers
 

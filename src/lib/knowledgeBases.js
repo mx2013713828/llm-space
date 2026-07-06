@@ -1,4 +1,4 @@
-const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json']);
+const SUPPORTED_EXTENSIONS = new Set(['.md', '.markdown', '.txt', '.json', '.csv']);
 
 function getExtension(filename = '') {
 	const trimmed = String(filename || '').trim().toLowerCase();

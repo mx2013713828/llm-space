@@ -61,3 +61,30 @@ test('ingestKnowledgeFile persists file metadata, chunks, index, and trace event
   assert.equal(retrieval.chunks.length, 1);
   assert.equal(retrieval.chunks[0].source.filename, 'weather.md');
 });
+
+test('ingestKnowledgeFile loads CSV through document loader adapters', async (t) => {
+  const { rootDir } = await createFixture(t);
+  const kb = await createKnowledgeBase({ name: 'Models', knowledgeRoot: rootDir });
+
+  const result = await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'models.csv',
+    mimeType: 'text/csv',
+    content: 'name,context\nDeepSeek V4,1000000\nKimi,128000',
+    settings: { chunkSize: 400, overlap: 0 },
+    knowledgeRoot: rootDir,
+  });
+
+  assert.equal(result.file.parser, 'csv');
+  assert.equal(result.file.loader, 'csv');
+  assert.equal(result.chunks.length, 1);
+  assert.match(result.chunks[0].text, /name: DeepSeek V4/);
+
+  const retrieval = await retrieveKnowledge({
+    knowledgeBaseIds: [kb.id],
+    query: 'DeepSeek context',
+    knowledgeRoot: rootDir,
+  });
+  assert.equal(retrieval.chunks.length, 1);
+  assert.equal(retrieval.chunks[0].source.filename, 'models.csv');
+});

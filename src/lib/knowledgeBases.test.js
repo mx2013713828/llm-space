@@ -22,6 +22,7 @@ test('isSupportedKnowledgeFile accepts MVP document types only', () => {
 	assert.equal(isSupportedKnowledgeFile('README.markdown'), true);
 	assert.equal(isSupportedKnowledgeFile('policy.txt'), true);
 	assert.equal(isSupportedKnowledgeFile('schema.json'), true);
+	assert.equal(isSupportedKnowledgeFile('table.csv'), true);
 	assert.equal(isSupportedKnowledgeFile('report.pdf'), false);
 	assert.equal(isSupportedKnowledgeFile(''), false);
 });
