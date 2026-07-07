@@ -177,7 +177,7 @@ Jobs are scoped to a harness and run through the same agent executor path. If th
 
 ### Knowledge Bases
 
-Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, and keyword / vector / hybrid retrieval strategies.
+Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, keyword / vector / hybrid retrieval strategies, and optional Qwen3 rerank.
 
 Users can create local knowledge bases, import Markdown/text/JSON/CSV/PDF/DOCX files, generate bounded chunks and indexes, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
@@ -206,14 +206,19 @@ Vector store: Qdrant
 Qdrant URL: http://localhost:6333
 Qdrant collection: leave empty for auto naming, or use rag_test
 Qdrant key env: empty for local Qdrant; QDRANT_API_KEY for Qdrant Cloud
+Rerank provider: Qwen3 Rerank
+Rerank model: qwen3-rerank
+Rerank URL: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks
+Rerank key env: DASHSCOPE_API_KEY
+Rerank top N: 5
 ```
 
 Test flow:
 
-1. Set `ZHIPU_API_KEY` in `.env`, then restart `npm run dev`.
+1. Set `ZHIPU_API_KEY` and `DASHSCOPE_API_KEY` in `.env`, then restart `npm run dev`.
 2. Run `docker compose --env-file docker/qdrant.env up -d qdrant`.
 3. Create or open a Knowledge Base in the Knowledge page.
-4. Fill the Retrieval Quality settings above and click `Test Embedding`.
+4. Fill the Retrieval Quality settings above, replace `{WorkspaceId}` with your Alibaba Cloud Model Studio workspace id, then click `Test Embedding` and `Test Rerank`.
 5. Click `Save Retrieval Settings`.
 6. Select files again and click `Index`. Existing files are not automatically re-vectorized after switching vector stores.
 7. Compare `Keyword`, `Vector`, and `Hybrid` in Retrieval Test.

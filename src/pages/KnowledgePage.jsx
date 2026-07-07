@@ -308,6 +308,12 @@ export function KnowledgePage({ harness, onSave }) {
 						qdrantUrl: baseRetrievalDraft.qdrantUrl || 'http://localhost:6333',
 						qdrantCollection: baseRetrievalDraft.qdrantCollection || '',
 						qdrantApiKeyEnv: baseRetrievalDraft.qdrantApiKeyEnv || '',
+						rerankProvider: baseRetrievalDraft.rerankProvider || 'none',
+						rerankModel: baseRetrievalDraft.rerankModel || '',
+						rerankBaseUrl: baseRetrievalDraft.rerankBaseUrl || '',
+						rerankApiKeyEnv: baseRetrievalDraft.rerankApiKeyEnv || '',
+						rerankTopN: Number(baseRetrievalDraft.rerankTopN) || 0,
+						rerankInstruct: baseRetrievalDraft.rerankInstruct || '',
 					},
 				}),
 			});
@@ -348,6 +354,12 @@ export function KnowledgePage({ harness, onSave }) {
 					qdrantUrl: baseRetrievalDraft?.qdrantUrl || selectedBase.settings?.qdrantUrl || 'http://localhost:6333',
 					qdrantCollection: baseRetrievalDraft?.qdrantCollection || selectedBase.settings?.qdrantCollection || '',
 					qdrantApiKeyEnv: baseRetrievalDraft?.qdrantApiKeyEnv || selectedBase.settings?.qdrantApiKeyEnv || '',
+					rerankProvider: baseRetrievalDraft?.rerankProvider || selectedBase.settings?.rerankProvider || 'none',
+					rerankModel: baseRetrievalDraft?.rerankModel || selectedBase.settings?.rerankModel || '',
+					rerankBaseUrl: baseRetrievalDraft?.rerankBaseUrl || selectedBase.settings?.rerankBaseUrl || '',
+					rerankApiKeyEnv: baseRetrievalDraft?.rerankApiKeyEnv || selectedBase.settings?.rerankApiKeyEnv || '',
+					rerankTopN: baseRetrievalDraft?.rerankTopN || selectedBase.settings?.rerankTopN || 0,
+					rerankInstruct: baseRetrievalDraft?.rerankInstruct || selectedBase.settings?.rerankInstruct || '',
 				},
 			});
 			const res = await apiFetch(`/api/knowledge-bases/${encodeURIComponent(selectedBase.id)}/files`, {
@@ -384,6 +396,7 @@ export function KnowledgePage({ harness, onSave }) {
 					maxChars: baseRetrievalDraft?.maxChars || selectedBase.settings?.maxChars || 4000,
 					scoreThreshold: baseRetrievalDraft?.scoreThreshold || selectedBase.settings?.scoreThreshold || 0,
 					strategy: baseRetrievalDraft?.retrievalStrategy || selectedBase.settings?.retrievalStrategy || 'keyword',
+					rerank: (baseRetrievalDraft?.rerankProvider || selectedBase.settings?.rerankProvider || 'none') !== 'none',
 				}),
 			});
 			if (!res.ok) throw new Error((await res.json()).error || `Retrieve failed (${res.status})`);
@@ -418,6 +431,32 @@ export function KnowledgePage({ harness, onSave }) {
 			setStatus(`Embedding OK: ${result.embeddingProvider} / ${result.embeddingModel || 'none'} (${result.vectorDimensions} dims).`);
 		} catch (err) {
 			setError(err.message || 'Failed to test embedding settings.');
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	async function testRerankSettings() {
+		if (!baseRetrievalDraft) return;
+		setIsLoading(true);
+		setError('');
+		try {
+			const res = await apiFetch('/api/knowledge-bases/test-rerank', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					query: 'What is LLM Space?',
+					settings: {
+						...(selectedRawBase?.settings || {}),
+						...baseRetrievalDraft,
+					},
+				}),
+			});
+			if (!res.ok) throw new Error((await res.json()).error || `Rerank test failed (${res.status})`);
+			const result = await res.json();
+			setStatus(`Rerank OK: ${result.rerankProvider} / ${result.rerankModel || 'none'} (top score ${Number(result.topScore || 0).toFixed(3)}).`);
+		} catch (err) {
+			setError(err.message || 'Failed to test rerank settings.');
 		} finally {
 			setIsLoading(false);
 		}
@@ -627,6 +666,34 @@ export function KnowledgePage({ harness, onSave }) {
 										<input className="input" value={baseRetrievalDraft?.qdrantApiKeyEnv ?? ''} placeholder="optional" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantApiKeyEnv: event.target.value }))} />
 									</label>
 									<button className="btn btn-ghost" onClick={testEmbeddingSettings} disabled={isLoading || (baseRetrievalDraft?.embeddingProvider || 'none') === 'none'}>Test Embedding</button>
+									<label>
+										<span>Rerank provider</span>
+										<select className="input" value={baseRetrievalDraft?.rerankProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankProvider: event.target.value }))}>
+											<option value="none">None</option>
+											<option value="qwen3_rerank">Qwen3 Rerank</option>
+										</select>
+									</label>
+									<label>
+										<span>Rerank model</span>
+										<input className="input" value={baseRetrievalDraft?.rerankModel ?? ''} placeholder="qwen3-rerank" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankModel: event.target.value }))} />
+									</label>
+									<label>
+										<span>Rerank URL</span>
+										<input className="input" value={baseRetrievalDraft?.rerankBaseUrl ?? ''} placeholder="https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankBaseUrl: event.target.value }))} />
+									</label>
+									<label>
+										<span>Rerank key env</span>
+										<input className="input" value={baseRetrievalDraft?.rerankApiKeyEnv ?? ''} placeholder="DASHSCOPE_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankApiKeyEnv: event.target.value }))} />
+									</label>
+									<label>
+										<span>Rerank top N</span>
+										<input className="input" type="number" min="0" max="100" value={baseRetrievalDraft?.rerankTopN ?? ''} placeholder="same as Top K" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankTopN: event.target.value }))} />
+									</label>
+									<label>
+										<span>Rerank instruct</span>
+										<input className="input" value={baseRetrievalDraft?.rerankInstruct ?? ''} placeholder="Given a web search query, retrieve relevant passages that answer the query." onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankInstruct: event.target.value }))} />
+									</label>
+									<button className="btn btn-ghost" onClick={testRerankSettings} disabled={isLoading || (baseRetrievalDraft?.rerankProvider || 'none') === 'none'}>Test Rerank</button>
 									<label>
 										<span>Top K</span>
 										<input className="input" type="number" min="1" max="50" value={baseRetrievalDraft?.topK ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />

@@ -60,6 +60,12 @@ test('normalizeKnowledgeBaseSummary returns stable display defaults', () => {
 			qdrantUrl: 'http://localhost:6333',
 			qdrantCollection: '',
 			qdrantApiKeyEnv: '',
+			rerankProvider: 'none',
+			rerankModel: '',
+			rerankBaseUrl: '',
+			rerankApiKeyEnv: '',
+			rerankTopN: 0,
+			rerankInstruct: '',
 		},
 		updatedAt: '2026-06-01T00:00:00.000Z',
 	});
@@ -89,6 +95,12 @@ test('normalizeRetrievalSettings returns stable retrieval quality defaults', () 
 		qdrantUrl: 'http://localhost:6333',
 		qdrantCollection: '',
 		qdrantApiKeyEnv: '',
+		rerankProvider: 'none',
+		rerankModel: '',
+		rerankBaseUrl: '',
+		rerankApiKeyEnv: '',
+		rerankTopN: 0,
+		rerankInstruct: '',
 	});
 });
 
@@ -132,6 +144,12 @@ test('buildKnowledgeFilePayload trims settings and preserves file metadata', () 
 			qdrantUrl: 'http://localhost:6333',
 			qdrantCollection: '',
 			qdrantApiKeyEnv: '',
+			rerankProvider: 'none',
+			rerankModel: '',
+			rerankBaseUrl: '',
+			rerankApiKeyEnv: '',
+			rerankTopN: 0,
+			rerankInstruct: '',
 		},
 	});
 });

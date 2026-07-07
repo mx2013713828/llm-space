@@ -52,6 +52,12 @@ export function normalizeRetrievalSettings(settings = {}) {
 		qdrantUrl: String(settings.qdrantUrl || 'http://localhost:6333'),
 		qdrantCollection: String(settings.qdrantCollection || ''),
 		qdrantApiKeyEnv: String(settings.qdrantApiKeyEnv || ''),
+		rerankProvider: String(settings.rerankProvider || 'none'),
+		rerankModel: String(settings.rerankModel || ''),
+		rerankBaseUrl: String(settings.rerankBaseUrl || ''),
+		rerankApiKeyEnv: String(settings.rerankApiKeyEnv || ''),
+		rerankTopN: toFiniteNumber(settings.rerankTopN, 0),
+		rerankInstruct: String(settings.rerankInstruct || ''),
 	};
 }
 
@@ -83,6 +89,12 @@ export function buildKnowledgeFilePayload({ file, content, contentBase64, settin
 			qdrantUrl: String(settings.qdrantUrl || 'http://localhost:6333'),
 			qdrantCollection: String(settings.qdrantCollection || ''),
 			qdrantApiKeyEnv: String(settings.qdrantApiKeyEnv || ''),
+			rerankProvider: String(settings.rerankProvider || 'none'),
+			rerankModel: String(settings.rerankModel || ''),
+			rerankBaseUrl: String(settings.rerankBaseUrl || ''),
+			rerankApiKeyEnv: String(settings.rerankApiKeyEnv || ''),
+			rerankTopN: toFiniteNumber(settings.rerankTopN, 0),
+			rerankInstruct: String(settings.rerankInstruct || ''),
 		},
 	};
 }

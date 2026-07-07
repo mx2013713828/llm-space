@@ -8,6 +8,7 @@ const SUPPORTED_INDEX_METHODS = new Set(['keyword', 'vector', 'hybrid']);
 const SUPPORTED_RETRIEVAL_STRATEGIES = new Set(['keyword', 'vector', 'hybrid']);
 const SUPPORTED_EMBEDDING_PROVIDERS = new Set(['none', 'local_hash', 'zhipu_embedding_3', 'openai_compatible']);
 const SUPPORTED_VECTOR_STORES = new Set(['local_json', 'qdrant']);
+const SUPPORTED_RERANK_PROVIDERS = new Set(['none', 'qwen3_rerank']);
 
 export function getKnowledgeRoot({ knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	return path.resolve(knowledgeRoot);
@@ -222,6 +223,12 @@ export function normalizeKnowledgeSettings(settings = {}) {
 		qdrantUrl: String(input.qdrantUrl || 'http://localhost:6333').replace(/\/+$/, ''),
 		qdrantCollection: String(input.qdrantCollection || '').trim().replace(/[^A-Za-z0-9_-]/g, '_'),
 		qdrantApiKeyEnv: normalizeEnvName(input.qdrantApiKeyEnv),
+		rerankProvider: normalizeEnum(input.rerankProvider, 'none', SUPPORTED_RERANK_PROVIDERS),
+		rerankModel: normalizeRerankModel(input),
+		rerankBaseUrl: normalizeRerankBaseUrl(input),
+		rerankApiKeyEnv: normalizeEnvName(input.rerankApiKeyEnv || (input.rerankProvider === 'qwen3_rerank' ? 'DASHSCOPE_API_KEY' : '')),
+		rerankTopN: normalizeInteger(input.rerankTopN, 0, { min: 0, max: 100 }),
+		rerankInstruct: normalizeRerankInstruct(input),
 	};
 }
 
@@ -263,6 +270,24 @@ function normalizeEmbeddingBaseUrl(input) {
 
 function normalizeEnvName(value) {
 	return String(value || '').trim().replace(/[^A-Za-z0-9_]/g, '');
+}
+
+function normalizeRerankModel(input) {
+	const provider = normalizeEnum(input.rerankProvider, 'none', SUPPORTED_RERANK_PROVIDERS);
+	if (provider === 'qwen3_rerank') return String(input.rerankModel || 'qwen3-rerank');
+	return '';
+}
+
+function normalizeRerankBaseUrl(input) {
+	const provider = normalizeEnum(input.rerankProvider, 'none', SUPPORTED_RERANK_PROVIDERS);
+	if (provider !== 'qwen3_rerank') return '';
+	return String(input.rerankBaseUrl || '').trim();
+}
+
+function normalizeRerankInstruct(input) {
+	const provider = normalizeEnum(input.rerankProvider, 'none', SUPPORTED_RERANK_PROVIDERS);
+	if (provider !== 'qwen3_rerank') return '';
+	return String(input.rerankInstruct || 'Given a web search query, retrieve relevant passages that answer the query.');
 }
 
 function normalizeInteger(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {

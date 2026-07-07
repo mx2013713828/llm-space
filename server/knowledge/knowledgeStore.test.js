@@ -41,6 +41,7 @@ test('createKnowledgeBase persists path-safe metadata and lists summaries', asyn
   assert.equal(kb.settings.retrievalStrategy, 'keyword');
   assert.equal(kb.settings.embeddingProvider, 'none');
   assert.equal(kb.settings.embeddingModel, '');
+  assert.equal(kb.settings.rerankProvider, 'none');
   assert.equal(kb.settings.topK, 5);
   assert.equal(kb.fileCount, 0);
   assert.equal(kb.chunkCount, 0);
@@ -61,6 +62,8 @@ test('normalize settings clamps retrieval quality options to supported MVP value
       indexMethod: 'vector',
       retrievalStrategy: 'hybrid',
       embeddingProvider: 'local_hash',
+      rerankProvider: 'qwen3_rerank',
+      rerankTopN: 999,
       topK: 0,
       maxChars: -20,
       scoreThreshold: '0.75',
@@ -72,6 +75,10 @@ test('normalize settings clamps retrieval quality options to supported MVP value
   assert.equal(kb.settings.retrievalStrategy, 'hybrid');
   assert.equal(kb.settings.embeddingProvider, 'local_hash');
   assert.equal(kb.settings.embeddingModel, 'local-hash-v1');
+  assert.equal(kb.settings.rerankProvider, 'qwen3_rerank');
+  assert.equal(kb.settings.rerankModel, 'qwen3-rerank');
+  assert.equal(kb.settings.rerankApiKeyEnv, 'DASHSCOPE_API_KEY');
+  assert.equal(kb.settings.rerankTopN, 100);
   assert.equal(kb.settings.topK, 1);
   assert.equal(kb.settings.maxChars, 500);
   assert.equal(kb.settings.scoreThreshold, 0.75);

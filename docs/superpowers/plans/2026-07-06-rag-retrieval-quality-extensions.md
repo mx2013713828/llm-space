@@ -16,7 +16,7 @@ Task 16 extends the existing keyword RAG MVP in layers:
 4. Embedding provider abstraction.
 5. Vector index abstraction.
 6. Hybrid retrieval and rerank adapters.
-7. Parent-child retrieval and evaluation hooks.
+7. Evaluation hooks and later parent-child retrieval experiments.
 
 The agent loop must not know provider-specific embedding details. It should continue calling `retrieveKnowledge(...)`; retrieval internals decide keyword/vector/hybrid behavior.
 
@@ -115,11 +115,14 @@ Those come after the retrieval settings and observability contract is stable.
 - [x] Add Qdrant collection/upsert/search tests with fake HTTP.
 - [x] Add Auto RAG confidence gate so low-score vector/hybrid results are observable but not injected.
 - [x] Show skipped retrieved knowledge in Context Inspector as `sentToModel: false`.
+- [x] Add Qwen3 rerank adapter through Alibaba Cloud Model Studio's rerank-compatible API.
+- [x] Add `test-rerank` API and Knowledge UI test action.
+- [x] Apply rerank after initial keyword/vector/hybrid retrieval while preserving original scores.
 - [ ] Add stronger hybrid weighting controls and comparison records.
 - [ ] Add retrieval evaluation records with injected/skipped decisions and top-score traces.
 
 ### Phase 5: Rerank And Evaluation
 
-- Add rerank adapter interface.
 - Add retrieval evaluation records and comparison view.
-- Keep rerank optional and bounded.
+- Add richer rerank comparison traces across pre-rerank and post-rerank orders.
+- Keep rerank optional, bounded, and provider-pluggable.

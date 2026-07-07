@@ -177,7 +177,7 @@ Cron Scheduler 暴露：
 
 ### 知识库
 
-Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储，以及 keyword / vector / hybrid 检索策略。
+Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储、keyword / vector / hybrid 检索策略，以及可选的 Qwen3 rerank 重排。
 
 用户可以创建本地知识库，导入 Markdown/text/JSON/CSV/PDF/DOCX 文件，生成有边界的 chunks 和索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
@@ -206,14 +206,19 @@ Vector store: Qdrant
 Qdrant URL: http://localhost:6333
 Qdrant collection: 留空自动生成，或填写 rag_test
 Qdrant key env: 本地留空；Qdrant Cloud 填 QDRANT_API_KEY
+Rerank provider: Qwen3 Rerank
+Rerank model: qwen3-rerank
+Rerank URL: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks
+Rerank key env: DASHSCOPE_API_KEY
+Rerank top N: 5
 ```
 
 测试步骤：
 
-1. 在 `.env` 中配置 `ZHIPU_API_KEY`，然后重启 `npm run dev`。
+1. 在 `.env` 中配置 `ZHIPU_API_KEY` 和 `DASHSCOPE_API_KEY`，然后重启 `npm run dev`。
 2. 运行 `docker compose --env-file docker/qdrant.env up -d qdrant`。
 3. 在 Knowledge 页面创建或打开一个 Knowledge Base。
-4. 填写上面的 Retrieval Quality 配置，点击 `Test Embedding`。
+4. 填写上面的 Retrieval Quality 配置，把 `{WorkspaceId}` 替换成阿里云百炼 / Model Studio 的工作空间 ID，然后点击 `Test Embedding` 和 `Test Rerank`。
 5. 点击 `Save Retrieval Settings`。
 6. 重新选择文件并点击 `Index`。切换向量存储后，旧文件不会自动补向量。
 7. 用 Retrieval Test 比较 `Keyword`、`Vector`、`Hybrid`。

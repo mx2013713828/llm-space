@@ -13,6 +13,7 @@ import {
 	previewKnowledgeChunks,
 } from '../knowledge/knowledgeIngest.js';
 import { embedKnowledgeTexts } from '../knowledge/embeddingProviders.js';
+import { rerankKnowledgeChunks } from '../knowledge/rerankProviders.js';
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getKnowledgePipelineTrace } from '../knowledge/knowledgePipelineTrace.js';
 import { listKnowledgeRetrievalRecords } from '../knowledge/knowledgeRetrievalRecords.js';
@@ -116,6 +117,30 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 		}
 	});
 
+	app.post('/api/knowledge-bases/test-rerank', async (req, res) => {
+		try {
+			const result = await rerankKnowledgeChunks({
+				query: req.body?.query || 'What is LLM Space?',
+				chunks: [
+					{ id: 'a', text: req.body?.positive || 'LLM Space is an agent harness workbench.' },
+					{ id: 'b', text: req.body?.negative || 'The weather is cloudy today.' },
+				],
+				settings: req.body?.settings || {},
+				topN: 2,
+			});
+			res.json({
+				rerankProvider: result.rerankProvider,
+				rerankModel: result.rerankModel,
+				resultCount: result.chunks.length,
+				topScore: result.chunks[0]?.rerankScore ?? result.chunks[0]?.score ?? 0,
+				topId: result.chunks[0]?.id || '',
+				usage: result.usage || null,
+			});
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
 	app.post('/api/knowledge-bases/:knowledgeBaseId/files', async (req, res) => {
 		try {
 			const result = await ingestKnowledgeFile({
@@ -151,6 +176,7 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 				maxChars: req.body?.maxChars,
 				scoreThreshold: req.body?.scoreThreshold,
 				strategy: req.body?.strategy,
+				rerank: req.body?.rerank,
 				recordRetrieval: req.body?.recordRetrieval !== false,
 				knowledgeRoot,
 			}));

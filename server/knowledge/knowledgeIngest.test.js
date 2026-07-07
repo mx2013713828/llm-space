@@ -130,3 +130,74 @@ test('ingestKnowledgeFile builds vector index when embedding provider is enabled
   assert.equal(retrieval.chunks.length, 1);
   assert.equal(retrieval.chunks[0].scoreType, 'vector');
 });
+
+test('retrieveKnowledge reranks initially retrieved chunks with Qwen-compatible API', async (t) => {
+  const { rootDir } = await createFixture(t);
+  const rerankSettings = {
+    chunkSize: 300,
+    overlap: 0,
+    retrievalStrategy: 'keyword',
+    rerankProvider: 'qwen3_rerank',
+    rerankModel: 'qwen3-rerank',
+    rerankBaseUrl: 'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks',
+    rerankApiKeyEnv: 'DASHSCOPE_API_KEY',
+    rerankTopN: 2,
+  };
+  const kb = await createKnowledgeBase({
+    name: 'Rerank Docs',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'mountable.md',
+    mimeType: 'text/markdown',
+    content: 'answer Mountable Knowledge Bases is the current experimental RAG feature.',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'mountain.md',
+    mimeType: 'text/markdown',
+    content: 'answer Mount Everest is the highest mountain on Earth.',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+
+  const retrieval = await retrieveKnowledge({
+    knowledgeBaseIds: [kb.id],
+    query: 'answer',
+    topK: 2,
+    rerank: true,
+    knowledgeRoot: rootDir,
+    env: { DASHSCOPE_API_KEY: 'test-key' },
+    fetchImpl: async (url, options) => {
+      assert.equal(url, rerankSettings.rerankBaseUrl);
+      assert.equal(options.headers.authorization, 'Bearer test-key');
+      const body = JSON.parse(options.body);
+      assert.equal(body.model, 'qwen3-rerank');
+      assert.equal(body.top_n, 2);
+      const mountableIndex = body.documents.findIndex(document => document.includes('Mountable Knowledge Bases'));
+      const otherIndex = mountableIndex === 0 ? 1 : 0;
+      return {
+        ok: true,
+        json: async () => ({
+          results: [
+            { index: mountableIndex, relevance_score: 0.98 },
+            { index: otherIndex, relevance_score: 0.12 },
+          ],
+          usage: { total_tokens: 42 },
+        }),
+      };
+    },
+  });
+
+  assert.equal(retrieval.effectiveSettings.rerankProvider, 'qwen3_rerank');
+  assert.equal(retrieval.chunks.length, 2);
+  assert.equal(retrieval.chunks[0].scoreType, 'rerank');
+  assert.equal(retrieval.chunks[0].rerankScore, 0.98);
+  assert.equal(retrieval.chunks[0].originalScore > 0, true);
+  assert.match(retrieval.chunks[0].text, /Mountable Knowledge Bases/);
+});

@@ -5,6 +5,7 @@ import {
 } from './knowledgeStore.js';
 import { embedKnowledgeTexts } from './embeddingProviders.js';
 import { retrieveFromKeywordIndex } from './knowledgeIndex.js';
+import { rerankKnowledgeChunks } from './rerankProviders.js';
 import { retrieveKnowledgeVectors } from './vectorStores.js';
 import { recordKnowledgePipelineEvent } from './knowledgePipelineTrace.js';
 import { recordKnowledgeRetrieval } from './knowledgeRetrievalRecords.js';
@@ -16,10 +17,13 @@ export async function retrieveKnowledge({
 	maxChars,
 	scoreThreshold,
 	strategy,
+	rerank,
 	knowledgeRoot,
 	recordRetrieval = false,
 	runId = `run_${Date.now().toString(36)}`,
 	now = () => new Date(),
+	fetchImpl = globalThis.fetch,
+	env = globalThis.process?.env || {},
 } = {}) {
 	const ids = [...new Set(Array.isArray(knowledgeBaseIds) ? knowledgeBaseIds : [])];
 	const chunks = [];
@@ -42,10 +46,12 @@ export async function retrieveKnowledge({
 		const effectiveMaxChars = maxChars ?? kb.settings?.maxChars ?? 8000;
 		const effectiveScoreThreshold = scoreThreshold ?? kb.settings?.scoreThreshold ?? 0;
 		const effectiveStrategy = strategy || kb.settings?.retrievalStrategy || 'keyword';
+		const rerankEnabled = shouldRerank({ explicit: rerank, settings: kb.settings });
 		effectiveSettings.strategy = effectiveStrategy;
 		effectiveSettings.topK = effectiveTopK;
 		effectiveSettings.maxChars = effectiveMaxChars;
 		effectiveSettings.scoreThreshold = effectiveScoreThreshold;
+		effectiveSettings.rerankProvider = rerankEnabled ? kb.settings?.rerankProvider || 'none' : 'none';
 		await recordKnowledgePipelineEvent({
 			knowledgeBaseId,
 			runId,
@@ -70,7 +76,17 @@ export async function retrieveKnowledge({
 			scoreThreshold: effectiveScoreThreshold,
 			knowledgeRoot,
 		});
-		const enrichedResults = results.map(chunk => ({
+		const rerankedResults = rerankEnabled
+			? (await rerankKnowledgeChunks({
+				query,
+				chunks: results,
+				settings: kb.settings,
+				topN: effectiveTopK,
+				fetchImpl,
+				env,
+			})).chunks
+			: results;
+		const enrichedResults = rerankedResults.map(chunk => ({
 			...chunk,
 			knowledgeBase: {
 				id: kb.id,
@@ -219,4 +235,10 @@ function boundCombinedResults({ chunks, topK, maxChars }) {
 		output.push(chunk);
 	}
 	return output;
+}
+
+function shouldRerank({ explicit, settings }) {
+	if (explicit === false) return false;
+	if (explicit === true) return settings?.rerankProvider && settings.rerankProvider !== 'none';
+	return settings?.rerankProvider && settings.rerankProvider !== 'none';
 }
