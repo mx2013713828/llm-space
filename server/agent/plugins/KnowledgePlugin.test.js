@@ -5,6 +5,7 @@ import {
 	KnowledgePlugin,
 	buildMountedKnowledgeManifest,
 	buildRetrievedKnowledgeBlock,
+	evaluateAutoRagInjectionGate,
 	formatKnowledgeToolResults,
 	formatMountedKnowledgeList,
 } from './KnowledgePlugin.js';
@@ -126,6 +127,58 @@ test('KnowledgePlugin injects retrieved knowledge only for auto_rag with matchin
 	assert.equal(context.promptAssemblySections.some(section => section.id === 'retrieved_knowledge'), true);
 });
 
+test('KnowledgePlugin skips low-confidence vector retrieval without injecting prompt content', async () => {
+	const context = createKnowledgeContext({
+		retrieval: {
+			query: 'world tallest mountain',
+			effectiveSettings: {
+				strategy: 'vector',
+				scoreThreshold: 0,
+			},
+			sources: [{ id: 'kb_docs', name: 'Docs', resultCount: 1 }],
+			chunks: [{
+				id: 'chk_low',
+				score: 0.2992,
+				text: 'Unrelated project docs.',
+				source: { filename: 'rag.md', chunkIndex: 0 },
+			}],
+		},
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'auto_rag',
+				auto_retrieve: true,
+				knowledge_tools: false,
+			},
+		},
+	});
+	context.apiMessages[0].content[0].text = 'world tallest mountain';
+
+	await KnowledgePlugin.preLLM(context);
+
+	assert.doesNotMatch(context.apiMessages[0].content[0].text, /<retrieved_knowledge>/);
+	const skipped = context.promptAssemblySections.find(section => section.id === 'retrieved_knowledge_skipped');
+	assert.equal(skipped?.sentToModel, false);
+	assert.match(skipped?.content || '', /below_threshold/);
+	assert.match(skipped?.content || '', /0\.2992/);
+	assert.equal(context.knowledgeRetrieval.chunks.length, 1);
+});
+
+test('evaluateAutoRagInjectionGate allows keyword retrieval without implicit vector threshold', () => {
+	assert.deepEqual(evaluateAutoRagInjectionGate({
+		retrieval: {
+			effectiveSettings: { strategy: 'keyword', scoreThreshold: 0 },
+			chunks: [{ score: 0.1 }],
+		},
+		runtime: { scoreThreshold: 0 },
+	}), {
+		shouldInject: true,
+		reason: 'passed',
+		topScore: 0.1,
+		threshold: 0,
+	});
+});
+
 test('KnowledgePlugin does not inject empty retrieved knowledge blocks', async () => {
 	const context = createKnowledgeContext({
 		retrievalChunks: [],
@@ -215,6 +268,7 @@ test('KnowledgePlugin rejects knowledge tools when current strategy disables the
 
 function createKnowledgeContext({
 	features = {},
+	retrieval,
 	retrievalChunks = [{
 		id: 'chk_1',
 		score: 3,
@@ -243,8 +297,8 @@ function createKnowledgeContext({
 				},
 				async retrieveKnowledge({ knowledgeBaseIds, query }) {
 					assert.deepEqual(knowledgeBaseIds, ['kb_docs']);
-					assert.equal(query, 'What is RAG?');
-					return {
+					if (!retrieval) assert.equal(query, 'What is RAG?');
+					return retrieval || {
 						query,
 						chunks: retrievalChunks,
 					};

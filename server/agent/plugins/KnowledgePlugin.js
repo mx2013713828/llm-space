@@ -3,6 +3,7 @@ import { retrieveKnowledge } from '../../knowledge/knowledgeRetrieve.js';
 import { resolveKnowledgeRuntime } from '../../../src/lib/knowledgeRuntime.js';
 
 const RETRIEVED_KNOWLEDGE_PATTERN = /(?:<retrieved_knowledge>[\s\S]*?<\/retrieved_knowledge>\s*)+/g;
+const DEFAULT_AUTO_RAG_MIN_SCORE = 0.45;
 
 export function stripRetrievedKnowledge(apiMessages = []) {
 	for (const message of apiMessages || []) {
@@ -128,6 +129,21 @@ export const KnowledgePlugin = {
 			maxChars: runtime.maxChars,
 			scoreThreshold: runtime.scoreThreshold,
 		});
+		const gate = evaluateAutoRagInjectionGate({
+			retrieval,
+			runtime,
+		});
+		if (!gate.shouldInject) {
+			context.knowledgeRetrieval = retrieval;
+			context.promptAssemblySections = Array.isArray(context.promptAssemblySections) ? context.promptAssemblySections : [];
+			context.promptAssemblySections.push(buildSkippedRetrievalSection({
+				mountedIds,
+				query,
+				retrieval,
+				gate,
+			}));
+			return;
+		}
 		const block = buildRetrievedKnowledgeBlock(retrieval);
 		if (!block) return;
 
@@ -212,6 +228,34 @@ export const KnowledgePlugin = {
 	},
 };
 
+export function evaluateAutoRagInjectionGate({ retrieval = {}, runtime = {} } = {}) {
+	const chunks = Array.isArray(retrieval.chunks) ? retrieval.chunks : [];
+	const topScore = chunks.reduce((max, chunk) => Math.max(max, Number(chunk?.score || 0)), 0);
+	const threshold = resolveAutoRagInjectionThreshold({ retrieval, runtime });
+	if (chunks.length === 0) {
+		return {
+			shouldInject: false,
+			reason: 'no_chunks',
+			topScore,
+			threshold,
+		};
+	}
+	if (topScore < threshold) {
+		return {
+			shouldInject: false,
+			reason: 'below_threshold',
+			topScore,
+			threshold,
+		};
+	}
+	return {
+		shouldInject: true,
+		reason: 'passed',
+		topScore,
+		threshold,
+	};
+}
+
 function getKnowledgeDependencies(executor) {
 	const deps = executor.knowledgeDependencies || {};
 	return {
@@ -242,6 +286,54 @@ function injectMountedManifest({ context, mountedIds, knowledgeBases }) {
 			knowledgeBaseCount: knowledgeBases.length,
 		},
 	});
+}
+
+function buildSkippedRetrievalSection({ mountedIds, query, retrieval, gate }) {
+	const topScore = Number(gate.topScore || 0).toFixed(4);
+	const threshold = Number(gate.threshold || 0).toFixed(4);
+	const sourceSummary = (retrieval.sources || [])
+		.map(source => `${source.name || source.id}: ${source.resultCount || 0}`)
+		.join(', ') || 'none';
+	const content = [
+		'<retrieved_knowledge_skipped>',
+		`Query: ${escapeXmlText(query)}`,
+		`Reason: ${gate.reason}`,
+		`Top score: ${topScore}`,
+		`Required threshold: ${threshold}`,
+		`Sources checked: ${escapeXmlText(sourceSummary)}`,
+		'</retrieved_knowledge_skipped>',
+		'',
+	].join('\n');
+	return {
+		id: 'retrieved_knowledge_skipped',
+		label: 'Retrieved Knowledge Skipped',
+		target: 'user',
+		lifecycle: 'dynamic',
+		source: 'knowledge/retrieval',
+		content,
+		order: 90,
+		sentToModel: false,
+		cacheImpact: 'not_sent',
+		chars: content.length,
+		metadata: {
+			knowledgeBaseIds: mountedIds,
+			chunkCount: retrieval.chunks?.length || 0,
+			query,
+			reason: gate.reason,
+			topScore: gate.topScore,
+			threshold: gate.threshold,
+		},
+	};
+}
+
+function resolveAutoRagInjectionThreshold({ retrieval = {}, runtime = {} } = {}) {
+	const explicitRuntimeThreshold = Number(runtime.autoInjectThreshold ?? runtime.minInjectScore);
+	if (Number.isFinite(explicitRuntimeThreshold)) return explicitRuntimeThreshold;
+	const retrievalThreshold = Number(retrieval.effectiveSettings?.scoreThreshold);
+	if (Number.isFinite(retrievalThreshold) && retrievalThreshold > 0) return retrievalThreshold;
+	const strategy = retrieval.effectiveSettings?.strategy || runtime.strategy || '';
+	if (strategy === 'vector' || strategy === 'hybrid') return DEFAULT_AUTO_RAG_MIN_SCORE;
+	return Number(runtime.scoreThreshold || 0);
 }
 
 async function loadMountedKnowledgeBases({ mountedIds = [], loadBase }) {

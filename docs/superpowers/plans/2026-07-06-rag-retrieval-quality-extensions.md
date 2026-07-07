@@ -106,14 +106,17 @@ Those come after the retrieval settings and observability contract is stable.
 - [x] Store remote provider config as references, not raw secrets in KB files.
 - [x] Add `test-embedding` API and Knowledge UI test action.
 
-### Phase 4: Vector And Hybrid Index
+### Phase 4: Retrieval Quality Gates And Evaluation
 
 - [x] Add `vectorIndex.js`.
 - [x] Store vectors separately from chunks in `vector-index.json`.
 - [x] Add `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid' })`.
 - [x] Add `vectorStores.js` with local JSON and Qdrant adapters.
 - [x] Add Qdrant collection/upsert/search tests with fake HTTP.
+- [x] Add Auto RAG confidence gate so low-score vector/hybrid results are observable but not injected.
+- [x] Show skipped retrieved knowledge in Context Inspector as `sentToModel: false`.
 - [ ] Add stronger hybrid weighting controls and comparison records.
+- [ ] Add retrieval evaluation records with injected/skipped decisions and top-score traces.
 
 ### Phase 5: Rerank And Evaluation
 

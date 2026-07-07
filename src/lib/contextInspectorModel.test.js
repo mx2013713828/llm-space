@@ -99,6 +99,29 @@ test('buildContextInspectorModel separates mounted manifest and retrieved knowle
   assert.equal(model.groups[2].rows[0].cacheImpact, 'changes_per_user_turn');
 });
 
+test('buildContextInspectorModel exposes skipped retrieved knowledge as observable but unsent', () => {
+  const model = buildContextInspectorModel({
+    promptAssembly: {
+      sections: [
+        {
+          id: 'retrieved_knowledge_skipped',
+          label: 'Retrieved Knowledge Skipped',
+          target: 'user',
+          lifecycle: 'dynamic',
+          source: 'knowledge/retrieval',
+          content: '<retrieved_knowledge_skipped>below_threshold</retrieved_knowledge_skipped>',
+          cacheImpact: 'not_sent',
+          sentToModel: false,
+        },
+      ],
+    },
+  });
+
+  const group = model.groups.find(item => item.id === 'retrieved_knowledge');
+  assert.deepEqual(group.rows.map(row => row.id), ['retrieved_knowledge_skipped']);
+  assert.equal(group.rows[0].cacheImpact, 'not_sent');
+});
+
 test('formatContextSize uses compact readable labels', () => {
   assert.equal(formatContextSize(999), '999 chars');
   assert.equal(formatContextSize(1536), '1.5k chars');

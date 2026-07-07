@@ -121,14 +121,17 @@ export function buildContextInspectorModel({
   messages = [],
   tools = [],
 } = {}) {
-  const sentSections = (promptAssembly.sections || [])
+  const allSections = promptAssembly.sections || [];
+  const sentSections = allSections
     .filter(section => section?.sentToModel !== false);
+  const observableSections = allSections
+    .filter(section => section?.sentToModel !== false || section?.observable === true || section?.id === 'retrieved_knowledge_skipped');
   const mountedKnowledgeRows = sentSections
     .filter(section => section?.id === 'mounted_knowledge_manifest')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map(section => createPromptSectionRow(section, 'system'));
-  const retrievedKnowledgeRows = sentSections
-    .filter(section => section?.id === 'retrieved_knowledge')
+  const retrievedKnowledgeRows = observableSections
+    .filter(section => section?.id === 'retrieved_knowledge' || section?.id === 'retrieved_knowledge_skipped')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map(section => createPromptSectionRow(section, 'user'));
   const sentPromptSections = sentSections
