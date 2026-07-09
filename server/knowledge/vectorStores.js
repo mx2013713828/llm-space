@@ -121,6 +121,9 @@ async function ensureQdrantCollection({ settings, collection, dimensions, fetchI
 			},
 		},
 	});
+	if (response.status === 409) {
+		return;
+	}
 	if (!response.ok) {
 		throw new Error(`Qdrant collection error ${response.status}: ${await safeText(response)}`);
 	}
