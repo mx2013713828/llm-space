@@ -6,6 +6,7 @@ import { registerAgentRunRoutes } from '../routes/agentRunRoutes.js';
 import { registerHarnessRoutes } from '../routes/harnessRoutes.js';
 import { registerKnowledgeRoutes } from '../routes/knowledgeRoutes.js';
 import { registerMemoryRoutes } from '../routes/memoryRoutes.js';
+import { registerMcpRoutes } from '../routes/mcpRoutes.js';
 import { registerModelRoutes } from '../routes/modelRoutes.js';
 import { registerSessionRoutes } from '../routes/sessionRoutes.js';
 
@@ -39,6 +40,7 @@ export function createServerApp({
   registerHarnessRoutes(app, routeDeps.harness);
   registerKnowledgeRoutes(app, routeDeps.knowledge);
   registerMemoryRoutes(app, routeDeps.memory);
+  registerMcpRoutes(app, routeDeps.mcp);
   registerModelRoutes(app, routeDeps.model);
   registerSessionRoutes(app, routeDeps.session);
   registerAgentRunRoutes(app, routeDeps.agentRun);
