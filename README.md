@@ -178,7 +178,7 @@ Jobs are scoped to a harness and run through the same agent executor path. If th
 
 ### Knowledge Bases
 
-Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, keyword / vector / hybrid retrieval strategies, and optional Qwen3 rerank.
+Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, keyword / vector / hybrid retrieval strategies, optional Qwen3 rerank, and retrieval evaluation records.
 
 Users can create local knowledge bases, import Markdown/text/JSON/CSV/PDF/DOCX files, generate bounded chunks and indexes, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
@@ -193,6 +193,7 @@ Current shape:
 - Auto RAG: automatic retrieval from mounted bases on each user turn
 - Agentic RAG: pinned mounted manifest plus `list_mounted_knowledge_bases` / `query_knowledge_base` tools
 - Manual Lab: retrieval testing in the Knowledge page without changing chat context
+- Recent Retrieval Records: bounded comparison records for initial recall, rerank, final results, top scores, and sources without persisting chunk text
 - Context Inspector separates Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema
 
 Recommended quick modes:

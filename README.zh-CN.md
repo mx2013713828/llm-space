@@ -178,7 +178,7 @@ Cron Scheduler 暴露：
 
 ### 知识库
 
-Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储、keyword / vector / hybrid 检索策略，以及可选的 Qwen3 rerank 重排。
+Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储、keyword / vector / hybrid 检索策略、可选的 Qwen3 rerank 重排，以及 retrieval evaluation records。
 
 用户可以创建本地知识库，导入 Markdown/text/JSON/CSV/PDF/DOCX 文件，生成有边界的 chunks 和索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
@@ -193,6 +193,7 @@ Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真
 - Auto RAG：每轮自动从已挂载知识库检索
 - Agentic RAG：稳定挂载清单 + `list_mounted_knowledge_bases` / `query_knowledge_base` 工具
 - Manual Lab：只在 Knowledge 页面测试检索，不改变对话上下文
+- Recent Retrieval Records：有边界地记录 initial recall、rerank、final results、top scores 和 sources，用于对比检索质量，但不落盘 chunk 正文
 - Context Inspector 分层展示 Mounted Knowledge Manifest、Retrieved Knowledge、Messages Payload 和 Provider Tool Schema
 
 推荐快速模式：
