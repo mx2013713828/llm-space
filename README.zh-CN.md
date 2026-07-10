@@ -6,11 +6,60 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-flat.svg?style=flat-square&color=blue)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-node%20--test-blue.svg?style=flat-square)](./package.json)
 
-LLM Space 是一个用于实验 AI Agent Harness 的可视化白盒工作台。
+> 零抽象的白盒调试器，像拼乐高一样随心所欲搭建与测试你的 AI 代理。
 
-它不是重型 Agent 框架，也不追求把所有决策封装成黑盒。相反，它把运行循环、prompt 组装、模型 payload、工具调用、记忆、任务编排、子代理行为都尽量展开，让你能看见并修改一个 Agent 是如何被组装出来的。
+LLM Space 是一个面向开发者的可视化 AI Agent Harness 实验平台与工作台。它不是重型 Agent 框架，也不追求把所有决策封装成黑盒。相反，它把运行循环、prompt 组装、模型 payload、工具调用、记忆、任务编排、知识检索、子代理行为都尽量展开，让你能看见并修改一个 Agent 是如何被组装出来的。
 
-项目原则很简单：保持实验性、可观察、可拆卸。用户可以从最小 ReAct 循环开始，再按需开启任务系统、sub-agent、async teams、定时任务、记忆、上下文压缩、多模型协议适配等能力。
+许多 Agent 框架为了追求通用性引入大量黑盒封装和概念抽象。LLM Space 选择相反方向：Agent 看到了什么、思考了什么、调用了什么、检索了什么、最终发给模型什么，都应该可观察、可替换、可调试。
+
+项目原则很简单：保持实验性、可观察、可拆卸。用户可以从最小 ReAct 循环开始，再按需开启任务系统、sub-agent、async teams、定时任务、记忆、上下文压缩、多模型协议适配和知识库等能力。
+
+## 整体交互演示
+
+![LLM Space 整体操作演示](images/llm-space.gif)
+
+## 先用最小 Harness 跑一次
+
+最快理解这个项目的方式，是先用最小对话 Harness 跑一次，再逐步打开高级特性。
+
+1. 安装并启动：
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+2. 打开前端：
+
+   ```text
+   http://localhost:5174
+   ```
+
+3. 在左侧配置区添加或选择一个模型。
+
+   你可以直接通过 UI 添加模型，也可以按 [模型配置](#模型配置) 中的结构编辑 `.env`。
+
+4. 在 **Harness Explorer** 中选择：
+
+   ```text
+   01-chat-bot.json
+   ```
+
+5. 先发一条普通对话：
+
+   ```text
+   你好，介绍一下你自己
+   ```
+
+6. 再试一次工具调用：
+
+   ```text
+   查询北京天气
+   ```
+
+7. 打开 **Context Inspector**，查看实际发送给模型的 system prompt、messages payload 和 provider tool schema。
+
+完成这次最小体验后，再切换到 Prompt Lab 或其他 Harness，逐个启用高级特性。
 
 ## 你可以实验什么
 
@@ -22,6 +71,15 @@ LLM Space 是一个用于实验 AI Agent Harness 的可视化白盒工作台。
 - **定时任务 MVP**：让 Agent 创建、查看、取消并执行当前 Harness 作用域内的计划任务。
 - **自动记忆质量门**：自动提取记忆会被路由为 `auto_write`、`pending_review`、`discard`、`sensitive_blocked`。
 - **安全与可靠性控制**：敏感文件访问、路径穿越、高风险 bash、child-agent 权限事件、大输出处理等都按 fail-closed 思路防御。
+
+## 最近亮点
+
+- **Knowledge Base / RAG pipeline**：文档 loader、embedding provider、Local JSON / Qdrant 向量存储、Qwen3 rerank 和 retrieval evaluation records。
+- **多供应商模型网关**：模型调用通过 Anthropic Messages 和 OpenAI-compatible Chat Completions 协议适配器。
+- **任务编排实验**：比较 TODO planning、DAG task-system、sub-agent delegation 和 async teammate coordination。
+- **定时任务调度器**：Harness 作用域的计划任务复用同一条 AgentExecutor 路径，并保留执行历史。
+
+详细历史见：[更新日志](./docs/changelog.zh-CN.md)。
 
 ## 快速开始
 
@@ -269,6 +327,8 @@ export default {
 - [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
 - [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
 - [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
+- [更新日志](./docs/changelog.zh-CN.md)
+- [Changelog](./docs/changelog.md)
 - [Runtime Roadmap 汇总计划](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
 ## 设计原则

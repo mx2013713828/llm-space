@@ -6,11 +6,60 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-flat.svg?style=flat-square&color=blue)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-node%20--test-blue.svg?style=flat-square)](./package.json)
 
-LLM Space is a visual, white-box workbench for experimenting with AI agent harnesses.
+> A zero-abstraction white-box debugger for building and testing AI agents like composable LEGO blocks.
 
-It is intentionally not a heavy agent framework. Instead, it exposes the runtime loop, prompt assembly, model payload, tool calls, memory, task orchestration, and child-agent behavior so you can see and change how an agent is put together.
+LLM Space is a visual AI Agent harness workbench for developers. It is intentionally not a heavy agent framework. Instead, it exposes the runtime loop, prompt assembly, model payload, tool calls, memory, task orchestration, retrieval, and child-agent behavior so you can see and change how an agent is put together.
 
-The product principle is simple: keep the platform experimental, observable, and detachable. Users should be able to start with a minimal ReAct loop, then selectively enable features such as task systems, sub-agents, async teams, scheduled jobs, memory, compaction, and provider adapters.
+Many agent frameworks hide behavior behind layers of abstractions. LLM Space takes the opposite path: what the agent sees, thinks, calls, retrieves, and sends to the provider should be inspectable and swappable.
+
+The product principle is simple: keep the platform experimental, observable, and detachable. Start with a minimal ReAct loop, then selectively enable task systems, sub-agents, async teams, scheduled jobs, memory, compaction, provider adapters, and knowledge bases.
+
+## Demo
+
+![LLM Space overall interaction demo](images/llm-space.gif)
+
+## Try The Smallest Harness First
+
+The fastest way to feel the project is to run the minimal chat harness before exploring advanced systems.
+
+1. Install and start the app:
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+2. Open the frontend:
+
+   ```text
+   http://localhost:5174
+   ```
+
+3. Add or select a model in the left configuration panel.
+
+   You can add a model through the UI, or edit `.env` using the structure shown in [Model Configuration](#model-configuration).
+
+4. In **Harness Explorer**, select:
+
+   ```text
+   01-chat-bot.json
+   ```
+
+5. Send a simple message:
+
+   ```text
+   你好，介绍一下你自己
+   ```
+
+6. Try the first tool call:
+
+   ```text
+   What is the weather in Beijing?
+   ```
+
+7. Open **Context Inspector** to see the actual prompt, messages payload, and provider tool schema sent to the model.
+
+After this first run, switch to Prompt Lab or another harness to enable advanced features one by one.
 
 ## What You Can Explore
 
@@ -22,6 +71,15 @@ The product principle is simple: keep the platform experimental, observable, and
 - **Cron scheduler MVP**: let an agent create, list, cancel, and run harness-scoped scheduled jobs.
 - **Memory quality gate**: automatic memory extraction is filtered through `auto_write`, `pending_review`, `discard`, and `sensitive_blocked` decisions.
 - **Security and reliability controls**: sensitive file access, path traversal, high-risk bash operations, child-agent permission events, and large-output behavior are handled defensively.
+
+## Recent Highlights
+
+- **Knowledge Base / RAG pipeline**: document loaders, embedding providers, Local JSON / Qdrant vector stores, Qwen3 rerank, and retrieval evaluation records.
+- **Multi-provider gateway**: model calls go through protocol adapters for Anthropic Messages and OpenAI-compatible Chat Completions.
+- **Task orchestration**: compare TODO planning, DAG task-system planning, sub-agent delegation, and async teammate coordination.
+- **Cron scheduler**: harness-scoped scheduled jobs reuse the same AgentExecutor path and keep execution history.
+
+Detailed history lives in [Changelog](./docs/changelog.md).
 
 ## Quick Start
 
@@ -269,6 +327,8 @@ export default {
 - [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
 - [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
 - [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
+- [Changelog](./docs/changelog.md)
+- [更新日志](./docs/changelog.zh-CN.md)
 - [Consolidated Runtime Roadmap](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
 ## Design Principles
