@@ -30,7 +30,7 @@ export function createRouteApp() {
       middleware.push(handler);
     },
   };
-  for (const method of ['get', 'post', 'put', 'delete']) {
+  for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
     app[method] = (pattern, handler) => {
       routes.push({ method: method.toUpperCase(), pattern, handler });
     };

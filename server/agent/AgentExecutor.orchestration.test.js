@@ -28,6 +28,11 @@ test('parent-disabled orchestration strips every managed child tool but keeps cu
         enable_background_tasks: true,
         enable_cron_scheduler: true,
       },
+      knowledge_bases: {
+        enabled: true,
+        strategy: 'manual_lab',
+        knowledge_tools: false,
+      },
     },
   });
 
@@ -86,6 +91,11 @@ test('task-system mode mounts the task board tools once and preserves current ti
       task_orchestration: {
         enabled: true,
         mode: 'task_system',
+      },
+      knowledge_bases: {
+        enabled: true,
+        strategy: 'manual_lab',
+        knowledge_tools: false,
       },
     },
   });

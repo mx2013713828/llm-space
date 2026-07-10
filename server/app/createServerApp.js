@@ -4,13 +4,14 @@ import cors from 'cors';
 import { createAccessGuard, createRateLimiter } from '../http/accessGuard.js';
 import { registerAgentRunRoutes } from '../routes/agentRunRoutes.js';
 import { registerHarnessRoutes } from '../routes/harnessRoutes.js';
+import { registerKnowledgeRoutes } from '../routes/knowledgeRoutes.js';
 import { registerMemoryRoutes } from '../routes/memoryRoutes.js';
 import { registerModelRoutes } from '../routes/modelRoutes.js';
 import { registerSessionRoutes } from '../routes/sessionRoutes.js';
 
 export function createServerApp({
   app = express(),
-  corsMiddleware = cors({ origin: ['http://localhost:5174', 'http://127.0.0.1:5174'] }),
+  corsMiddleware = cors({ origin: allowLocalDevOrigins }),
   accessGuard = createAccessGuard(),
   rateLimiter = createRateLimiter(),
   jsonMiddleware = express.json({ limit: '4mb' }),
@@ -36,6 +37,7 @@ export function createServerApp({
   }
 
   registerHarnessRoutes(app, routeDeps.harness);
+  registerKnowledgeRoutes(app, routeDeps.knowledge);
   registerMemoryRoutes(app, routeDeps.memory);
   registerModelRoutes(app, routeDeps.model);
   registerSessionRoutes(app, routeDeps.session);
@@ -43,4 +45,12 @@ export function createServerApp({
   registerExtraRoutes?.(app);
 
   return app;
+}
+
+export function allowLocalDevOrigins(origin, callback) {
+  if (!origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(null, false);
 }

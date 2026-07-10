@@ -7,6 +7,7 @@ import {
   getMissingStrategyPrimitives,
   getStrategyAfterPrimitiveEdit,
 } from '../lib/taskOrchestration.js';
+import { applyKnowledgeRuntimeStrategy } from '../lib/knowledgeRuntime.js';
 import { apiFetch } from '../lib/apiClient.js';
 
 const STRATEGY_PROMPT_VISIBILITY = {
@@ -184,11 +185,16 @@ export function PromptLabPage({ harness, onSave }) {
       ...prev,
       [parentKey]: parentKey === 'task_orchestration' && subKey === 'strategy'
         ? applyExecutionStrategyPreset(prev[parentKey], val)
+        : parentKey === 'knowledge_bases' && subKey === 'strategy'
+          ? applyKnowledgeRuntimeStrategy(prev, val).knowledge_bases
         : {
             ...prev[parentKey],
             [subKey]: val,
             ...(parentKey === 'task_orchestration'
               ? { strategy: getStrategyAfterPrimitiveEdit(prev[parentKey], subKey, val) }
+              : {}),
+            ...(parentKey === 'knowledge_bases' && ['auto_retrieve', 'knowledge_tools'].includes(subKey)
+              ? { strategy: 'custom' }
               : {}),
           }
     }));

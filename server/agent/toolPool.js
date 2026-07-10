@@ -1,4 +1,5 @@
 import { parseFeatures } from './FeatureParser.js';
+import { resolveKnowledgeRuntime } from '../../src/lib/knowledgeRuntime.js';
 
 export const TASK_SYSTEM_PLANNING_TOOLS = [
 	'create_task',
@@ -15,6 +16,7 @@ export const CRON_TOOLS = ['schedule_cron', 'list_crons', 'cancel_cron'];
 export const TEAM_LEAD_TOOLS = ['spawn_teammate', 'wait_for_teammates', 'check_team_inbox'];
 export const TEAM_COMMUNICATION_TOOLS = ['send_team_message'];
 export const TEAM_TOOLS = [...TEAM_LEAD_TOOLS, ...TEAM_COMMUNICATION_TOOLS];
+export const KNOWLEDGE_TOOLS = ['list_mounted_knowledge_bases', 'query_knowledge_base'];
 
 export const ORCHESTRATION_MANAGED_TOOL_NAMES = [
 	...TODO_PLANNING_TOOLS,
@@ -27,6 +29,7 @@ export const ORCHESTRATION_MANAGED_TOOL_NAMES = [
 export const TASK_ORCHESTRATION_HIDDEN_TOOL_NAMES = [
 	...ORCHESTRATION_MANAGED_TOOL_NAMES,
 	...TEAM_TOOLS,
+	...KNOWLEDGE_TOOLS,
 ];
 
 const REVIEWER_BLOCKED_TOOL_NAMES = [
@@ -177,6 +180,14 @@ function applyRuntimeRoleTools(tools, runtimeRole, orchestration) {
 	return applyLeadOrchestrationTools(tools, orchestration);
 }
 
+function applyLeadKnowledgeTools(tools, knowledgeRuntime) {
+	if (!knowledgeRuntime?.enabled || !knowledgeRuntime?.knowledgeTools) {
+		return tools;
+	}
+
+	return appendTools(tools, KNOWLEDGE_TOOLS);
+}
+
 export function assembleToolPool({
 	baseTools = [],
 	features = {},
@@ -186,9 +197,13 @@ export function assembleToolPool({
 } = {}) {
 	const normalizedFeatures = parseFeatures(features);
 	const orchestration = normalizedFeatures.task_orchestration;
+	const knowledgeRuntime = resolveKnowledgeRuntime(normalizedFeatures);
 	const originalTools = dedupeToolsByName([...baseTools, ...getMountedTools(mountedResources)]);
 	const filteredBaseTools = filterBaseToolsForRuntimeRole(originalTools, runtimeRole);
 	let tools = applyRuntimeRoleTools(filteredBaseTools, runtimeRole, orchestration);
+	if (runtimeRole === 'lead') {
+		tools = applyLeadKnowledgeTools(tools, knowledgeRuntime);
+	}
 	tools = removeTools(tools, ['get_current_time']);
 	tools = appendTools(tools, ['get_current_time']);
 
@@ -198,6 +213,7 @@ export function assembleToolPool({
 		features: normalizedFeatures,
 		runtimeRole,
 		strategyId: String(strategyId || '').trim(),
+		knowledgeRuntime,
 		addedToolNames: getAddedToolNames(originalTools, tools),
 		removedToolNames: getRemovedToolNames(originalTools, filteredBaseTools),
 	};
@@ -219,6 +235,7 @@ export function filterToolsForRuntimeRole(toolPool, runtimeRole) {
 export function describeToolPool(toolPool) {
 	const pool = toolPool ?? assembleToolPool();
 	const orchestration = pool.features?.task_orchestration ?? {};
+	const knowledgeRuntime = pool.knowledgeRuntime ?? resolveKnowledgeRuntime(pool.features ?? {});
 	return {
 		runtimeRole: pool.runtimeRole || 'lead',
 		strategyId: pool.strategyId || '',
@@ -233,6 +250,13 @@ export function describeToolPool(toolPool) {
 			backgroundTasks: isOrchestrationEnabled(orchestration, 'enable_background_tasks'),
 			agentTeams: isOrchestrationEnabled(orchestration, 'enable_agent_teams'),
 			cronScheduler: isOrchestrationEnabled(orchestration, 'enable_cron_scheduler'),
+		},
+		knowledge: {
+			enabled: knowledgeRuntime.enabled,
+			strategy: knowledgeRuntime.strategy,
+			manifest: knowledgeRuntime.manifestEnabled,
+			autoRetrieve: knowledgeRuntime.autoRetrieve,
+			tools: knowledgeRuntime.knowledgeTools,
 		},
 	};
 }

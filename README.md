@@ -1,245 +1,285 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
----
-
-# LLM Space - A LEGO-style Visual Experiment Platform for AI Agents 🚀
+# LLM Space
 
 [![Node Version](https://img.shields.io/badge/node-%3E%3D%2018.0.0-flat.svg?style=flat-square&color=339966)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-flat.svg?style=flat-square&color=blue)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-flat.svg?style=flat-square&color=orange)](https://github.com/shareAI-lab/learn-claude-code/pulls)
+[![Tests](https://img.shields.io/badge/tests-node%20--test-blue.svg?style=flat-square)](./package.json)
 
-> **"A zero-abstraction white-box debugger, enabling you to build and test your AI agents like playing with LEGO bricks."**
+LLM Space is a visual, white-box workbench for experimenting with AI agent harnesses.
 
-**LLM Space** is a zero-framework-abstraction, visual AI Agent LEGO experiment platform and workbench (IDE) custom-designed for developers.
+It is intentionally not a heavy agent framework. Instead, it exposes the runtime loop, prompt assembly, model payload, tool calls, memory, task orchestration, and child-agent behavior so you can see and change how an agent is put together.
 
-Many heavy Agent frameworks (such as LangChain) introduce massive black-box encapsulation and complex conceptual abstractions for the sake of generality. This introduces a steep learning curve for beginners and high barriers for developers' local debugging. **LLM Space adheres to "what you see is what you get" and "extreme lightweightness"**, completely exposing the Agent's decision-making, reasoning, and tool invocation trajectories, while supporting one-click toggling of advanced features.
+The product principle is simple: keep the platform experimental, observable, and detachable. Users should be able to start with a minimal ReAct loop, then selectively enable features such as task systems, sub-agents, async teams, scheduled jobs, memory, compaction, and provider adapters.
 
----
+## What You Can Explore
 
-## 🆕 Recent Updates
+- **White-box agent trajectories**: inspect streamed assistant text, thinking blocks, tool calls, tool results, final answers, and child-agent events.
+- **Prompt and payload inspection**: Context Inspector shows the actual system prompt sections, messages payload transcript, and provider tool schema sent to the model.
+- **Editable guidance**: base agent instructions are stored as file-backed `AGENTS.md` guidance rather than hidden JSON-only prompt text.
+- **Multi-provider model gateway**: model configuration supports provider-neutral runtime calls with protocol adapters such as Anthropic Messages and OpenAI-compatible Chat Completions.
+- **Task orchestration experiments**: compare inline execution, TODO planning, DAG task-system planning, sub-agent delegation, and async teammate coordination.
+- **Cron scheduler MVP**: let an agent create, list, cancel, and run harness-scoped scheduled jobs.
+- **Memory quality gate**: automatic memory extraction is filtered through `auto_write`, `pending_review`, `discard`, and `sensitive_blocked` decisions.
+- **Security and reliability controls**: sensitive file access, path traversal, high-risk bash operations, child-agent permission events, and large-output behavior are handled defensively.
 
-* **2026-06-20: In-process Cron Scheduler MVP**
-  - **Agent-managed schedules**: Agents can create, inspect, and cancel Harness-scoped jobs with `schedule_cron`, `list_crons`, and `cancel_cron`.
-  - **Durable execution pipeline**: Five-field cron expressions feed an in-process event queue, resolve the latest model configuration at run time, and execute through the existing `AgentExecutor`.
-  - **Visible scheduled runs**: Scheduled prompts, tool calls, final answers, success/failure counts, and current job state appear in the trajectory and Scheduled Tasks panel.
-  - **Persistent execution history**: Recent runs retain start/completion timestamps, duration, outcome, and failure details across server restarts.
-  - **Safer background behavior**: A busy Harness queues work instead of running concurrent agent loops, while session polling and SSE attachment surface background results in the active UI.
+## Quick Start
 
-* **2026-06-13: Recoverable Directed Acyclic Graph Task System (DAG Task System) 🕸️**
-  - **Backend Task Dependency Stream**: Supports a complex task system based on DAG. Features built-in Kahn's algorithm cycle detection, Claim exclusive file locks for concurrency protection, and automatic rollback of physical board leases when the Agent crashes or exits unexpectedly.
-  - **Cache-Friendly & Deduplicated Assembly**: Refactored the plugin lifecycle (`preLLM`). Splits and injects static/dynamic states to maximize LLM KV Cache (Prompt Cache) hit rate, while introducing XML tag deduplication filtering during injection.
-  - **Customizable Prompts UI (Prompt Lab)**: Added folding accordion cards in experimental features, allowing advanced users to customize XML prompts. Supports vertical text stretching, long-content scrolling, safe buffering for local changes, and one-click reset to default prompts.
+Requirements:
 
----
+- Node.js 18 or newer
+- npm
+- Docker Desktop (optional; required for local Qdrant vector-store testing)
 
-## 🎬 Global Interaction Demo
+Install and run:
 
-![LLM Space Demo](images/llm-space.gif)
-
----
-
-## 📖 Project Overview
-
-**LLM Space** is an open-source, browser-based visual workbench for building, debugging, and experimenting with AI Agents. Unlike heavy Agent frameworks that wrap every detail in abstractions, LLM Space exposes the full execution lifecycle — every thought, every tool call, every response — in real time.
-
-### 🎯 What Problem Does It Solve?
-
-- **Framework fatigue**: Frameworks like LangChain introduce hundreds of concepts (Chains, Agents, Tools, Memory, Callbacks...) that obscure what's actually happening. LLM Space strips away all framework abstraction — you see raw HTTP requests, streaming responses, and tool execution output directly.
-- **Debugging difficulty**: When an Agent produces an unexpected result, traditional frameworks give you a final answer with zero visibility into the decision path. LLM Space provides a complete visual trajectory of every single step.
-- **Configuration overhead**: Switching between Agent configurations usually means editing YAML files and restarting servers. LLM Space supports one-click hot-swapping of Harness presets with zero downtime.
-
-### 👥 Who Is It For?
-
-- **AI/LLM learners** who want to understand how Agents really work under the hood
-- **Prompt engineers** who need rapid iteration on system prompts with instant visual feedback
-- **Tool developers** who want to prototype and test new Agent capabilities in 30 seconds
-- **Researchers** exploring multi-agent collaboration, DAG task decomposition, and Agent safety
-
-### 📊 Key Numbers
-
-- **5** built-in Harness presets (from basic chatbot to DAG task system)
-- **30 seconds** to develop and register a custom Tool
-- **3 minutes** from zero to running your first Agent experiment
-- **0** framework dependencies — pure Node.js + vanilla JavaScript
-
-## 💡 Core Design Philosophy
-
-### 🧱 Modular Sandbox (LEGO-style plug-and-play config)
-We deconstruct the complex lifecycle of Agents into clear "building blocks", all supporting one-click enable/disable via the UI:
-- **LEGO Base (Harness Host)**: Uses minimalist `.json` configuration files to define the Agent's system prompt presets and initial state. Switch harnesses in seconds via the left panel.
-- **Pluggable Feature Slots (Modular Features)**:
-  - **API Self-Healing & Disaster Recovery (Error Recovery)**: Features automatic non-blocking exponential backoff retry on 429, automatic failover to fallback models on continuous 529, physical stitching and lossless continuation on `max_tokens` truncation, and infinite loop circuit breakers.
-  - **LLM Semantic Compaction (Hard-Compact)**: Triggers emergency history memory compression and transcript archiving when context window is close to full.
-  - **Real-time KV Cache Monitor**: Real-time tracking of KV cache utilization for models like DeepSeek.
-
-### 👁️ White-Box Observability (Visual tracking)
-Say no to black-box execution! Keep every detail in plain sight:
-- **Thinking Chain Rendering**: Native support for Anthropic Extended Thinking. Streams and folds `<thinking>` reasoning trajectories.
-- **Tool Call Trajectory**: Intuitively visualizes the entire interaction process, including `tool_use` initiation, input parameters, and actual local tool execution output (streaming shell outputs, web scraping, etc.).
-- **Physical Message Merging**: Seamlessly aligns typed stream continuations with history bubbles, preventing logical disruptions or fragmented bubbles.
-
----
-
-## 🛠️ Quick Start (Get Started in 3 Mins)
-
-### 1. Installation & Execution
-Make sure **Node.js** (v18+ recommended) is installed on your computer, then execute:
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Start (runs both the frontend UI and backend services)
 npm run dev
 ```
-Once started, your browser will automatically open the frontend workbench: `http://localhost:5174`.
 
-### 2. Environment Variables (.env)
-Create a `.env` file in the root directory (or refer to `.env.example`):
-```dotenv
-# Tavily Search API — Used by the web search tool (https://tavily.com - 1000 free calls/month)
-TAVILY_API_KEY=tvly-your-key-here
+The dev command starts:
 
-# Service port (optional, default: 3001)
-PORT=3001
+- Backend: `http://localhost:3001`
+- Frontend: `http://localhost:5174`
+
+Run verification:
+
+```bash
+npm test
+npm run build
 ```
-*(Tip: LLM API Keys can be dynamically added directly in the left panel of the frontend UI, and the system will automatically persist them.)*
 
----
+To test vector retrieval, start local Qdrant first:
 
-## Scheduled Tasks (Cron Scheduler MVP)
+```bash
+docker compose --env-file docker/qdrant.env up -d qdrant
+curl http://localhost:6333/collections
+```
 
-Enable **Cron Scheduler** in the Harness experimental features, then ask the agent to create a task in natural language, for example:
+The dedicated `docker/qdrant.env` file prevents Docker Compose from parsing the app `.env`, which may contain multiline `MODELS_CONFIG` JSON.
+
+Qdrant Dashboard:
 
 ```text
-Every 10 minutes, check the weather in Linyi and report it.
+http://localhost:6333/dashboard
 ```
 
-When enabled, the agent receives three tools:
+## Model Configuration
 
-- `schedule_cron`: create a recurring or one-shot job with a five-field cron expression.
-- `list_crons`: inspect jobs and their queued/running/succeeded/failed state.
-- `cancel_cron`: cancel a job owned by the current Harness.
+Create `.env` from `.env.example`, or add models through the UI.
 
-Durable definitions are stored in `server/scheduler/tasks.json`, while the latest 500 execution records are stored in `server/scheduler/runs.json`. Jobs store a model reference rather than an API key, so each run resolves the latest matching model configuration from `.env`. If the Harness is already running, the scheduled event stays queued until it becomes idle. Use the history button on a task row to inspect run state, timing, duration, and errors.
+Typical `.env` entries:
 
-MVP boundaries:
+```dotenv
+PORT=3001
+TAVILY_API_KEY=tvly-your-key-here
+ZHIPU_API_KEY=your-zhipu-key-here
+DASHSCOPE_API_KEY=your-dashscope-key-here
+QDRANT_API_KEY=
+MODELS_CONFIG=[]
+```
 
-- Cron syntax supports `*`, `*/N`, exact values, ranges, and comma-separated values.
-- Jobs use the server's local timezone.
-- Missed runs while the server is stopped are not backfilled.
-- Execution mode is currently `main`; isolated sessions, automatic retries, and alerting are planned for later phases.
+Model entries are managed as structured JSON. A model can choose its protocol and provider connection independently:
 
----
+- `protocol: "anthropic"` for Anthropic-compatible Messages APIs.
+- `protocol: "openai_chat_completions"` for OpenAI-compatible Chat Completions APIs.
+- `baseUrl`, API key, model id, context window, and provider-specific `extraBody` live in model configuration.
 
-## 🔬 5 Basic Harness Preset Experiments
+The agent loop should not branch on a provider name. Protocol adapters normalize requests, streaming events, tool calls, thinking/reasoning content, usage, and prompt-cache fields.
 
-We have pre-configured 5 classic presets ranging from simple to advanced for you, which can be switched in seconds in the left panel to quickly start experimenting:
+## Core Architecture
 
-### 📁 01-chat-bot.json (Basic Chatbot)
-* **Positioning**: Understand the most basic ReAct tool-call loop.
-* **Highlights**: Equipped with simple tools like city weather queries. Ideal for observing the closed-loop of the LLM analyzing cities, triggering `tool_call`, retrieving data, and summarizing in natural language.
-  <details>
-  <summary>🔍 Click to expand running demo GIF</summary>
+### Harnesses
 
-  ![01-chat-bot Demo](docs/images/01-chat-bot-demo.gif)
+A Harness is a local agent configuration. It controls the mounted tools, enabled experimental features, selected model, editable guidance, and orchestration strategy.
 
-  </details>
+Harness files live under:
 
-### 📁 02-bash.json (System Interaction)
-* **Positioning**: Empower the Agent with filesystem operations and network diagnostics.
-* **Highlights**: Equipped with a real Bash executor (with streaming output echo), file read/write, and Tavily real-time web search and extraction. You can type commands like "Find the three largest files in the current directory" to observe the execution path.
-  <details>
-  <summary>🔍 Click to expand running demo GIF</summary>
+```text
+harnesses/
+```
 
-  ![02-bash Demo](docs/images/02-bash-demo.gif)
+Editable base guidance is file-backed under:
 
-  </details>
+```text
+guidance/<harnessId>/AGENTS.md
+```
 
-### 📁 03-deep-research.json (Deep Research)
-* **Positioning**: Learn how the Agent automatically plans and breaks down complex tasks.
-* **Highlights**: Combines behaviors defined in `systemPrompt` with local `write_todos`. When facing complex research tasks, the LLM will automatically decompose them into 4-8 TODO steps on the right side and tackle them one by one.
-  <details>
-  <summary>🔍 Click to expand running demo GIF</summary>
+### Agent Loop
 
-  ![03-deep-research Demo](docs/images/03-deep-research-demo.gif)
+The runtime follows a hook-oriented loop:
 
-  </details>
+1. user input handling
+2. pre-LLM state assembly
+3. model gateway call
+4. pre-tool permission and security checks
+5. tool dispatch
+6. post-tool processing and offload
+7. stop, persistence, and UI broadcast
 
-### 📁 04-subagent.json (Multi-Agent Collaboration)
-* **Positioning**: Explore multi-agent division of labor and context isolation.
-* **Highlights**: Equipped with the `sub_agent` core tool. When encountering heavy diagnostics or massive context collection tasks, the main Agent will proactively assign tasks and spin up isolated Sub-agents, then receive and integrate their reports, preventing main context overflow.
-  <details>
-  <summary>🔍 Click to expand running demo GIF</summary>
+New runtime features should be implemented as detachable modules or plugins instead of growing the main executor with ad-hoc branches.
 
-  ![04-subagent Demo](docs/images/04-subagent-demo.gif)
+### Context Assembly
 
-  </details>
+Prompt assembly is tracked as explicit sections. The current Context Inspector defaults to model-bound content only:
 
-### 📁 05-task-system.json (DAG Task System)
-* **Positioning**: Understand complex, long-cycle task decomposition and concurrency safety based on DAG (Directed Acyclic Graph).
-* **Highlights**: Equipped with task dependency system tools (`create_task`, `list_tasks`, `claim_task`, `complete_task`). Features built-in Kahn's algorithm for cycle checking, Claim exclusive file locks, and crash self-healing. When facing complex multi-step tasks, the Agent can automatically decompose dependencies, claim tasks, and conquer them one by one like a human engineer.
-  <details>
-  <summary>🔍 Click to expand running demo GIF</summary>
+- System Prompt sections
+- Messages Payload transcript
+- Provider Tool Schema
 
-  ![05-task-system Demo](docs/images/05-task-system-demo.gif)
+Sidecar state such as runtime queues, memory candidates, or debug summaries belongs in dedicated observability surfaces unless it is actually injected into the model request.
 
-  </details>
+### Memory Layers
 
----
+LLM Space separates long-term context into three layers:
 
-## ⚙️ LEGO Sandbox Closed-loop Interaction (How to Customize & Export)
+- **Explicit Guidance**: manually editable rules and project instructions, backed by `AGENTS.md`.
+- **Auto-Capture Working Layer**: uncertain or provisional memory candidates.
+- **Curated Long-term Memory**: stable cross-session facts that pass quality and safety checks.
 
-Any experimental adjustments you make in LLM Space can be seamlessly persisted:
+This keeps automatic memory observable without turning every extraction into a blocking approval workflow.
 
-1. **Seconds-Level Hot Swap**: Select any basic Harness from the left list, modify the Base System Prompt in the **Prompt Lab**, check the Tools you want to try (e.g., `bash`, `sub_agent`), or toggle the `Error Recovery` self-healing switch in the experimental features section.
-2. **White-Box Tracking**: Send a query and observe whether the execution path expanded in the trace panel meets expectations.
-3. **One-Click Save**: Once satisfied, click the **"Save"** button at the bottom of the page. The system will immediately generate and export your custom Harness JSON configuration file in the local `harnesses/` directory for future use or sharing.
+## Built-in Harness Presets
 
----
+| Harness | Purpose |
+| --- | --- |
+| `01-chat-bot.json` | Minimal ReAct-style chat and simple tools. |
+| `02-bash.json` | Filesystem, shell, and web-search experiments. |
+| `03-deep-research.json` | TODO-driven research and planning. |
+| `04-subagent.json` | Sub-agent delegation and context isolation. |
+| `05-task-system.json` | DAG task decomposition with claim/complete flow. |
 
-## 🔧 Developer Guide: Develop your first Tool in 30 seconds
+Presets are examples, not fixed products. Use Prompt Lab and configuration panels to compose your own harness behavior.
 
-If you want to give the Agent new capabilities (e.g., executing database queries or calling custom APIs), it only takes two steps:
+## Experimental Systems
 
-### Step 1: Create a JS file under the `server/tools/` directory (e.g., `hello_tool.js`)
-```javascript
-// server/tools/hello_tool.js
+### Task Orchestration
+
+LLM Space keeps orchestration primitives detachable:
+
+- `write_todos` for lightweight planning.
+- DAG `task-system` tools for dependency-aware work.
+- `sub_agent` for isolated one-off delegation.
+- async teams for finite teammate coordination.
+- strategy presets for combining these primitives without hiding them.
+
+Simple tasks should stay simple. If a user explicitly asks for a specific execution route, such as using a sub-agent, the harness should respect that route unless it first confirms a better alternative.
+
+### Scheduled Jobs
+
+Cron Scheduler exposes:
+
+- `schedule_cron`
+- `list_crons`
+- `cancel_cron`
+
+Jobs are scoped to a harness and run through the same agent executor path. If the target harness is busy, scheduled events are queued instead of launching concurrent loops against the same session.
+
+### Knowledge Bases
+
+Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real embedding providers, Local JSON / Qdrant vector stores, keyword / vector / hybrid retrieval strategies, optional Qwen3 rerank, and retrieval evaluation records.
+
+Users can create local knowledge bases, import Markdown/text/JSON/CSV/PDF/DOCX files, generate bounded chunks and indexes, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
+
+See the full setup guide: [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md).
+
+Current shape:
+
+- local knowledge store and metadata
+- bounded ingestion and chunking
+- retrieval preview with source labels
+- harness-level mounting
+- Auto RAG: automatic retrieval from mounted bases on each user turn
+- Agentic RAG: pinned mounted manifest plus `list_mounted_knowledge_bases` / `query_knowledge_base` tools
+- Manual Lab: retrieval testing in the Knowledge page without changing chat context
+- Recent Retrieval Records: bounded comparison records for initial recall, rerank, final results, top scores, and sources without persisting chunk text
+- Context Inspector separates Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema
+
+Recommended quick modes:
+
+```text
+Lightweight local:
+  Retrieval strategy: Keyword
+  Index method: Keyword
+  Embedding provider: None
+  Vector store: Local JSON
+  Rerank provider: None
+
+Local vector:
+  Retrieval strategy: Vector or Hybrid
+  Index method: Vector or Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Local JSON
+  Rerank provider: None
+
+Full pipeline:
+  Retrieval strategy: Hybrid
+  Index method: Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Qdrant
+  Rerank provider: Qwen3 Rerank
+```
+
+Common environment variables:
+
+```text
+ZHIPU_API_KEY=...
+DASHSCOPE_API_KEY=...
+QDRANT_API_KEY=...
+```
+
+The detailed guide covers provider URLs, field meanings, Qdrant setup, rerank setup, test flow, and troubleshooting.
+
+## Developer Workflow
+
+Common commands:
+
+```bash
+npm run dev
+npm test
+npm run build
+npm run lint
+```
+
+Add a new tool by creating a module in `server/tools/` and registering it in `server/tools/index.js`.
+
+Example:
+
+```js
 export default {
   name: 'hello_tool',
-  description: 'Greet a specific user with a custom message.',
+  description: 'Return a greeting.',
   parameters: {
     type: 'object',
     properties: {
-      userName: { type: 'string', description: 'The username to greet' },
-      customMsg: { type: 'string', description: 'Additional custom blessing message' }
+      name: { type: 'string' },
     },
-    required: ['userName']
+    required: ['name'],
   },
-  async execute({ userName, customMsg = 'Have a great day!' }) {
-    // Write your actual business logic here
-    return `Hello, ${userName}! ${customMsg}`;
-  }
+  async execute({ name }) {
+    return `Hello, ${name}.`;
+  },
 };
 ```
 
-### Step 2: Import and register it in `server/tools/index.js`
-```javascript
-// server/tools/index.js
-import hello_tool from './hello_tool.js';
+## Key Documents
 
-export const tools = [
-  // ... other tools
-  hello_tool
-];
-```
-**Done!** Refresh the frontend page, go to the **🔧 Tools** tab in the Prompt Lab, check the box, and it's ready to use.
+- [Development Spec](./docs/DEVELOPMENT_SPEC.md)
+- [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
+- [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
+- [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
+- [Consolidated Runtime Roadmap](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
----
+## Design Principles
 
-## 🤝 Contributing
-Everyone is welcome to help improve this Agent LEGO sandbox! You can participate by:
-- Submitting your custom, creative `Tools` (e.g., integrations with Jira, Notion, etc.);
-- Submitting new `Feature` plugins for experimental traits;
-- Improving user experience and micro-animations of the trace visualization UI.
+- Prefer observable behavior over black-box automation.
+- Prefer detachable primitives over sealed commercial-agent-style modes.
+- Keep model-provider logic inside the gateway, not the agent loop.
+- Keep prompt assembly cache-friendly: stable content first, dynamic content late.
+- Treat filesystem, shell, and credentials as fail-closed surfaces.
+- Keep Context Inspector focused on actual model payload.
 
-If you find this project helpful, please give it a **⭐ Star**. It is the greatest encouragement for open-source authors!
+## Contributing
+
+This project is a local experimental workbench. Contributions that improve observability, safety, runtime modularity, prompt assembly, model adapters, task orchestration, or knowledge mounting are especially welcome.

@@ -20,6 +20,8 @@ import spawnTeammate from './spawn_teammate.js';
 import sendTeamMessage from './send_team_message.js';
 import checkTeamInbox from './check_team_inbox.js';
 import waitForTeammates from './wait_for_teammates.js';
+import listMountedKnowledgeBases from './list_mounted_knowledge_bases.js';
+import queryKnowledgeBase from './query_knowledge_base.js';
 import { validateToolInput } from './toolValidation.js';
 
 /**
@@ -51,6 +53,8 @@ class ToolRegistry {
       send_team_message: sendTeamMessage,
       check_team_inbox: checkTeamInbox,
       wait_for_teammates: waitForTeammates,
+      list_mounted_knowledge_bases: listMountedKnowledgeBases,
+      query_knowledge_base: queryKnowledgeBase,
     };
   }
 

@@ -20,6 +20,11 @@ test('lead task-system mode assembles planning, delegation, background, cron, te
 				enable_agent_teams: true,
 				enable_cron_scheduler: true,
 			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
 		},
 		runtimeRole: 'lead',
 		strategyId: 'async_teams',
@@ -77,6 +82,11 @@ test('lead todo mode mounts only write_todos plus time when optional primitives 
 				enable_agent_teams: false,
 				enable_cron_scheduler: false,
 			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
 		},
 	});
 
@@ -85,13 +95,18 @@ test('lead todo mode mounts only write_todos plus time when optional primitives 
 
 test('orchestration-disabled lead strips all orchestration-managed tools but preserves mounted resources', () => {
 	const pool = assembleToolPool({
-		baseTools: ['bash', 'sub_agent', 'spawn_teammate', 'send_team_message', 'write_todos'],
+		baseTools: ['bash', 'sub_agent', 'spawn_teammate', 'send_team_message', 'write_todos', 'query_knowledge_base'],
 		features: {
 			task_orchestration: {
 				enabled: false,
 				mode: 'task_system',
 				enable_sub_agents: true,
 				enable_agent_teams: true,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
 			},
 		},
 		mountedResources: {
@@ -100,7 +115,70 @@ test('orchestration-disabled lead strips all orchestration-managed tools but pre
 	});
 
 	assert.deepEqual(pool.tools, ['bash', { name: 'knowledge_search' }, 'get_current_time']);
-	assert.deepEqual(pool.removedToolNames, ['sub_agent', 'spawn_teammate', 'send_team_message', 'write_todos']);
+	assert.deepEqual(pool.removedToolNames, ['sub_agent', 'spawn_teammate', 'send_team_message', 'write_todos', 'query_knowledge_base']);
+});
+
+test('agentic knowledge strategy mounts knowledge tools for lead only', () => {
+	const pool = assembleToolPool({
+		baseTools: ['bash'],
+		features: {
+			task_orchestration: {
+				enabled: false,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'agentic_rag',
+				knowledge_tools: true,
+			},
+		},
+		runtimeRole: 'lead',
+	});
+
+	assert.deepEqual(pool.tools, [
+		'bash',
+		'list_mounted_knowledge_bases',
+		'query_knowledge_base',
+		'get_current_time',
+	]);
+	assert.deepEqual(pool.addedToolNames, [
+		'list_mounted_knowledge_bases',
+		'query_knowledge_base',
+		'get_current_time',
+	]);
+});
+
+test('manual knowledge strategy and child roles do not expose knowledge tools', () => {
+	const manual = assembleToolPool({
+		baseTools: ['bash', 'query_knowledge_base'],
+		features: {
+			task_orchestration: {
+				enabled: false,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
+		},
+		runtimeRole: 'lead',
+	});
+	const teammate = assembleToolPool({
+		baseTools: ['bash', 'query_knowledge_base'],
+		features: {
+			task_orchestration: {
+				enabled: false,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'agentic_rag',
+				knowledge_tools: true,
+			},
+		},
+		runtimeRole: 'teammate',
+	});
+
+	assert.deepEqual(manual.tools, ['bash', 'get_current_time']);
+	assert.deepEqual(teammate.tools, ['bash', 'send_team_message', 'get_current_time']);
 });
 
 test('sub-agent runtime strips every orchestration and team tool', () => {
@@ -121,6 +199,11 @@ test('sub-agent runtime strips every orchestration and team tool', () => {
 				enable_sub_agents: true,
 				enable_agent_teams: true,
 			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
 		},
 		runtimeRole: 'sub_agent',
 	});
@@ -136,6 +219,11 @@ test('teammate runtime keeps atomic tools and team communication only', () => {
 				enabled: true,
 				mode: 'task_system',
 				enable_agent_teams: true,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
 			},
 		},
 		runtimeRole: 'teammate',
@@ -166,6 +254,11 @@ test('filterToolsForRuntimeRole can filter an existing pool without mutating it'
 				mode: 'todo',
 				enable_agent_teams: true,
 			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
 		},
 	});
 
@@ -185,6 +278,11 @@ test('describeToolPool returns a compact Context Inspector summary', () => {
 				enabled: true,
 				mode: 'task_system',
 				enable_sub_agents: true,
+			},
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
 			},
 		},
 		runtimeRole: 'lead',
@@ -222,6 +320,13 @@ test('describeToolPool returns a compact Context Inspector summary', () => {
 			backgroundTasks: false,
 			agentTeams: false,
 			cronScheduler: false,
+		},
+		knowledge: {
+			enabled: true,
+			strategy: 'manual_lab',
+			manifest: false,
+			autoRetrieve: false,
+			tools: false,
 		},
 	});
 });

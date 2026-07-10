@@ -1,245 +1,285 @@
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
----
-
-# LLM Space - 乐高式 AI Agent 可视化实验平台 🚀
+# LLM Space
 
 [![Node Version](https://img.shields.io/badge/node-%3E%3D%2018.0.0-flat.svg?style=flat-square&color=339966)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-flat.svg?style=flat-square&color=blue)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-flat.svg?style=flat-square&color=orange)](https://github.com/shareAI-lab/learn-claude-code/pulls)
+[![Tests](https://img.shields.io/badge/tests-node%20--test-blue.svg?style=flat-square)](./package.json)
 
-> **“零抽象的白盒调试器，像拼乐高一样随心所欲搭建与测试你的 AI 代理。”**
+LLM Space 是一个用于实验 AI Agent Harness 的可视化白盒工作台。
 
-**LLM Space** 是一个专为开发者设计的零框架抽象、可视化 AI Agent 乐高实验平台与工作台（IDE）。
+它不是重型 Agent 框架，也不追求把所有决策封装成黑盒。相反，它把运行循环、prompt 组装、模型 payload、工具调用、记忆、任务编排、子代理行为都尽量展开，让你能看见并修改一个 Agent 是如何被组装出来的。
 
-许多重型 Agent 框架（如 LangChain）为了追求通用性引入了大量的黑盒封装与复杂的概念抽象，这给初学者的理解和开发者的本地调试带来了极高门槛。**LLM Space 坚持“所见即所得”与“极致轻量化”**，将 Agent 的决策、思考与工具调用轨迹完整呈现，并支持一键插拔高级特性。
+项目原则很简单：保持实验性、可观察、可拆卸。用户可以从最小 ReAct 循环开始，再按需开启任务系统、sub-agent、async teams、定时任务、记忆、上下文压缩、多模型协议适配等能力。
 
----
+## 你可以实验什么
 
-## 🆕 最近更新 (Recent Updates)
+- **白盒运行轨迹**：查看流式回答、thinking block、工具调用、工具结果、最终回答和 child-agent 事件。
+- **Prompt 与 Payload 检查**：Context Inspector 展示实际发送给模型的 system prompt sections、messages payload transcript 和 provider tool schema。
+- **可编辑指导层**：基础 agent 指导词使用文件化 `AGENTS.md` 承载，不再只是隐藏在 JSON 里的 prompt 字段。
+- **多供应商模型网关**：模型配置支持 provider-neutral 调用，通过 Anthropic Messages、OpenAI-compatible Chat Completions 等协议适配器接入不同 provider。
+- **任务编排实验**：比较 inline execution、TODO planning、DAG task-system、sub-agent delegation、async teammate coordination 等模式。
+- **定时任务 MVP**：让 Agent 创建、查看、取消并执行当前 Harness 作用域内的计划任务。
+- **自动记忆质量门**：自动提取记忆会被路由为 `auto_write`、`pending_review`、`discard`、`sensitive_blocked`。
+- **安全与可靠性控制**：敏感文件访问、路径穿越、高风险 bash、child-agent 权限事件、大输出处理等都按 fail-closed 思路防御。
 
-* **2026-06-20：进程内定时任务调度器 MVP**
-  - **Agent 自主管理任务**：通过 `schedule_cron`、`list_crons`、`cancel_cron` 创建、查看和取消当前 Harness 下的定时任务。
-  - **持久化执行链路**：五字段 cron 表达式进入进程内事件队列，运行时解析最新模型配置，并复用现有 `AgentExecutor` 完成执行。
-  - **可视化定时轨迹**：Scheduled Prompt、工具调用、最终回答、成功/失败次数和任务状态会显示在轨迹及 Scheduled Tasks 面板中。
-  - **持久化执行历史**：最近的运行记录会保存开始/结束时间、耗时、结果和错误，并可在服务重启后继续查看。
-  - **安全的后台执行**：Harness 忙碌时任务进入队列，避免并发 Agent Loop；前端通过 SSE 自动附着和 session 同步展示后台结果。
+## 快速开始
 
-* **2026-06-13：可恢复的有向无环图任务系统 (DAG Task System) 🕸️**
-  - **后端任务依赖流**：支持基于 DAG 的复杂任务系统，内置 Kahn 算法死锁检验、Claim 排他性文件锁并发保护、以及 Agent 异常崩溃退出时的物理看板租约自动回滚。
-  - **缓存友好与去重装配**：重构插件 lifecycle (`preLLM`)。静动态状态 Diff 拆分注入以最大化提升模型 KV Cache（Prompt Cache）命中率，同时引入 XML 标签防重注入过滤。
-  - **指引词自定义 UI (Prompt Lab)**：在实验特性中增加折叠手风琴卡片，高级用户可自定义修改 XML 指引词。支持文本垂直拉伸、长内容上下滚动、局部缓冲区安全暂存，以及一键重置默认指引。
+环境要求：
 
----
+- Node.js 18 或更高版本
+- npm
+- Docker Desktop（可选；测试 Qdrant 向量数据库时需要）
 
-## 🎬 整体交互演示
+安装并启动：
 
-![LLM Space 整体操作演示](images/llm-space.gif)
-
----
-
-## 📖 项目简介
-
-**LLM Space** 是一个开源的、基于浏览器的可视化工作台，用于构建、调试和实验 AI Agent。与那些用层层抽象包裹一切的重量级 Agent 框架不同，LLM Space 将完整的执行生命周期——每一次思考、每一次工具调用、每一次响应——实时呈现在你眼前。
-
-### 🎯 解决了什么痛点？
-
-- **框架疲劳**：LangChain 等框架引入了成百上千个概念（Chains、Agents、Tools、Memory、Callbacks...），模糊了实际发生的一切。LLM Space 完全剥离框架抽象——你直接看到原始 HTTP 请求、流式响应和工具执行输出。
-- **调试困难**：当 Agent 产生意外结果时，传统框架只给你一个最终答案，完全看不到决策路径。LLM Space 提供每一步的完整可视化轨迹。
-- **配置繁琐**：切换 Agent 配置通常意味着编辑 YAML 文件并重启服务。LLM Space 支持一键热切换 Harness 预设，零等待。
-
-### 👥 适合谁用？
-
-- **AI/LLM 学习者**：想真正弄懂 Agent 底层工作原理的人
-- **提示词工程师**：需要快速迭代 System Prompt 并获得即时可视化反馈
-- **工具开发者**：想在 30 秒内原型并测试新的 Agent 能力
-- **研究人员**：探索多 Agent 协作、DAG 任务拆解和 Agent 安全
-
-### 📊 关键数据
-
-- **5** 个内置 Harness 预设（从基础对话到 DAG 任务系统）
-- **30 秒** 开发并注册一个自定义工具
-- **3 分钟** 从零到运行你的第一个 Agent 实验
-- **0** 框架依赖——纯 Node.js + 原生 JavaScript
-
-## 💡 核心设计理念
-
-### 🧱 乐高式插拔与配置 (Modular Sandbox)
-我们把 Agent 复杂的生命周期解构为清晰的“积木结构”，全部支持在 UI 界面一键开启/禁用：
-- **乐合底座 (Harness 宿主)**：使用极简的 `.json` 配置文件定义 Agent 的 System Prompt 预设与初始状态。在左侧面板秒级热切换。
-- **可插拔功能插槽 (Modular Features)**：
-  - **API 自愈与容灾 (Error Recovery)**：遇到 429 自动非阻塞指数退避重试、连续 529 自动 Failover 备用模型、`max_tokens` 截断自动无损续写物理拼接、死循环熔断。
-  - **大模型语义重构 (Hard-Compact)**：上下文爆满时，自动触发紧急历史记忆压缩与 transcript 归档。
-  - **实时缓存监控 (KV Cache Monitor)**：实时追踪 DeepSeek 等模型的 KV 缓存利用率。
-
-### 👁️ 可视化白盒追踪 (White-Box Observability)
-拒绝黑盒运行！所有细节尽收眼底：
-- **思考链渲染**：原生支持 Anthropic Extended Thinking，流式渲染并折叠 `<thinking>` 思考轨迹。
-- **工具调用轨迹**：直观展示 `tool_use` 发起、输入参数、工具本地真实执行输出（流式 Shell 输出、网页抓取等）的交互全过程。
-- **消息物理合并**：续写流式打字与历史气泡无缝对齐，不产生逻辑断裂气泡。
-
----
-
-## 🛠️ 快速启动 (3分钟极速上手)
-
-### 1. 安装与运行
-确保你的电脑上安装了 **Node.js** (推荐 v18+)，然后执行：
 ```bash
-# 1. 安装依赖
 npm install
-
-# 2. 一键启动 (同时运行前端 UI 与后端服务)
 npm run dev
 ```
-启动后，浏览器会自动打开前端工作台：`http://localhost:5174`。
 
-### 2. 环境变量配置 (.env)
-在项目根目录创建 `.env` 文件（或参考 `.env.example`）：
-```dotenv
-# Tavily Search API — 用于网络搜索工具（https://tavily.com 免额度 1000次/月）
-TAVILY_API_KEY=tvly-你的KEY
+启动后：
 
-# 服务端口（可选，默认 3001）
-PORT=3001
+- 后端：`http://localhost:3001`
+- 前端：`http://localhost:5174`
+
+验证命令：
+
+```bash
+npm test
+npm run build
 ```
-*(提示：大模型 API Key 可直接在前端 UI 左侧面板中动态添加，系统会自动将其存盘。)*
 
----
+如果要测试向量检索，先启动本地 Qdrant：
 
-## 定时任务（Cron Scheduler MVP）
+```bash
+docker compose --env-file docker/qdrant.env up -d qdrant
+curl http://localhost:6333/collections
+```
 
-在 Harness 的实验特性中开启 **Cron Scheduler**，然后直接使用自然语言让 Agent 创建任务，例如：
+这里使用专用 `docker/qdrant.env`，避免 Docker Compose 误读应用 `.env` 中的多行 `MODELS_CONFIG`。
+
+Qdrant Dashboard：
 
 ```text
-每 10 分钟查询一次临沂天气并播报。
+http://localhost:6333/dashboard
 ```
 
-开启后，Agent 会获得三个工具：
+## 模型配置
 
-- `schedule_cron`：使用五字段 cron 表达式创建循环或单次任务。
-- `list_crons`：查看任务及 queued/running/succeeded/failed 状态。
-- `cancel_cron`：取消当前 Harness 所属的任务。
+可以从 `.env.example` 创建 `.env`，也可以直接通过 UI 添加模型。
 
-持久化任务定义保存在 `server/scheduler/tasks.json`，最近 500 条执行记录保存在 `server/scheduler/runs.json`。任务仅保存模型引用，不保存 API Key；每次执行时都会从 `.env` 解析最新的匹配模型配置。如果 Harness 正在运行，定时事件会排队等待，避免同时启动多个 Agent Loop。点击任务行的历史按钮可以查看运行状态、时间、耗时和错误。
+典型 `.env` 内容：
 
-MVP 边界：
+```dotenv
+PORT=3001
+TAVILY_API_KEY=tvly-your-key-here
+ZHIPU_API_KEY=your-zhipu-key-here
+DASHSCOPE_API_KEY=your-dashscope-key-here
+QDRANT_API_KEY=
+MODELS_CONFIG=[]
+```
 
-- Cron 语法支持 `*`、`*/N`、固定值、范围和逗号分隔值。
-- 任务使用服务器本地时区。
-- 服务停止期间错过的任务不会补跑。
-- 当前仅支持 `main` 执行模式；隔离会话、自动重试和告警将在后续阶段实现。
+模型配置以结构化 JSON 管理。每个模型可以独立选择协议和连接方式：
 
----
+- `protocol: "anthropic"`：Anthropic-compatible Messages API。
+- `protocol: "openai_chat_completions"`：OpenAI-compatible Chat Completions API。
+- `baseUrl`、API key、model id、context window、provider-specific `extraBody` 都属于模型配置层。
 
-## 🔬 5 大基础 Harness 预设实验
+Agent Loop 不应关心 provider 名称。协议适配器负责标准化 request、streaming event、tool call、thinking/reasoning content、usage 和 prompt-cache 字段。
 
-我们为您预先创建了 5 个由浅入深的经典预设，可供您在左侧面板秒级切换并快速开始实验：
+## 核心架构
 
-### 📁 01-chat-bot.json (基础对话)
-* **定位**：理解最基础的 ReAct 工具调用循环。
-* **特色**：挂载了简单的城市天气查询等工具。适合观察大模型分析城市、触发 tool_call、获取数据并自然语言归纳 of 闭环。
-  <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
+### Harness
 
-  ![01-chat-bot 演示](docs/images/01-chat-bot-demo.gif)
+Harness 是一个本地 Agent 配置，负责控制工具挂载、实验特性、模型选择、可编辑指导词和任务编排策略。
 
-  </details>
+Harness 文件位于：
 
-### 📁 02-bash.json (系统交互)
-* **定位**：让 Agent 拥有文件系统操作与网络探针大礼包。
-* **特色**：挂载了真实的 Bash 执行器（流式回显）、文件读写、Tavily 实时网页搜索与抓取。你可以输入诸如“查找当前目录下最大的三个文件”来观察轨迹。
-  <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
+```text
+harnesses/
+```
 
-  ![02-bash 演示](docs/images/02-bash-demo.gif)
+可编辑基础指导词位于：
 
-  </details>
+```text
+guidance/<harnessId>/AGENTS.md
+```
 
-### 📁 03-deep-research.json (深度调研)
-* **定位**：学习 Agent 自动规划和拆解复杂任务。
-* **特色**：结合 systemPrompt 中的 Behaviors 与本地 `write_todos`，大模型遇到复杂调研任务时会自动在右侧拆解出 4~8 个 TODO 步骤，并逐个攻克。
-  <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
+### Agent Loop
 
-  ![03-deep-research 演示](docs/images/03-deep-research-demo.gif)
+运行时采用 hook-oriented loop：
 
-  </details>
+1. 用户输入处理
+2. Pre-LLM 状态组装
+3. 模型网关调用
+4. 工具执行前权限与安全检查
+5. 工具调度
+6. 工具后处理与 offload
+7. 停止、持久化与 UI 广播
 
-### 📁 04-subagent.json (多 Agent 协作)
-* **定位**：探索多 Agent 分工与上下文隔离。
-* **特色**：挂载了 `sub_agent` 核心工具。主 Agent 在遇到繁重探针或庞大上下文搜集任务时，会主动派发任务并创建隔离的 Sub-agent 运行，最后接收并整合其汇报，避免当前主 context 溢出污染。
-  <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
+新的运行时能力应优先做成可拆卸模块或插件，不要把临时分支继续堆进主 executor。
 
-  ![04-subagent 演示](docs/images/04-subagent-demo.gif)
+### Context Assembly
 
-  </details>
+Prompt 组装会被记录为显式 section。当前 Context Inspector 默认只展示真正发送给模型的内容：
 
-### 📁 05-task-system.json (DAG 任务系统)
-* **定位**：理解基于 DAG（有向无环图）的复杂长周期任务拆解与并发安全。
-* **特色**：挂载了任务依赖系统工具（`create_task`, `list_tasks`, `claim_task`, `complete_task`）。内置 Kahn 算法环检测、Claim 排他性文件锁保护、以及崩溃自愈。Agent 遇到复杂多任务时，能像人类工程师一样自动拆解依赖、认领并逐个击破。
-  <details>
-  <summary>🔍 点击展开看运行演示 GIF</summary>
+- System Prompt sections
+- Messages Payload transcript
+- Provider Tool Schema
 
-  ![05-task-system 演示](docs/images/05-task-system-demo.gif)
+Runtime queues、memory candidates、tool-pool summaries 等 sidecar 状态，只有在真正注入模型请求时才进入默认视图；否则应该放在独立可观察面板里。
 
-  </details>
+### 记忆分层
 
----
+LLM Space 将长期上下文拆成三层：
 
-## ⚙️ 乐高沙盒闭环交互 (如何自定义与导出)
+- **Explicit Guidance**：用户明确要求长期遵守的规则和项目指导，使用 `AGENTS.md` 承载。
+- **Auto-Capture Working Layer**：不确定、待观察、可能过期的候选记忆。
+- **Curated Long-term Memory**：通过质量与安全检查的稳定跨会话事实。
 
-在 LLM Space 中，你所做的任何实验调整都可以无缝沉淀：
+这样既保留自动记忆的可观察性，又不会把每次记忆提取都变成打断式审批。
 
-1. **秒级插拔**：在左侧列表随意选中一个基础 Harness 后，在 **Prompt Lab** 中修改 Base System Prompt，勾选你想尝试的 Tools（如 `bash`, `sub_agent`），或者在实验特性区开启 `Error Recovery` 自愈开关。
-2. **白盒追踪**：发送提问，观察轨迹追踪面板中展开的运行轨迹是否符合预期。
-3. **一键存盘**：调试满意后，点击页面下方的 **“保存 (Save)”** 按钮。系统会立即在本地 `harnesses/` 目录下生成并导出您专属的全新 Harness JSON 配置文件，方便随用随切或与团队共享。
+## 内置 Harness 预设
 
----
+| Harness | 用途 |
+| --- | --- |
+| `01-chat-bot.json` | 最小 ReAct 对话与简单工具。 |
+| `02-bash.json` | 文件系统、shell、网络搜索实验。 |
+| `03-deep-research.json` | TODO 驱动的研究与规划。 |
+| `04-subagent.json` | Sub-agent 委托与上下文隔离。 |
+| `05-task-system.json` | DAG 任务拆解与 claim/complete 流程。 |
 
-## 🔧 开发者进阶：30秒开发你的第一个 Tool 积木
+这些预设只是示例，不是固定产品。你可以通过 Prompt Lab 和配置面板组合自己的 Harness 行为。
 
-如果你想让 Agent 拥有新的能力（例如执行数据库查询、或是调用自定义 API），只需两步：
+## 实验系统
 
-### 第一步：在 `server/tools/` 目录下新建一个 JS 文件（例如 `hello_tool.js`）
-```javascript
-// server/tools/hello_tool.js
+### 任务编排
+
+LLM Space 保持编排原语可拆卸：
+
+- `write_todos`：轻量 planning。
+- DAG `task-system`：带依赖的任务系统。
+- `sub_agent`：一次性隔离委托。
+- async teams：有限异步 teammate 协作。
+- strategy presets：组合上述原语，但不把它们黑盒封装。
+
+简单任务应保持简单。如果用户明确要求某种执行方式，例如“调用 sub-agent”，Harness 应尊重该方式，除非先向用户确认替代方案。
+
+### 定时任务
+
+Cron Scheduler 暴露：
+
+- `schedule_cron`
+- `list_crons`
+- `cancel_cron`
+
+任务按 Harness 作用域隔离，并复用同一条 AgentExecutor 路径执行。如果目标 Harness 忙碌，定时事件会排队，避免同一个 session 上并发启动多个 agent loop。
+
+### 知识库
+
+Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真实 embedding provider、Local JSON / Qdrant 向量存储、keyword / vector / hybrid 检索策略、可选的 Qwen3 rerank 重排，以及 retrieval evaluation records。
+
+用户可以创建本地知识库，导入 Markdown/text/JSON/CSV/PDF/DOCX 文件，生成有边界的 chunks 和索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
+
+完整配置教程见：[知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)。
+
+当前形态：
+
+- 本地知识库 metadata 与存储
+- 有边界的 ingestion 与 chunking
+- 带来源标签的检索预览
+- Harness 级挂载
+- Auto RAG：每轮自动从已挂载知识库检索
+- Agentic RAG：稳定挂载清单 + `list_mounted_knowledge_bases` / `query_knowledge_base` 工具
+- Manual Lab：只在 Knowledge 页面测试检索，不改变对话上下文
+- Recent Retrieval Records：有边界地记录 initial recall、rerank、final results、top scores 和 sources，用于对比检索质量，但不落盘 chunk 正文
+- Context Inspector 分层展示 Mounted Knowledge Manifest、Retrieved Knowledge、Messages Payload 和 Provider Tool Schema
+
+推荐快速模式：
+
+```text
+轻量本地：
+  Retrieval strategy: Keyword
+  Index method: Keyword
+  Embedding provider: None
+  Vector store: Local JSON
+  Rerank provider: None
+
+本地向量：
+  Retrieval strategy: Vector 或 Hybrid
+  Index method: Vector 或 Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Local JSON
+  Rerank provider: None
+
+完整链路：
+  Retrieval strategy: Hybrid
+  Index method: Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Qdrant
+  Rerank provider: Qwen3 Rerank
+```
+
+常用环境变量：
+
+```text
+ZHIPU_API_KEY=...
+DASHSCOPE_API_KEY=...
+QDRANT_API_KEY=...
+```
+
+详细指南包含 provider URL、字段含义、Qdrant 配置、rerank 配置、测试流程和常见问题排查。
+
+## 开发工作流
+
+常用命令：
+
+```bash
+npm run dev
+npm test
+npm run build
+npm run lint
+```
+
+新增工具时，在 `server/tools/` 下创建模块，并在 `server/tools/index.js` 注册。
+
+示例：
+
+```js
 export default {
   name: 'hello_tool',
-  description: '向指定的用户发送问候，并附加一条自定义消息。',
+  description: 'Return a greeting.',
   parameters: {
     type: 'object',
     properties: {
-      userName: { type: 'string', description: '接收问候的用户名' },
-      customMsg: { type: 'string', description: '附加的自定义祝福消息' }
+      name: { type: 'string' },
     },
-    required: ['userName']
+    required: ['name'],
   },
-  async execute({ userName, customMsg = '祝你开心！' }) {
-    // 在这里编写真实的业务逻辑
-    return `你好，${userName}！ ${customMsg}`;
-  }
+  async execute({ name }) {
+    return `Hello, ${name}.`;
+  },
 };
 ```
 
-### 第二步：在 `server/tools/index.js` 中引入并注册
-```javascript
-// server/tools/index.js
-import hello_tool from './hello_tool.js';
+## 关键文档
 
-export const tools = [
-  // ... 其他工具
-  hello_tool
-];
-```
-**搞定！** 刷新前端页面，在 Prompt Lab 的 **🔧 Tools 挂载** 选项卡里勾选它即可使用。
+- [开发规范](./docs/DEVELOPMENT_SPEC.md)
+- [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
+- [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
+- [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
+- [Runtime Roadmap 汇总计划](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
----
+## 设计原则
 
-## 🤝 参与贡献
-欢迎大家共同完善这个 Agent 乐高沙盘！你可以通过以下方式参与：
-- 提交你手写的有趣、有创意的 `Tools`（例如对接 Jira, Notion 等）；
-- 提交新的 `Feature` 实验特性插件；
-- 改进轨迹渲染界面的用户体验与微动画。
+- 优先可观察行为，不做黑盒自动化。
+- 优先可拆卸原语，不做封闭商业 Agent 模式。
+- 模型 provider 逻辑留在 gateway，不进入 agent loop。
+- Prompt 组装要 cache-friendly：稳定内容在前，动态内容靠后。
+- 文件系统、shell、凭据相关能力必须 fail-closed。
+- Context Inspector 专注展示真实模型 payload。
 
-如果你觉得这个项目对你有帮助，请给项目点一个 **⭐ Star**，这对于开源作者是最大的鼓励！
+## 参与贡献
+
+这是一个本地实验工作台。欢迎改进可观察性、安全性、运行时模块化、prompt assembly、模型适配、任务编排和知识库挂载。

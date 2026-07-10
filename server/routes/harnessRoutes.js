@@ -15,6 +15,8 @@ import {
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
 import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
+import { listMountedKnowledgeBases, loadKnowledgeBase } from '../knowledge/knowledgeStore.js';
+import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getToolSchemasForTools } from '../tools/index.js';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 
@@ -72,6 +74,7 @@ export function registerHarnessRoutes(app, {
   registry = toolRegistry,
   resolveStrategy = resolveSelectedStrategyId,
   memoryCandidateStore = { listMemoryCandidates },
+  knowledgeRoot,
 } = {}) {
   app.get('/api/harnesses', async (req, res) => {
     try {
@@ -262,6 +265,11 @@ export function registerHarnessRoutes(app, {
         dryRunMode: dryRunMode === 'static_context' ? 'static_context' : '',
         skills: safeSkills,
         runtimeNotificationQueue: dryRunNotificationQueue,
+        knowledgeDependencies: {
+          listMountedKnowledgeBases: (args) => listMountedKnowledgeBases({ ...args, knowledgeRoot }),
+          loadKnowledgeBase: (args) => loadKnowledgeBase({ ...args, knowledgeRoot }),
+          retrieveKnowledge: (args) => retrieveKnowledge({ ...args, knowledgeRoot }),
+        },
         onEvent: () => {}
       });
 

@@ -54,9 +54,13 @@ The Context Inspector is not a general runtime dashboard. Its job is to clearly 
 ### 6. Knowledge Bases and Mountable Resources
 External knowledge bases, skills, project documents, and future MCP resources should be treated as mountable resources, not hard-coded prompt text:
 - Users should be able to upload/generate knowledge bases and explicitly mount them in a conversation.
-- Model injection must be bounded and source-labeled. For example, `<mounted_knowledge>` should include only retrieved, limited snippets.
+- Knowledge runtime strategy should be configurable: Auto RAG retrieves every turn, Agentic RAG exposes tools for model-driven retrieval, and Manual Lab keeps retrieval in the lab surface.
+- Mounted Knowledge Manifest belongs to stable pinned context; Retrieved Knowledge belongs to per-turn dynamic context and is injected only when chunks match.
+- Model injection must be bounded and source-labeled. Dynamic retrieval content should use clear boundaries such as `<retrieved_knowledge>` and must never push complete files directly into the prompt.
 - Large file contents must not be pushed directly into trajectory or messages. They should enter context through indexing, retrieval, and traceable citations.
 - Knowledge mounting should reuse the Context Inspector prompt assembly mechanism so users can see exactly which knowledge snippets were injected.
+- Real vectorization development should use Docker Compose-managed Qdrant via `docker compose --env-file docker/qdrant.env up -d qdrant`. Embedding API keys must be referenced through environment variable names such as `ZHIPU_API_KEY`; raw secrets must not be stored in KB metadata or frontend state.
+- Auto RAG dynamic injection must respect relevance thresholds. Low-score nearest neighbors may be shown in retrieval previews, but should not automatically pollute chat context.
 
 ---
 
@@ -146,4 +150,7 @@ LLM-Space is an experimental platform and should not fully black-box commercial-
 ### 5. Current Development Status
 - Task 13 (Pinned Strategy + Context Assembly Inspector) is complete: execution strategy is pinned into system prompt assembly, and Context Inspector now acts as a static payload inspector.
 - Task 14 (Multi-layer Guidance Composition) is intentionally skipped for now.
-- The next priority is Task 15 (Mountable Knowledge Bases): upload, index, retrieve, mount, and inspect external knowledge sources.
+- Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import files, chunk/index them, preview retrieval, and mount them to a harness.
+- Knowledge Runtime Strategies are complete: Auto RAG, Agentic RAG, and Manual Lab are supported; Mounted Knowledge Manifest and Retrieved Knowledge are split; Agentic RAG exposes `list_mounted_knowledge_bases` / `query_knowledge_base`; Context Inspector shows the actual knowledge context sent to the model in separate layers.
+- Task 16 (RAG Retrieval Quality Extensions) is complete through the real-vectorization loop: Markdown/text/JSON/CSV/PDF/DOCX loaders, Zhipu `embedding-3` / OpenAI-compatible embedding providers, Local JSON / Qdrant vector stores, keyword/vector/hybrid retrieval, Retrieval Records, and Context Inspector knowledge-context layers.
+- The next priority is Auto RAG confidence gating, rerank adapters, retrieval evaluation, and comparison views.

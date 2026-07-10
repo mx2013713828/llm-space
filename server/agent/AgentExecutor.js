@@ -19,6 +19,7 @@ import { SubAgentPlugin } from './plugins/SubAgentPlugin.js';
 import { SkillsPlugin } from './plugins/SkillsPlugin.js';
 import { SecurityPlugin } from './plugins/SecurityPlugin.js';
 import { MemoryPlugin } from './plugins/MemoryPlugin.js';
+import { KnowledgePlugin } from './plugins/KnowledgePlugin.js';
 import { parseFeatures } from './FeatureParser.js';
 import { TaskSystemPlugin } from './plugins/TaskSystemPlugin.js';
 import { CronSchedulerPlugin } from './plugins/CronSchedulerPlugin.js';
@@ -150,6 +151,7 @@ export class AgentExecutor {
     runtimeNotificationQueue = defaultRuntimeNotificationQueue,
     dryRunMode = '',
     memoryDependencies = null,
+    knowledgeDependencies = null,
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
@@ -192,6 +194,7 @@ export class AgentExecutor {
     this.runtimeNotificationQueue = runtimeNotificationQueue;
     this.dryRunMode = dryRunMode;
     this.memoryDependencies = memoryDependencies;
+    this.knowledgeDependencies = knowledgeDependencies;
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
@@ -226,6 +229,9 @@ export class AgentExecutor {
     // 记忆系统插件（需 enable_memory 父开关开启）
     if (this.runtimeRole !== 'teammate' && this.features.enable_memory?.enabled) {
       this.hooks.register(MemoryPlugin);
+    }
+    if (this.runtimeRole !== 'teammate') {
+      this.hooks.register(KnowledgePlugin);
     }
     this.hooks.register(CronSchedulerPlugin);
     this.hooks.register(SubAgentPlugin);

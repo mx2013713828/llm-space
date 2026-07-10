@@ -96,13 +96,15 @@ Stage 1: Runtime shell and server boundaries
 Stage 2: Agent loop kernel, tool pool, and notifications
 Stage 3: Model gateway and stream normalization
 Stage 4: Collaboration runtime: teams, protocols, worktrees
-Stage 5: Context & knowledge layer: guidance, memory, prompt assembly, knowledge, resource mounting
-Stage 6: Runtime quality: tests, observability, E2E, maintainability
+Stage 5: Context & RAG knowledge layer: guidance, memory, prompt assembly, local Knowledge Bases
+Stage 6: MCP runtime layer: standalone MCP client, tool adaptation, permission UX
+Stage 7: Unified runtime resource layer: resource mount registry and experiment profiles
+Stage 8: Runtime quality: tests, observability, E2E, maintainability
 ```
 
-Current closure point: **Stage 1 through Stage 4 Task 8 are minimally closed and tested**. Task 9 and Task 10 remain intentionally deferred because protocol approval and worktree isolation are heavier collaboration features.
+Current closure point: **Stage 1 through Stage 5 Task 15 plus Knowledge Runtime Strategies are minimally closed and tested**. Task 9, Task 10, and Task 14 remain intentionally deferred because protocol approval, worktree isolation, and multi-layer guidance composition are heavier follow-up features.
 
-The recommended next task is **Task 13: Pinned Strategy + Context Assembly Inspector**. Task 11 and Task 12 have closed the first two Stage 5 foundations: automatic memory quality gating and `AGENTS.md` explicit guidance.
+The recommended next task is **Task 16: RAG Retrieval Quality Extensions**. Task 11 through Task 13 closed the first Stage 5 foundations: automatic memory quality gating, `AGENTS.md` explicit guidance, and the static Context Assembly Inspector. Task 15 now provides a local Knowledge Base MVP with create/import/index/retrieve/mount flow, and Knowledge Runtime Strategies add Auto RAG, Agentic RAG, Manual Lab, split manifest/retrieval context, and agent-controlled knowledge tools.
 
 ---
 
@@ -613,13 +615,43 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - [ ] Add tests proving composition order is project guidance then harness guidance.
 - [ ] Verify and commit with `feat: compose multi-layer guidance`.
 
-### Task 15: Mountable Knowledge Bases
+### Task 15: Local RAG Knowledge Base MVP
 
-**Goal:** Let users upload files, generate reusable local knowledge bases, and mount selected bases into a conversation as external context.
+**Goal:** Let users create local Knowledge Bases from selected files, generate a lightweight RAG database, test retrieval, and mount selected bases into conversations as bounded, source-labeled context.
 
-**Why:** Knowledge should behave like a mounted resource, similar to a skill/reference bundle, not as hard-coded prompt text.
+**Status:** MVP plus runtime strategy layer implemented. The first closure supports local metadata storage, Markdown/text/JSON parsing, bounded chunking, keyword indexing, retrieval preview, harness-level mounting, Auto RAG, Agentic RAG, Manual Lab, pinned Mounted Knowledge Manifest, per-turn Retrieved Knowledge, and agent-controlled list/query knowledge tools. Embedding providers, richer file parsers, vector/hybrid retrieval, rerank, and retrieval evaluation remain follow-up work.
 
-**Loop stages:** Pre-LLM assembly, mountable resource management.
+**Why:** Dify's knowledge workflow shows that RAG should be a visible data pipeline, not a hidden "upload to vector DB" button. LLM-Space should start with a lightweight local MVP while preserving the final architecture for multiple file types, configurable embedding providers, hybrid retrieval, rerank, and parent-child retrieval.
+
+**Loop stages:** Knowledge management, pre-LLM assembly, Context Inspector dry-run.
+
+**MVP scope:**
+
+- Users can create, list, rename, delete, and inspect local Knowledge Bases.
+- Users can import `.md`, `.txt`, and `.json` files in the first version.
+- Document parsing is routed through a small parser adapter interface, even though the MVP only ships three parsers.
+- Each upload can optionally override basic processing settings such as parser type, cleanup, chunk size, overlap, and retrieval limits.
+- Ingestion performs deterministic text extraction, cleanup, chunking, and local keyword/BM25-ish indexing.
+- Users can preview chunks before final ingestion or inspect chunks after ingestion.
+- Users can run retrieval tests against a Knowledge Base without starting an agent loop.
+- Ingestion and retrieval expose lightweight pipeline progress: parse, clean, chunk, index, retrieve, inject.
+- Users can mount one or more Knowledge Bases to a harness/conversation.
+- `KnowledgePlugin` supports three runtime strategies: Auto RAG, Agentic RAG, and Manual Lab.
+- Mounted Knowledge Manifest is pinned as stable system context when strategy requires it.
+- Retrieved Knowledge is injected into the latest user turn only when matching chunks exist.
+- Agentic RAG exposes `list_mounted_knowledge_bases` and `query_knowledge_base` through the runtime tool pool.
+- Context Inspector separates System Prompt, Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema.
+
+**Final RAG direction:**
+
+- Support more file types: PDF, DOCX, PPTX, CSV/TSV, HTML, code files, and eventually images/OCR when the extraction layer is ready.
+- Keep document parsers as independent adapters so extraction, chunking, indexing, and retrieval can evolve separately.
+- Support per-upload process config so a user can experiment with parser, chunking, summary, question generation, embedding, and retrieval settings without changing the entire Knowledge Base.
+- Support user-configured embedding model APIs: provider, base URL, API key reference, model name, dimensions, batch size, and extra request body.
+- Support provider-specific embedding adapters without leaking provider details into the agent loop.
+- Support vector indexes, keyword indexes, hybrid retrieval, rerank adapters, parent-child retrieval, metadata filters, retrieval records, and evaluation hooks.
+- Support RAG pipeline traces with lazy detail loading; main trajectory should only show compact progress and citations.
+- Treat "Knowledge Base" as the product concept. Vector storage is one possible index backend, not the user-facing abstraction.
 
 **Files:**
 
@@ -627,68 +659,252 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - Create: `server/knowledge/knowledgeStore.test.js`
 - Create: `server/knowledge/knowledgeIngest.js`
 - Create: `server/knowledge/knowledgeIngest.test.js`
+- Create: `server/knowledge/knowledgeParsers.js`
+- Create: `server/knowledge/knowledgeParsers.test.js`
+- Create: `server/knowledge/knowledgeChunking.js`
+- Create: `server/knowledge/knowledgeChunking.test.js`
+- Create: `server/knowledge/knowledgeIndex.js`
+- Create: `server/knowledge/knowledgeIndex.test.js`
 - Create: `server/knowledge/knowledgeRetrieve.js`
 - Create: `server/knowledge/knowledgeRetrieve.test.js`
+- Create: `server/knowledge/knowledgePipelineTrace.js`
+- Create: `server/knowledge/knowledgePipelineTrace.test.js`
+- Create: `server/routes/knowledgeRoutes.js`
+- Create: `server/routes/knowledgeRoutes.test.js`
 - Add: `server/agent/plugins/KnowledgePlugin.js`
-- Modify: knowledge routes.
-- Create: `src/lib/knowledgeMounts.js`
-- Create: `src/lib/knowledgeMounts.test.js`
-- Modify: configuration UI to upload, list, mount, and unmount knowledge bases.
+- Modify: server route mounting.
+- Create: `src/lib/knowledgeBases.js`
+- Create: `src/lib/knowledgeBases.test.js`
+- Modify: configuration UI to create, upload/import, test, mount, and unmount Knowledge Bases.
+- Modify: `src/components/ContextInspector.jsx`
 
 **Interfaces:**
 
-- `createKnowledgeBase({ name, description, files })`
-- `ingestKnowledgeFile({ knowledgeBaseId, filename, mimeType, content })`
-- `retrieveKnowledge({ knowledgeBaseIds, query, limit }): KnowledgeChunk[]`
-- `mountKnowledgeBases({ harnessId, knowledgeBaseIds })`
+- `createKnowledgeBase({ name, description, settings }): KnowledgeBase`
+- `listKnowledgeBases(): KnowledgeBaseSummary[]`
+- `deleteKnowledgeBase({ knowledgeBaseId }): void`
+- `parseKnowledgeFile({ filename, mimeType, content, parserConfig }): ParsedKnowledgeDocument`
+- `ingestKnowledgeFile({ knowledgeBaseId, filename, mimeType, content, settings }): IngestionResult`
+- `previewKnowledgeChunks({ filename, mimeType, content, settings }): KnowledgeChunkPreview[]`
+- `retrieveKnowledge({ knowledgeBaseIds, query, topK, maxChars, scoreThreshold }): KnowledgeRetrievalResult`
+- `recordKnowledgePipelineEvent({ knowledgeBaseId, runId, stage, status, summary }): void`
+- `mountKnowledgeBases({ harnessId, knowledgeBaseIds }): void`
 
 **Steps:**
 
-- [ ] Write knowledge store tests for create/list/delete, file metadata, and path-safe storage.
-- [ ] Implement local metadata and chunk storage under a gitignored runtime directory.
-- [ ] Write ingestion tests for plain text, markdown, JSON, and unsupported file rejection.
-- [ ] Implement bounded chunking and source metadata.
-- [ ] Write retrieval tests for keyword retrieval, mounted-base filtering, limits, and citations.
-- [ ] Add bounded `<mounted_knowledge>` injection with source labels.
-- [ ] Add lightweight upload/select UI without embedding large file contents into the trajectory.
-- [ ] Verify and commit with `feat: add mountable knowledge bases`.
+- [x] Write knowledge store tests for create/list/delete, metadata persistence, path-safe IDs, and runtime directory isolation.
+- [x] Implement local metadata, file metadata, chunk storage, and keyword index storage under a gitignored runtime directory.
+- [x] Write parser adapter tests for Markdown, plain text, JSON, unsupported file rejection, and safe metadata.
+- [x] Write ingestion tests for deterministic chunk IDs, cleanup, per-upload process config, chunk size, and overlap.
+- [x] Implement bounded chunking, source metadata, and chunk preview.
+- [x] Write retrieval tests for keyword ranking, mounted-base filtering, `topK`, `maxChars`, `scoreThreshold`, and source labels.
+- [x] Add lightweight pipeline trace tests for parse, chunk, index, and retrieve stages.
+- [x] Add Knowledge Base API routes and route-level validation.
+- [x] Add stable Mounted Knowledge Manifest and dynamic Retrieved Knowledge prompt assembly sections.
+- [x] Add Auto RAG, Agentic RAG, and Manual Lab runtime strategies.
+- [x] Add agentic knowledge list/query tools and tool-pool integration.
+- [x] Add lightweight frontend UI for create/import/test/mount and runtime strategy selection without embedding large file contents into the trajectory.
+- [x] Split Context Inspector knowledge sections for model-bound manifest and retrieved chunks.
+- [ ] Verify and commit with `feat: add local rag knowledge bases`.
 
-### Task 16: Runtime Resource Mount Registry
+### Task 16: RAG Retrieval Quality Extensions
 
-**Goal:** Create one registry for mountable runtime resources: skills, memories, knowledge bases, MCP tool servers, and future provider capabilities.
+**Goal:** Upgrade retrieval quality after the local RAG MVP has a working end-to-end loop.
 
-**Why:** S20's MCP and skill catalog pattern points to the same abstraction as knowledge and memory: resources should be visible, mountable, disabled independently, and assembled at the correct loop stage.
+**Why:** Production RAG quality usually comes from a pipeline: extraction quality, chunking strategy, keyword/vector/hybrid recall, reranking, metadata filters, and evaluation. These should extend the MVP interfaces rather than rewrite them.
 
-**Loop stages:** Pre-LLM assembly, tool pool dispatch.
+**Scope rule:** Keep this stage modular and experimental. Each quality upgrade should be independently configurable, observable, and removable; do not convert the MVP into a heavyweight enterprise knowledge platform.
+
+**Loop stages:** Knowledge ingestion, retrieval, pre-LLM assembly, retrieval testing.
+
+**Files:**
+
+- Modify: `server/knowledge/knowledgeStore.js`
+- Modify: `server/knowledge/knowledgeIngest.js`
+- Modify: `server/knowledge/knowledgeParsers.js`
+- Modify: `server/knowledge/knowledgePipelineTrace.js`
+- Modify: `server/knowledge/knowledgeRetrieve.js`
+- Create: `server/knowledge/embeddingProviders.js`
+- Create: `server/knowledge/embeddingProviders.test.js`
+- Create: `server/knowledge/documentLoaders.js`
+- Create: `server/knowledge/documentLoaders.test.js`
+- Create: `server/knowledge/vectorIndex.js`
+- Create: `server/knowledge/vectorIndex.test.js`
+- Create: `server/knowledge/rerankProviders.js`
+- Create: `server/knowledge/rerankProviders.test.js`
+- Modify: knowledge routes.
+- Modify: Knowledge Base settings UI.
+- Modify: Context Inspector retrieval details.
+
+**Interfaces:**
+
+- `configureEmbeddingProvider({ provider, baseUrl, apiKeyRef, model, dimensions, batchSize, extraBody })`
+- `loadKnowledgeDocument({ filename, mimeType, content, loaderConfig }): ParsedKnowledgeDocument`
+- `embedChunks({ providerConfig, chunks }): EmbeddingResult[]`
+- `retrieveKnowledge({ strategy: 'keyword' | 'vector' | 'hybrid', rerank, filters, topK, maxChars })`
+- `rerankKnowledgeChunks({ providerConfig, query, chunks, topK }): RerankResult[]`
+- `buildParentChildChunks({ document, parentSettings, childSettings }): ParentChildChunkGraph`
+- `getKnowledgePipelineTrace({ knowledgeBaseId, runId }): KnowledgePipelineTrace`
+
+**Steps:**
+
+- [ ] Add Knowledge Base settings for `indexMethod`, embedding provider config, retrieval strategy, `topK`, score threshold, and max injected chars.
+- [ ] Add document loader adapter tests for at least one richer format before enabling it in UI.
+- [ ] Add embedding provider adapter tests using fake HTTP responses.
+- [ ] Implement configurable embedding API calls without coupling agent loop code to embedding providers.
+- [ ] Add vector index adapter behind the `vectorIndex` interface.
+- [ ] Add hybrid retrieval tests for keyword + vector result merging.
+- [ ] Add rerank adapter tests and fake rerank provider.
+- [ ] Add parent-child chunk tests for child matching and parent context return.
+- [ ] Add retrieval records for test retrieval and normal agent retrieval.
+- [ ] Extend pipeline trace UI with lazy detail loading for parser, chunking, embedding, retrieval, rerank, and injection events.
+- [ ] Verify and commit with `feat: extend rag retrieval quality`.
+
+---
+
+## Stage 6: MCP Runtime Layer
+
+### Task 17: Standalone MCP Client MVP
+
+**Goal:** Connect local MCP servers as an independent runtime capability before folding them into a unified resource registry.
+
+**Why:** MCP has its own lifecycle: server configuration, startup, initialization, tool discovery, schema translation, tool execution, approval, and tracing. It should prove itself as a working loop before being abstracted as a generic mounted resource.
+
+**Loop stages:** Tool discovery, tool pool dispatch, tool execution, permission approval.
+
+**Files:**
+
+- Create: `server/mcp/mcpServerConfig.js`
+- Create: `server/mcp/mcpServerConfig.test.js`
+- Create: `server/mcp/mcpClientManager.js`
+- Create: `server/mcp/mcpClientManager.test.js`
+- Create: `server/mcp/mcpToolAdapter.js`
+- Create: `server/mcp/mcpToolAdapter.test.js`
+- Modify: tool pool assembly.
+- Modify: tool execution dispatch.
+- Modify: SecurityPlugin / permission flow integration if needed.
+- Create: MCP configuration UI.
+- Modify: Context Inspector provider tool schema view.
+
+**Interfaces:**
+
+- `listMcpServers({ harnessId }): McpServerSummary[]`
+- `saveMcpServerConfig({ harnessId, server }): McpServerConfig`
+- `connectMcpServer({ harnessId, serverId }): McpConnection`
+- `listMcpTools({ harnessId, serverId }): ToolDefinition[]`
+- `callMcpTool({ harnessId, serverId, toolName, args }): ToolResult`
+- `adaptMcpToolSchema(mcpTool): InternalToolDefinition`
+
+**Steps:**
+
+- [ ] Write config tests for local stdio MCP server definitions and path-safe storage.
+- [ ] Implement MCP server config CRUD.
+- [ ] Write fake MCP server tests for initialize, list tools, and call tool.
+- [ ] Implement MCP client manager with lifecycle states.
+- [ ] Write schema adapter tests from MCP tool schema to internal tool schema.
+- [ ] Route MCP tool calls through existing security and permission approval paths.
+- [ ] Show MCP tools in tool schema dry-run / Context Inspector.
+- [ ] Add minimal MCP configuration UI.
+- [ ] Verify and commit with `feat: add standalone mcp client`.
+
+### Task 18: MCP Observability And Permission UX
+
+**Goal:** Make MCP runtime behavior visible and controllable without dumping raw server output into the main trajectory.
+
+**Why:** MCP servers can be powerful and risky. Users need clear status, tool schemas, call logs, approval prompts, and failure states.
+
+**Files:**
+
+- Modify: `server/mcp/mcpClientManager.js`
+- Create: `server/mcp/mcpRunLog.js`
+- Create: `server/mcp/mcpRunLog.test.js`
+- Modify: permission notification routes.
+- Modify: trajectory event rendering.
+- Modify: MCP configuration UI.
+- Modify: Context Inspector.
+
+**Steps:**
+
+- [ ] Add MCP server status and reconnect state tests.
+- [ ] Add bounded MCP call logs with lazy detail loading.
+- [ ] Reuse child-agent permission approval UI for MCP tool calls.
+- [ ] Show MCP errors as structured events with server ID, tool name, and safe message.
+- [ ] Add Context Inspector section for active MCP tool schemas.
+- [ ] Verify and commit with `feat: improve mcp observability`.
+
+---
+
+## Stage 7: Unified Runtime Resource Layer
+
+### Task 19: Runtime Resource Mount Registry
+
+**Goal:** Create one registry for mountable runtime resources after RAG and MCP have independent working loops.
+
+**Why:** Skills, memories, Knowledge Bases, MCP tool servers, project documents, and future provider capabilities are all runtime resources. But the abstraction should come after concrete resource types are proven, not before.
+
+**Loop stages:** Pre-LLM assembly, tool pool dispatch, Context Inspector dry-run.
 
 **Files:**
 
 - Create: `server/agent/resources/resourceMountRegistry.js`
 - Create: `server/agent/resources/resourceMountRegistry.test.js`
-- Modify: skills plugin / future knowledge plugin.
-- Modify: tool pool assembly.
+- Modify: skills plugin.
+- Modify: memory visibility.
+- Modify: KnowledgePlugin.
+- Modify: MCP tool assembly.
 - Modify: Context Inspector.
 
 **Interfaces:**
 
-- `listMountableResources({ harnessId })`
+- `listMountableResources({ harnessId }): MountableResource[]`
 - `resolveMountedResources({ harnessId, features }): MountedResource[]`
-- `assembleResourceContext(mountedResources, userTurn): MessageBlock[]`
-- `assembleResourceTools(mountedResources): ToolDefinition[]`
+- `assembleResourceContext({ mountedResources, userTurn }): PromptSection[]`
+- `assembleResourceTools({ mountedResources }): ToolDefinition[]`
+- `summarizeMountedResources({ mountedResources }): MountedResourceSummary[]`
 
 **Steps:**
 
-- [ ] Write registry tests for skills, memory scope, knowledge base, and MCP-style tool resources.
-- [ ] Move skill catalog and knowledge mount metadata behind the registry.
-- [ ] Keep resource context bounded and source-labeled.
-- [ ] Show mounted resources in Context Inspector.
+- [ ] Write registry tests for skills, memory scopes, Knowledge Bases, and MCP tool servers.
+- [ ] Move skill catalog, Knowledge Base mount metadata, and MCP mount metadata behind the registry.
+- [ ] Keep resource context bounded, source-labeled, and prompt-cache aware.
+- [ ] Show mounted resources in Context Inspector without duplicating full runtime dashboards.
 - [ ] Verify and commit with `refactor: add runtime resource mount registry`.
+
+### Task 20: Resource Presets And Experiment Profiles
+
+**Goal:** Let users save reusable combinations of guidance, tools, Knowledge Bases, MCP servers, memory scopes, and execution strategy settings.
+
+**Why:** LLM-Space should support both one-click experimental presets and fully detachable component toggles. Profiles are the product layer above the low-level resource registry.
+
+**Files:**
+
+- Create: `server/agent/resources/resourceProfiles.js`
+- Create: `server/agent/resources/resourceProfiles.test.js`
+- Modify: harness routes.
+- Modify: Prompt Lab / configuration UI.
+- Modify: Context Inspector resource summary.
+
+**Interfaces:**
+
+- `createResourceProfile({ name, description, mounts, features }): ResourceProfile`
+- `applyResourceProfile({ harnessId, profileId }): HarnessPatch`
+- `exportResourceProfile({ profileId }): ResourceProfileSnapshot`
+- `importResourceProfile({ snapshot }): ResourceProfile`
+
+**Steps:**
+
+- [ ] Add profile store tests for create/list/update/delete/export/import.
+- [ ] Implement profile application as a harness patch, not hidden side effects.
+- [ ] Add UI to save current runtime configuration as a profile.
+- [ ] Add UI to apply a profile while still showing the underlying toggles.
+- [ ] Show active profile and expanded resource mounts in Context Inspector.
+- [ ] Verify and commit with `feat: add resource experiment profiles`.
 
 ---
 
-## Stage 6: Runtime Quality And Maintainability
+## Stage 8: Runtime Quality And Maintainability
 
-### Task 17: Runtime Test Harness And E2E Smoke Tests
+### Task 21: Runtime Test Harness And E2E Smoke Tests
 
 **Goal:** Add test coverage for the full agent run lifecycle without depending on real model calls.
 
@@ -713,7 +929,7 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - [ ] Keep fake model scripts small and readable.
 - [ ] Verify and commit with `test: add runtime harness smoke tests`.
 
-### Task 18: Observability And Debug Surfaces
+### Task 22: Observability And Debug Surfaces
 
 **Goal:** Make runtime state understandable without dumping huge raw traces into the main UI.
 
@@ -761,5 +977,5 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 - This roadmap intentionally does not reintroduce child-agent turn limits. The direction is to rely on runtime contracts, observability, permission flow, cancellation semantics, and isolation.
 - `sub_agent` and `agent_teams` are harness-profile compositions over shared child-agent primitives.
 - Commercial-style one-click strategies can be added later, but the experimental platform must keep primitives independently toggleable.
-- Vector RAG is a later optimization for knowledge bases. The MVP starts with source-labeled local chunks and keyword retrieval.
-- MCP support should enter through the resource mount registry and tool pool, not as a separate parallel tool path.
+- Vector RAG is a later optimization for Knowledge Bases. The MVP starts with source-labeled local chunks and keyword retrieval, while preserving embedding provider and hybrid retrieval extension points.
+- MCP support should first prove itself as a standalone runtime loop, then be folded into the Runtime Resource Mount Registry after RAG and MCP both have working concrete implementations.

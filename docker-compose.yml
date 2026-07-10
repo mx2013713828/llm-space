@@ -1,0 +1,12 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: llm-space-qdrant
+    env_file:
+      - docker/qdrant.env
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./.qdrant_storage:/qdrant/storage
+    restart: unless-stopped

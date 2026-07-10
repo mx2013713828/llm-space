@@ -215,6 +215,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
     <div style={{ display: 'flex', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
       {/* 左侧配置面板 */}
       <ConfigPanel
+        harness={harness}
         models={models}
         selectedModel={selectedModel}
         setSelectedModel={setSelectedModel}
