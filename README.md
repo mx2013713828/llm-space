@@ -75,6 +75,7 @@ Typical `.env` entries:
 PORT=3001
 TAVILY_API_KEY=tvly-your-key-here
 ZHIPU_API_KEY=your-zhipu-key-here
+DASHSCOPE_API_KEY=your-dashscope-key-here
 QDRANT_API_KEY=
 MODELS_CONFIG=[]
 ```
@@ -181,6 +182,8 @@ Task 15 adds a local RAG Knowledge Base MVP. Task 16 adds document loaders, real
 
 Users can create local knowledge bases, import Markdown/text/JSON/CSV/PDF/DOCX files, generate bounded chunks and indexes, preview retrieval, and mount selected knowledge into a conversation. Knowledge behaves like a mounted runtime resource, not hard-coded prompt text.
 
+See the full setup guide: [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md).
+
 Current shape:
 
 - local knowledge store and metadata
@@ -192,38 +195,40 @@ Current shape:
 - Manual Lab: retrieval testing in the Knowledge page without changing chat context
 - Context Inspector separates Mounted Knowledge Manifest, Retrieved Knowledge, Messages Payload, and Provider Tool Schema
 
-Recommended real-vector test configuration:
+Recommended quick modes:
 
 ```text
-Retrieval strategy: Hybrid
-Index method: Hybrid
-Embedding provider: Zhipu embedding-3
-Embedding model: embedding-3
-Dimensions: 1024
-Embedding URL: https://open.bigmodel.cn/api/paas/v4/embeddings
-API key env: ZHIPU_API_KEY
-Vector store: Qdrant
-Qdrant URL: http://localhost:6333
-Qdrant collection: leave empty for auto naming, or use rag_test
-Qdrant key env: empty for local Qdrant; QDRANT_API_KEY for Qdrant Cloud
-Rerank provider: Qwen3 Rerank
-Rerank model: qwen3-rerank
-Rerank URL: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks
-Rerank key env: DASHSCOPE_API_KEY
-Rerank top N: 5
+Lightweight local:
+  Retrieval strategy: Keyword
+  Index method: Keyword
+  Embedding provider: None
+  Vector store: Local JSON
+  Rerank provider: None
+
+Local vector:
+  Retrieval strategy: Vector or Hybrid
+  Index method: Vector or Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Local JSON
+  Rerank provider: None
+
+Full pipeline:
+  Retrieval strategy: Hybrid
+  Index method: Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Qdrant
+  Rerank provider: Qwen3 Rerank
 ```
 
-Test flow:
+Common environment variables:
 
-1. Set `ZHIPU_API_KEY` and `DASHSCOPE_API_KEY` in `.env`, then restart `npm run dev`.
-2. Run `docker compose --env-file docker/qdrant.env up -d qdrant`.
-3. Create or open a Knowledge Base in the Knowledge page.
-4. Fill the Retrieval Quality settings above, replace `{WorkspaceId}` with your Alibaba Cloud Model Studio workspace id, then click `Test Embedding` and `Test Rerank`.
-5. Click `Save Retrieval Settings`.
-6. Select files again and click `Index`. Existing files are not automatically re-vectorized after switching vector stores.
-7. Compare `Keyword`, `Vector`, and `Hybrid` in Retrieval Test.
+```text
+ZHIPU_API_KEY=...
+DASHSCOPE_API_KEY=...
+QDRANT_API_KEY=...
+```
 
-Note: with vector retrieval, Auto RAG can return the nearest chunk even for unrelated queries. For unrelated-query testing, set `Score threshold` to `0.45` or higher so low-confidence chunks are not injected into chat context.
+The detailed guide covers provider URLs, field meanings, Qdrant setup, rerank setup, test flow, and troubleshooting.
 
 ## Developer Workflow
 
@@ -261,6 +266,8 @@ export default {
 
 - [Development Spec](./docs/DEVELOPMENT_SPEC.md)
 - [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
+- [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
+- [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
 - [Consolidated Runtime Roadmap](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
 ## Design Principles

@@ -75,6 +75,7 @@ http://localhost:6333/dashboard
 PORT=3001
 TAVILY_API_KEY=tvly-your-key-here
 ZHIPU_API_KEY=your-zhipu-key-here
+DASHSCOPE_API_KEY=your-dashscope-key-here
 QDRANT_API_KEY=
 MODELS_CONFIG=[]
 ```
@@ -181,6 +182,8 @@ Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真
 
 用户可以创建本地知识库，导入 Markdown/text/JSON/CSV/PDF/DOCX 文件，生成有边界的 chunks 和索引，预览检索结果，并把选中的知识库挂载到对话中。知识应该像可挂载运行时资源一样工作，而不是硬编码进 prompt。
 
+完整配置教程见：[知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)。
+
 当前形态：
 
 - 本地知识库 metadata 与存储
@@ -192,38 +195,40 @@ Task 15 已加入本地 RAG 知识库 MVP；Task 16 已加入文档 loader、真
 - Manual Lab：只在 Knowledge 页面测试检索，不改变对话上下文
 - Context Inspector 分层展示 Mounted Knowledge Manifest、Retrieved Knowledge、Messages Payload 和 Provider Tool Schema
 
-推荐的真实向量化测试配置：
+推荐快速模式：
 
 ```text
-Retrieval strategy: Hybrid
-Index method: Hybrid
-Embedding provider: Zhipu embedding-3
-Embedding model: embedding-3
-Dimensions: 1024
-Embedding URL: https://open.bigmodel.cn/api/paas/v4/embeddings
-API key env: ZHIPU_API_KEY
-Vector store: Qdrant
-Qdrant URL: http://localhost:6333
-Qdrant collection: 留空自动生成，或填写 rag_test
-Qdrant key env: 本地留空；Qdrant Cloud 填 QDRANT_API_KEY
-Rerank provider: Qwen3 Rerank
-Rerank model: qwen3-rerank
-Rerank URL: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks
-Rerank key env: DASHSCOPE_API_KEY
-Rerank top N: 5
+轻量本地：
+  Retrieval strategy: Keyword
+  Index method: Keyword
+  Embedding provider: None
+  Vector store: Local JSON
+  Rerank provider: None
+
+本地向量：
+  Retrieval strategy: Vector 或 Hybrid
+  Index method: Vector 或 Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Local JSON
+  Rerank provider: None
+
+完整链路：
+  Retrieval strategy: Hybrid
+  Index method: Hybrid
+  Embedding provider: Zhipu embedding-3
+  Vector store: Qdrant
+  Rerank provider: Qwen3 Rerank
 ```
 
-测试步骤：
+常用环境变量：
 
-1. 在 `.env` 中配置 `ZHIPU_API_KEY` 和 `DASHSCOPE_API_KEY`，然后重启 `npm run dev`。
-2. 运行 `docker compose --env-file docker/qdrant.env up -d qdrant`。
-3. 在 Knowledge 页面创建或打开一个 Knowledge Base。
-4. 填写上面的 Retrieval Quality 配置，把 `{WorkspaceId}` 替换成阿里云百炼 / Model Studio 的工作空间 ID，然后点击 `Test Embedding` 和 `Test Rerank`。
-5. 点击 `Save Retrieval Settings`。
-6. 重新选择文件并点击 `Index`。切换向量存储后，旧文件不会自动补向量。
-7. 用 Retrieval Test 比较 `Keyword`、`Vector`、`Hybrid`。
+```text
+ZHIPU_API_KEY=...
+DASHSCOPE_API_KEY=...
+QDRANT_API_KEY=...
+```
 
-注意：Auto RAG 使用向量检索时，低相关 query 也可能返回“最相近”的 chunk。测试无关问题时建议把 `Score threshold` 调到 `0.45` 或更高，避免低置信结果被注入对话上下文。
+详细指南包含 provider URL、字段含义、Qdrant 配置、rerank 配置、测试流程和常见问题排查。
 
 ## 开发工作流
 
@@ -261,6 +266,8 @@ export default {
 
 - [开发规范](./docs/DEVELOPMENT_SPEC.md)
 - [Development Spec, English](./docs/DEVELOPMENT_SPEC.en.md)
+- [知识库 / RAG 配置指南](./docs/knowledge-base-setup.zh-CN.md)
+- [Knowledge Base / RAG Setup Guide](./docs/knowledge-base-setup.md)
 - [Runtime Roadmap 汇总计划](./docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md)
 
 ## 设计原则
