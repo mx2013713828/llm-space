@@ -118,6 +118,32 @@ test('orchestration-disabled lead strips all orchestration-managed tools but pre
 	assert.deepEqual(pool.removedToolNames, ['sub_agent', 'spawn_teammate', 'send_team_message', 'write_todos', 'query_knowledge_base']);
 });
 
+test('lead runtime preserves mounted MCP tools as dynamic tool objects', () => {
+	const mcpTool = {
+		name: 'mcp__echo__echo',
+		description: '[MCP: Echo] Echo text',
+		parameters: {
+			text: { type: 'string', description: 'Text to echo', required: true },
+		},
+		mcp: { serverId: 'echo', toolName: 'echo' },
+	};
+	const pool = assembleToolPool({
+		baseTools: ['bash'],
+		features: {
+			task_orchestration: { enabled: false },
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'manual_lab',
+				knowledge_tools: false,
+			},
+		},
+		mountedResources: { tools: [mcpTool] },
+	});
+
+	assert.deepEqual(pool.tools, ['bash', mcpTool, 'get_current_time']);
+	assert.deepEqual(pool.addedToolNames, ['get_current_time']);
+});
+
 test('agentic knowledge strategy mounts knowledge tools for lead only', () => {
 	const pool = assembleToolPool({
 		baseTools: ['bash'],

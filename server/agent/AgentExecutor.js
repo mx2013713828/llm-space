@@ -148,6 +148,7 @@ export class AgentExecutor {
     selectedStrategyId = '',
     interactionMode = null,
     skills = [],
+    mountedResources = null,
     runtimeNotificationQueue = defaultRuntimeNotificationQueue,
     dryRunMode = '',
     memoryDependencies = null,
@@ -180,6 +181,7 @@ export class AgentExecutor {
       features: this.features,
       runtimeRole,
       strategyId: selectedStrategyId,
+      mountedResources,
     });
     this.tools = this.toolPool.tools;
 

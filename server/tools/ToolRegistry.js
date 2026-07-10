@@ -23,13 +23,16 @@ import waitForTeammates from './wait_for_teammates.js';
 import listMountedKnowledgeBases from './list_mounted_knowledge_bases.js';
 import queryKnowledgeBase from './query_knowledge_base.js';
 import { validateToolInput } from './toolValidation.js';
+import { parseMcpToolName } from '../mcp/mcpNames.js';
+import { defaultMcpManager } from '../mcp/mcpManager.js';
 
 /**
  * ToolRegistry — 后端工具注册与管理器
  * 解耦并统一管理系统挂载的所有工具模块
  */
 class ToolRegistry {
-  constructor() {
+  constructor({ mcpManager = defaultMcpManager } = {}) {
+    this.mcpManager = mcpManager;
     this.tools = {
       bash,
       read_file: readFile,
@@ -90,6 +93,13 @@ class ToolRegistry {
    * @returns {Object|null}
    */
   getTool(name) {
+    if (parseMcpToolName(name)) {
+      return {
+        name,
+        description: 'MCP external tool',
+        parameters: {},
+      };
+    }
     return this.tools[name] || null;
   }
 
@@ -105,6 +115,11 @@ class ToolRegistry {
    * @returns {Promise<any>}
    */
   async execute(toolName, toolInput, onData) {
+    if (parseMcpToolName(toolName)) {
+      const output = await this.mcpManager.callTool(toolName, toolInput || {});
+      if (typeof onData === 'function') onData(String(output));
+      return output;
+    }
     const tool = this.getTool(toolName);
     if (!tool) {
       throw new Error(`未知工具: ${toolName}`);

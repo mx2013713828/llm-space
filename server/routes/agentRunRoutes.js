@@ -8,6 +8,8 @@ import {
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { resolveSelectedStrategyId as defaultResolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { resolveRunTeamContext as defaultResolveRunTeamContext } from '../sessions/sessionState.js';
+import { defaultMcpManager } from '../mcp/mcpManager.js';
+import { loadMcpMount as defaultLoadMcpMount } from '../mcp/mcpMountStore.js';
 
 const DEFAULT_SESSIONS_DIR = path.join(process.cwd(), 'server', 'sessions');
 
@@ -119,6 +121,8 @@ export function registerAgentRunRoutes(app, {
   resolveRunTeamContext = defaultResolveRunTeamContext,
   resolveSelectedStrategyId = defaultResolveSelectedStrategyId,
   resolvePermission = SecurityPlugin.resolvePermission,
+  mcpManager = defaultMcpManager,
+  loadMcpMount = defaultLoadMcpMount,
   logger = console,
 } = {}) {
   if (!activeJobs) {
@@ -159,10 +163,21 @@ export function registerAgentRunRoutes(app, {
       return res.status(400).json({ error: '缺少 API Key' });
     }
 
+    let mountedResources = null;
+    try {
+      const mcpMount = await loadMcpMount({ harnessId });
+      const mcpTools = await mcpManager.getMountedToolDefinitions(mcpMount);
+      mountedResources = { tools: mcpTools };
+    } catch (err) {
+      logger.warn?.('[agentRunRoutes] Failed to mount MCP tools:', err.message);
+      mountedResources = { tools: [] };
+    }
+
     prepareSseResponse(res);
 
     const executor = new ExecutorClass({
       ...runtimeRequest,
+      mountedResources,
       onEvent: (type, data) => {
         broadcastEvent(activeJobs, harnessId, type, data);
       }

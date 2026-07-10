@@ -19,6 +19,8 @@ import { listMountedKnowledgeBases, loadKnowledgeBase } from '../knowledge/knowl
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getToolSchemasForTools } from '../tools/index.js';
 import { toolRegistry } from '../tools/ToolRegistry.js';
+import { defaultMcpManager } from '../mcp/mcpManager.js';
+import { loadMcpMount as defaultLoadMcpMount } from '../mcp/mcpMountStore.js';
 
 const DEFAULT_HARNESS_DIR = path.join(process.cwd(), 'harnesses');
 const DEFAULT_GUIDANCE_ROOT = path.join(process.cwd(), 'guidance');
@@ -75,6 +77,8 @@ export function registerHarnessRoutes(app, {
   resolveStrategy = resolveSelectedStrategyId,
   memoryCandidateStore = { listMemoryCandidates },
   knowledgeRoot,
+  mcpManager = defaultMcpManager,
+  loadMcpMount = defaultLoadMcpMount,
 } = {}) {
   app.get('/api/harnesses', async (req, res) => {
     try {
@@ -250,6 +254,15 @@ export function registerHarnessRoutes(app, {
 
       const safeSkills = Array.isArray(skills) ? skills : [];
       const dryRunNotificationQueue = createRuntimeNotificationQueue();
+      let mountedResources = { tools: [] };
+      try {
+        const mcpMount = await loadMcpMount({ harnessId });
+        mountedResources = {
+          tools: await mcpManager.getMountedToolDefinitions(mcpMount),
+        };
+      } catch (err) {
+        console.warn('[harnessRoutes dry-run] Failed to mount MCP tools:', err.message);
+      }
       executor = new ExecutorClass({
         harnessId,
         messages: messages || [],
@@ -264,6 +277,7 @@ export function registerHarnessRoutes(app, {
         selectedStrategyId: resolveStrategy({ explicitStrategyId: selectedStrategyId, features }),
         dryRunMode: dryRunMode === 'static_context' ? 'static_context' : '',
         skills: safeSkills,
+        mountedResources,
         runtimeNotificationQueue: dryRunNotificationQueue,
         knowledgeDependencies: {
           listMountedKnowledgeBases: (args) => listMountedKnowledgeBases({ ...args, knowledgeRoot }),
