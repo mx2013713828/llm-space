@@ -5,6 +5,7 @@ import './App.css';
 import { TrajectoryPage } from './pages/TrajectoryPage';
 import { PromptLabPage } from './pages/PromptLabPage';
 import { KnowledgePage } from './pages/KnowledgePage';
+import { McpPage } from './pages/McpPage';
 import { apiFetch } from './lib/apiClient';
 
 /* ===== 导航配置 ===== */
@@ -38,6 +39,17 @@ const TABS = [
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
         <path d="M4 4v15.5A2.5 2.5 0 0 1 6.5 22H20V6a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 6.5"/>
         <path d="M8 9h8M8 13h5"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'mcp',
+    label: 'MCP',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M8 6h8M8 12h8M8 18h8"/>
+        <path d="M4 6h.01M4 12h.01M4 18h.01"/>
+        <path d="M20 6h.01M20 12h.01M20 18h.01"/>
       </svg>
     ),
   },
@@ -156,7 +168,7 @@ function AppContent() {
 
   // 当列表加载完毕且 URL 中缺失 harnessId 时，自动重定向到第一个有效 Harness
   useEffect(() => {
-    if (harnessFiles.length > 0 && !activeHarnessId && activeTab !== 'knowledge') {
+    if (harnessFiles.length > 0 && !activeHarnessId && !['knowledge', 'mcp'].includes(activeTab)) {
       navigate(`/${harnessFiles[0].id}/${activeTab}`, { replace: true });
     }
   }, [harnessFiles, activeHarnessId, activeTab, navigate]);
@@ -438,6 +450,9 @@ function AppContent() {
                 }).then(() => setHarness(updatedHarness));
               }}
             />
+          )}
+          {activeTab === 'mcp' && (
+            <McpPage harness={harness} />
           )}
         </main>
       </div>
