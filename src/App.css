@@ -712,12 +712,75 @@
   padding: 14px;
 }
 
+.knowledge-quality-stack {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.knowledge-quality-group {
+  padding: 14px 0 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.knowledge-quality-group:first-child {
+  border-top: 0;
+  padding-top: 10px;
+}
+
+.knowledge-quality-group-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.knowledge-quality-group-head div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.knowledge-quality-group-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.knowledge-quality-group-head span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.knowledge-quality-group-head em {
+  flex: 0 0 auto;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .knowledge-quality-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   align-items: end;
-  margin-top: 12px;
+}
+
+.knowledge-quality-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .knowledge-quality-grid label {
@@ -732,6 +795,22 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.knowledge-quality-grid label.wide {
+  grid-column: span 2;
+}
+
+.knowledge-quality-grid .btn {
+  min-height: 36px;
+  align-self: end;
+}
+
+.knowledge-quality-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .knowledge-settings-grid {

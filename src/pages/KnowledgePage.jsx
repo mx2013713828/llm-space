@@ -603,110 +603,172 @@ export function KnowledgePage({ harness, onSave }) {
 							<div className="knowledge-quality-panel">
 								<div className="knowledge-section-title">
 									<span>Retrieval Quality</span>
-									<small>Vector settings apply when files are indexed.</small>
+									<small>Configure the pipeline from recall to rerank.</small>
 								</div>
-								<div className="knowledge-quality-grid">
-									<label>
-										<span>Retrieval strategy</span>
-										<select className="input" value={baseRetrievalDraft?.retrievalStrategy || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), retrievalStrategy: event.target.value }))}>
-											<option value="keyword">Keyword</option>
-											<option value="vector">Vector</option>
-											<option value="hybrid">Hybrid</option>
-										</select>
-									</label>
-									<label>
-										<span>Index method</span>
-										<select className="input" value={baseRetrievalDraft?.indexMethod || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), indexMethod: event.target.value }))}>
-											<option value="keyword">Keyword</option>
-											<option value="vector">Vector</option>
-											<option value="hybrid">Hybrid</option>
-										</select>
-									</label>
-									<label>
-										<span>Embedding provider</span>
-										<select className="input" value={baseRetrievalDraft?.embeddingProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingProvider: event.target.value }))}>
-											<option value="none">None</option>
-											<option value="zhipu_embedding_3">Zhipu embedding-3</option>
-											<option value="openai_compatible">OpenAI-compatible</option>
-										</select>
-									</label>
-									<label>
-										<span>Embedding model</span>
-										<input className="input" value={baseRetrievalDraft?.embeddingModel ?? ''} placeholder="embedding-3" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingModel: event.target.value }))} />
-									</label>
-									<label>
-										<span>Dimensions</span>
-										<input className="input" type="number" min="1" max="8192" value={baseRetrievalDraft?.embeddingDimensions ?? ''} placeholder="1024" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingDimensions: event.target.value }))} />
-									</label>
-									<label>
-										<span>Embedding URL</span>
-										<input className="input" value={baseRetrievalDraft?.embeddingBaseUrl ?? ''} placeholder="https://open.bigmodel.cn/api/paas/v4/embeddings" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingBaseUrl: event.target.value }))} />
-									</label>
-									<label>
-										<span>API key env</span>
-										<input className="input" value={baseRetrievalDraft?.embeddingApiKeyEnv ?? ''} placeholder="ZHIPU_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingApiKeyEnv: event.target.value }))} />
-									</label>
-									<label>
-										<span>Vector store</span>
-										<select className="input" value={baseRetrievalDraft?.vectorStore || 'local_json'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), vectorStore: event.target.value }))}>
-											<option value="local_json">Local JSON</option>
-											<option value="qdrant">Qdrant</option>
-										</select>
-									</label>
-									<label>
-										<span>Qdrant URL</span>
-										<input className="input" value={baseRetrievalDraft?.qdrantUrl ?? ''} placeholder="http://localhost:6333" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantUrl: event.target.value }))} />
-									</label>
-									<label>
-										<span>Qdrant collection</span>
-										<input className="input" value={baseRetrievalDraft?.qdrantCollection ?? ''} placeholder="auto per KB" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantCollection: event.target.value }))} />
-									</label>
-									<label>
-										<span>Qdrant key env</span>
-										<input className="input" value={baseRetrievalDraft?.qdrantApiKeyEnv ?? ''} placeholder="optional" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantApiKeyEnv: event.target.value }))} />
-									</label>
-									<button className="btn btn-ghost" onClick={testEmbeddingSettings} disabled={isLoading || (baseRetrievalDraft?.embeddingProvider || 'none') === 'none'}>Test Embedding</button>
-									<label>
-										<span>Rerank provider</span>
-										<select className="input" value={baseRetrievalDraft?.rerankProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankProvider: event.target.value }))}>
-											<option value="none">None</option>
-											<option value="qwen3_rerank">Qwen3 Rerank</option>
-										</select>
-									</label>
-									<label>
-										<span>Rerank model</span>
-										<input className="input" value={baseRetrievalDraft?.rerankModel ?? ''} placeholder="qwen3-rerank" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankModel: event.target.value }))} />
-									</label>
-									<label>
-										<span>Rerank URL</span>
-										<input className="input" value={baseRetrievalDraft?.rerankBaseUrl ?? ''} placeholder="https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankBaseUrl: event.target.value }))} />
-									</label>
-									<label>
-										<span>Rerank key env</span>
-										<input className="input" value={baseRetrievalDraft?.rerankApiKeyEnv ?? ''} placeholder="DASHSCOPE_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankApiKeyEnv: event.target.value }))} />
-									</label>
-									<label>
-										<span>Rerank top N</span>
-										<input className="input" type="number" min="0" max="100" value={baseRetrievalDraft?.rerankTopN ?? ''} placeholder="same as Top K" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankTopN: event.target.value }))} />
-									</label>
-									<label>
-										<span>Rerank instruct</span>
-										<input className="input" value={baseRetrievalDraft?.rerankInstruct ?? ''} placeholder="Given a web search query, retrieve relevant passages that answer the query." onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankInstruct: event.target.value }))} />
-									</label>
-									<button className="btn btn-ghost" onClick={testRerankSettings} disabled={isLoading || (baseRetrievalDraft?.rerankProvider || 'none') === 'none'}>Test Rerank</button>
-									<label>
-										<span>Top K</span>
-										<input className="input" type="number" min="1" max="50" value={baseRetrievalDraft?.topK ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />
-									</label>
-									<label>
-										<span>Max chars</span>
-										<input className="input" type="number" min="500" max="100000" value={baseRetrievalDraft?.maxChars ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), maxChars: event.target.value }))} />
-									</label>
-									<label>
-										<span>Score threshold</span>
-										<input className="input" type="number" min="0" step="0.1" value={baseRetrievalDraft?.scoreThreshold ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), scoreThreshold: event.target.value }))} />
-									</label>
-									<button className="btn btn-ghost" onClick={saveBaseRetrievalSettings} disabled={isLoading}>Save Retrieval Settings</button>
+								<div className="knowledge-quality-stack">
+									<div className="knowledge-quality-group">
+										<div className="knowledge-quality-group-head">
+											<div>
+												<strong>Recall</strong>
+												<span>Choose how candidates are gathered before optional rerank.</span>
+											</div>
+											<em>{baseRetrievalDraft?.retrievalStrategy || 'keyword'}</em>
+										</div>
+										<div className="knowledge-quality-grid compact">
+											<label>
+												<span>Retrieval strategy</span>
+												<select className="input" value={baseRetrievalDraft?.retrievalStrategy || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), retrievalStrategy: event.target.value }))}>
+													<option value="keyword">Keyword</option>
+													<option value="vector">Vector</option>
+													<option value="hybrid">Hybrid</option>
+												</select>
+											</label>
+											<label>
+												<span>Index method</span>
+												<select className="input" value={baseRetrievalDraft?.indexMethod || 'keyword'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), indexMethod: event.target.value }))}>
+													<option value="keyword">Keyword</option>
+													<option value="vector">Vector</option>
+													<option value="hybrid">Hybrid</option>
+												</select>
+											</label>
+											<label>
+												<span>Top K</span>
+												<input className="input" type="number" min="1" max="50" value={baseRetrievalDraft?.topK ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />
+											</label>
+											<label>
+												<span>Max chars</span>
+												<input className="input" type="number" min="500" max="100000" value={baseRetrievalDraft?.maxChars ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), maxChars: event.target.value }))} />
+											</label>
+											<label>
+												<span>Score threshold</span>
+												<input className="input" type="number" min="0" step="0.1" value={baseRetrievalDraft?.scoreThreshold ?? ''} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), scoreThreshold: event.target.value }))} />
+											</label>
+										</div>
+									</div>
+
+									<div className="knowledge-quality-group">
+										<div className="knowledge-quality-group-head">
+											<div>
+												<strong>Embedding</strong>
+												<span>Used when indexing vector or hybrid knowledge.</span>
+											</div>
+											<em>{baseRetrievalDraft?.embeddingProvider || 'none'}</em>
+										</div>
+										<div className="knowledge-quality-grid compact">
+											<label>
+												<span>Provider</span>
+												<select className="input" value={baseRetrievalDraft?.embeddingProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingProvider: event.target.value }))}>
+													<option value="none">None</option>
+													<option value="zhipu_embedding_3">Zhipu embedding-3</option>
+													<option value="openai_compatible">OpenAI-compatible</option>
+												</select>
+											</label>
+											{(baseRetrievalDraft?.embeddingProvider || 'none') !== 'none' && (
+												<>
+													<label>
+														<span>Model</span>
+														<input className="input" value={baseRetrievalDraft?.embeddingModel ?? ''} placeholder="embedding-3" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingModel: event.target.value }))} />
+													</label>
+													<label>
+														<span>Dimensions</span>
+														<input className="input" type="number" min="1" max="8192" value={baseRetrievalDraft?.embeddingDimensions ?? ''} placeholder="1024" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingDimensions: event.target.value }))} />
+													</label>
+													<label className="wide">
+														<span>Embedding URL</span>
+														<input className="input" value={baseRetrievalDraft?.embeddingBaseUrl ?? ''} placeholder="https://open.bigmodel.cn/api/paas/v4/embeddings" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingBaseUrl: event.target.value }))} />
+													</label>
+													<label>
+														<span>API key env</span>
+														<input className="input" value={baseRetrievalDraft?.embeddingApiKeyEnv ?? ''} placeholder="ZHIPU_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), embeddingApiKeyEnv: event.target.value }))} />
+													</label>
+													<button className="btn btn-ghost" onClick={testEmbeddingSettings} disabled={isLoading}>Test Embedding</button>
+												</>
+											)}
+										</div>
+									</div>
+
+									<div className="knowledge-quality-group">
+										<div className="knowledge-quality-group-head">
+											<div>
+												<strong>Vector Store</strong>
+												<span>Where vectors are persisted after indexing.</span>
+											</div>
+											<em>{baseRetrievalDraft?.vectorStore || 'local_json'}</em>
+										</div>
+										<div className="knowledge-quality-grid compact">
+											<label>
+												<span>Store</span>
+												<select className="input" value={baseRetrievalDraft?.vectorStore || 'local_json'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), vectorStore: event.target.value }))}>
+													<option value="local_json">Local JSON</option>
+													<option value="qdrant">Qdrant</option>
+												</select>
+											</label>
+											{(baseRetrievalDraft?.vectorStore || 'local_json') === 'qdrant' && (
+												<>
+													<label>
+														<span>Qdrant URL</span>
+														<input className="input" value={baseRetrievalDraft?.qdrantUrl ?? ''} placeholder="http://localhost:6333" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantUrl: event.target.value }))} />
+													</label>
+													<label>
+														<span>Collection</span>
+														<input className="input" value={baseRetrievalDraft?.qdrantCollection ?? ''} placeholder="auto per KB" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantCollection: event.target.value }))} />
+													</label>
+													<label>
+														<span>API key env</span>
+														<input className="input" value={baseRetrievalDraft?.qdrantApiKeyEnv ?? ''} placeholder="optional" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), qdrantApiKeyEnv: event.target.value }))} />
+													</label>
+												</>
+											)}
+										</div>
+									</div>
+
+									<div className="knowledge-quality-group">
+										<div className="knowledge-quality-group-head">
+											<div>
+												<strong>Rerank</strong>
+												<span>Optional second pass over recalled chunks.</span>
+											</div>
+											<em>{baseRetrievalDraft?.rerankProvider || 'none'}</em>
+										</div>
+										<div className="knowledge-quality-grid compact">
+											<label>
+												<span>Provider</span>
+												<select className="input" value={baseRetrievalDraft?.rerankProvider || 'none'} onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankProvider: event.target.value }))}>
+													<option value="none">None</option>
+													<option value="qwen3_rerank">Qwen3 Rerank</option>
+												</select>
+											</label>
+											{(baseRetrievalDraft?.rerankProvider || 'none') !== 'none' && (
+												<>
+													<label>
+														<span>Model</span>
+														<input className="input" value={baseRetrievalDraft?.rerankModel ?? ''} placeholder="qwen3-rerank" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankModel: event.target.value }))} />
+													</label>
+													<label>
+														<span>Top N</span>
+														<input className="input" type="number" min="0" max="100" value={baseRetrievalDraft?.rerankTopN ?? ''} placeholder="same as Top K" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankTopN: event.target.value }))} />
+													</label>
+													<label className="wide">
+														<span>Rerank URL</span>
+														<input className="input" value={baseRetrievalDraft?.rerankBaseUrl ?? ''} placeholder="https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankBaseUrl: event.target.value }))} />
+													</label>
+													<label>
+														<span>API key env</span>
+														<input className="input" value={baseRetrievalDraft?.rerankApiKeyEnv ?? ''} placeholder="DASHSCOPE_API_KEY" onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankApiKeyEnv: event.target.value }))} />
+													</label>
+													<label className="wide">
+														<span>Instruct</span>
+														<input className="input" value={baseRetrievalDraft?.rerankInstruct ?? ''} placeholder="Given a web search query, retrieve relevant passages that answer the query." onChange={event => setBaseRetrievalDraft(prev => ({ ...(prev || {}), rerankInstruct: event.target.value }))} />
+													</label>
+													<button className="btn btn-ghost" onClick={testRerankSettings} disabled={isLoading}>Test Rerank</button>
+												</>
+											)}
+										</div>
+									</div>
+
+									<div className="knowledge-quality-actions">
+										<button className="btn btn-ghost" onClick={saveBaseRetrievalSettings} disabled={isLoading}>Save Retrieval Settings</button>
+									</div>
 								</div>
 							</div>
 
