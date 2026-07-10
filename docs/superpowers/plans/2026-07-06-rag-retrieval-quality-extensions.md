@@ -118,11 +118,13 @@ Those come after the retrieval settings and observability contract is stable.
 - [x] Add Qwen3 rerank adapter through Alibaba Cloud Model Studio's rerank-compatible API.
 - [x] Add `test-rerank` API and Knowledge UI test action.
 - [x] Apply rerank after initial keyword/vector/hybrid retrieval while preserving original scores.
-- [ ] Add stronger hybrid weighting controls and comparison records.
-- [ ] Add retrieval evaluation records with injected/skipped decisions and top-score traces.
+- [ ] Add stronger hybrid weighting controls.
+- [x] Add retrieval comparison records with initial, reranked, and final top-score traces.
+- [x] Keep evaluation records bounded and avoid persisting chunk text.
 
 ### Phase 5: Rerank And Evaluation
 
-- Add retrieval evaluation records and comparison view.
-- Add richer rerank comparison traces across pre-rerank and post-rerank orders.
-- Keep rerank optional, bounded, and provider-pluggable.
+- [x] Add retrieval evaluation records and comparison view.
+- [x] Add richer rerank comparison traces across pre-rerank and post-rerank orders.
+- [x] Keep rerank optional, bounded, and provider-pluggable.
+- [x] Surface evaluation records in the Knowledge page recent records panel.

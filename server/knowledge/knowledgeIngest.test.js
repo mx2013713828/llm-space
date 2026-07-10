@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { createKnowledgeBase, loadKnowledgeBase, loadKnowledgeVectorIndex } from './knowledgeStore.js';
 import { ingestKnowledgeFile, previewKnowledgeChunks } from './knowledgeIngest.js';
 import { retrieveKnowledge } from './knowledgeRetrieve.js';
+import { listKnowledgeRetrievalRecords } from './knowledgeRetrievalRecords.js';
 
 async function createFixture(t) {
   const rootDir = await mkdtemp(path.join(tmpdir(), 'knowledge-ingest-'));
@@ -200,4 +201,76 @@ test('retrieveKnowledge reranks initially retrieved chunks with Qwen-compatible 
   assert.equal(retrieval.chunks[0].rerankScore, 0.98);
   assert.equal(retrieval.chunks[0].originalScore > 0, true);
   assert.match(retrieval.chunks[0].text, /Mountable Knowledge Bases/);
+});
+
+test('retrieveKnowledge records initial, reranked, and final result summaries', async (t) => {
+  const { rootDir } = await createFixture(t);
+  const rerankSettings = {
+    chunkSize: 300,
+    overlap: 0,
+    retrievalStrategy: 'keyword',
+    rerankProvider: 'qwen3_rerank',
+    rerankModel: 'qwen3-rerank',
+    rerankBaseUrl: 'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks',
+    rerankApiKeyEnv: 'DASHSCOPE_API_KEY',
+    rerankTopN: 2,
+  };
+  const kb = await createKnowledgeBase({
+    name: 'Evaluation Docs',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'alpha.md',
+    mimeType: 'text/markdown',
+    content: 'answer alpha notes for retrieval evaluation.',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+  await ingestKnowledgeFile({
+    knowledgeBaseId: kb.id,
+    filename: 'beta.md',
+    mimeType: 'text/markdown',
+    content: 'answer beta notes should win after rerank.',
+    settings: rerankSettings,
+    knowledgeRoot: rootDir,
+  });
+
+  await retrieveKnowledge({
+    knowledgeBaseIds: [kb.id],
+    query: 'answer',
+    topK: 2,
+    rerank: true,
+    recordRetrieval: true,
+    knowledgeRoot: rootDir,
+    env: { DASHSCOPE_API_KEY: 'test-key' },
+    fetchImpl: async (url, options) => {
+      const body = JSON.parse(options.body);
+      const betaIndex = body.documents.findIndex(document => document.includes('beta notes'));
+      return {
+        ok: true,
+        json: async () => ({
+          results: [
+            { index: betaIndex, relevance_score: 0.97 },
+            { index: betaIndex === 0 ? 1 : 0, relevance_score: 0.21 },
+          ],
+        }),
+      };
+    },
+  });
+
+  const [record] = await listKnowledgeRetrievalRecords({
+    knowledgeBaseId: kb.id,
+    knowledgeRoot: rootDir,
+  });
+  assert.equal(record.settings.rerankProvider, 'qwen3_rerank');
+  assert.equal(record.evaluation.rerankEnabled, true);
+  assert.equal(record.evaluation.initialCount, 2);
+  assert.equal(record.evaluation.rerankedCount, 2);
+  assert.equal(record.evaluation.finalCount, 2);
+  assert.equal(record.evaluation.rerankedTop[0].scoreType, 'rerank');
+  assert.equal(record.evaluation.rerankedTop[0].filename, 'beta.md');
+  assert.equal(JSON.stringify(record).includes('beta notes'), false);
 });

@@ -11,6 +11,8 @@ export async function recordKnowledgeRetrieval({
 	strategy = 'keyword',
 	resultCount = 0,
 	sources = [],
+	settings = {},
+	evaluation = {},
 	knowledgeRoot,
 	now = () => new Date(),
 } = {}) {
@@ -20,6 +22,8 @@ export async function recordKnowledgeRetrieval({
 		query: String(query || '').slice(0, 500),
 		strategy: String(strategy || 'keyword'),
 		resultCount: Number(resultCount || 0),
+		settings: normalizeSettings(settings),
+		evaluation: normalizeEvaluation(evaluation),
 		sources: normalizeSources(sources),
 		createdAt: toIsoString(now()),
 	};
@@ -53,6 +57,58 @@ function normalizeSources(sources = []) {
 		});
 	}
 	return output.slice(0, 20);
+}
+
+function normalizeSettings(settings = {}) {
+	const input = settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {};
+	return {
+		topK: normalizeNumber(input.topK, 0),
+		maxChars: normalizeNumber(input.maxChars, 0),
+		scoreThreshold: normalizeNumber(input.scoreThreshold, 0),
+		rerankProvider: String(input.rerankProvider || 'none'),
+		rerankTopN: normalizeNumber(input.rerankTopN, 0),
+	};
+}
+
+function normalizeEvaluation(evaluation = {}) {
+	const input = evaluation && typeof evaluation === 'object' && !Array.isArray(evaluation) ? evaluation : {};
+	return {
+		rerankEnabled: Boolean(input.rerankEnabled),
+		initialCount: normalizeNumber(input.initialCount, 0),
+		rerankedCount: normalizeNumber(input.rerankedCount, 0),
+		finalCount: normalizeNumber(input.finalCount, 0),
+		injectedCount: normalizeNumber(input.injectedCount, input.finalCount || 0),
+		skippedCount: normalizeNumber(input.skippedCount, 0),
+		topScore: normalizeNullableNumber(input.topScore),
+		topScoreType: String(input.topScoreType || ''),
+		initialTop: normalizeChunkSummaries(input.initialTop),
+		rerankedTop: normalizeChunkSummaries(input.rerankedTop),
+		finalTop: normalizeChunkSummaries(input.finalTop),
+	};
+}
+
+function normalizeChunkSummaries(chunks = []) {
+	return (Array.isArray(chunks) ? chunks : [])
+		.slice(0, 10)
+		.map(chunk => ({
+			id: String(chunk?.id || ''),
+			filename: String(chunk?.filename || chunk?.source?.filename || ''),
+			score: normalizeNullableNumber(chunk?.score),
+			scoreType: String(chunk?.scoreType || ''),
+			originalScore: normalizeNullableNumber(chunk?.originalScore),
+			rerankScore: normalizeNullableNumber(chunk?.rerankScore),
+		}))
+		.filter(chunk => chunk.id || chunk.filename);
+}
+
+function normalizeNumber(value, fallback) {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeNullableNumber(value) {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getRecordsPath({ knowledgeBaseId, knowledgeRoot }) {

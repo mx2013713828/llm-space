@@ -81,7 +81,7 @@ export async function retrieveKnowledge({
 				query,
 				chunks: results,
 				settings: kb.settings,
-				topN: effectiveTopK,
+				topN: kb.settings?.rerankTopN || effectiveTopK,
 				fetchImpl,
 				env,
 			})).chunks
@@ -101,6 +101,26 @@ export async function retrieveKnowledge({
 				query,
 				strategy: effectiveStrategy,
 				resultCount: enrichedResults.length,
+				settings: {
+					topK: effectiveTopK,
+					maxChars: effectiveMaxChars,
+					scoreThreshold: effectiveScoreThreshold,
+					rerankProvider: rerankEnabled ? kb.settings?.rerankProvider || 'none' : 'none',
+					rerankTopN: rerankEnabled ? kb.settings?.rerankTopN || effectiveTopK : 0,
+				},
+				evaluation: {
+					rerankEnabled,
+					initialCount: results.length,
+					rerankedCount: rerankedResults.length,
+					finalCount: enrichedResults.length,
+					injectedCount: enrichedResults.length,
+					skippedCount: Math.max(0, results.length - enrichedResults.length),
+					topScore: enrichedResults[0]?.score ?? null,
+					topScoreType: enrichedResults[0]?.scoreType || '',
+					initialTop: summarizeChunks(results),
+					rerankedTop: summarizeChunks(rerankedResults),
+					finalTop: summarizeChunks(enrichedResults),
+				},
 				sources: summarizeResultSources(enrichedResults),
 				knowledgeRoot,
 				now,
@@ -222,6 +242,18 @@ function summarizeResultSources(chunks = []) {
 		counts.set(filename, (counts.get(filename) || 0) + 1);
 	}
 	return [...counts.entries()].map(([filename, chunkCount]) => ({ filename, chunkCount }));
+}
+
+function summarizeChunks(chunks = []) {
+	return (Array.isArray(chunks) ? chunks : []).slice(0, 10).map(chunk => ({
+		id: chunk.id,
+		filename: chunk.source?.filename || '',
+		score: chunk.score,
+		scoreType: chunk.scoreType || '',
+		originalScore: chunk.originalScore,
+		rerankScore: chunk.rerankScore,
+		source: chunk.source,
+	}));
 }
 
 function boundCombinedResults({ chunks, topK, maxChars }) {

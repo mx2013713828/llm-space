@@ -57,6 +57,34 @@ function formatDate(value) {
 	}
 }
 
+function formatScore(value) {
+	const score = Number(value);
+	return Number.isFinite(score) ? score.toFixed(3) : 'n/a';
+}
+
+function formatRecordPipeline(record) {
+	const evaluation = record?.evaluation || {};
+	const initial = Number(evaluation.initialCount ?? record?.resultCount ?? 0);
+	const reranked = Number(evaluation.rerankedCount ?? initial);
+	const finalCount = Number(evaluation.finalCount ?? record?.resultCount ?? 0);
+	return evaluation.rerankEnabled
+		? `${initial} recalled -> ${reranked} reranked -> ${finalCount} final`
+		: `${initial} recalled -> ${finalCount} final`;
+}
+
+function formatRecordSettings(record) {
+	const settings = record?.settings || {};
+	const parts = [
+		record?.strategy || 'keyword',
+		`top ${settings.topK || '?'}`,
+		`threshold ${settings.scoreThreshold ?? 0}`,
+	];
+	if (settings.rerankProvider && settings.rerankProvider !== 'none') {
+		parts.push(`rerank ${settings.rerankProvider}`);
+	}
+	return parts.join(' · ');
+}
+
 async function readFileAsBase64(file) {
 	const buffer = await file.arrayBuffer();
 	let binary = '';
@@ -865,11 +893,25 @@ export function KnowledgePage({ harness, onSave }) {
 								<div className="knowledge-record-list">
 									{retrievalRecords.map(record => (
 										<div key={record.id} className="knowledge-record-row">
-											<div>
-												<strong>{record.query || '(empty query)'}</strong>
-												<small>{record.strategy} · {record.resultCount} result{record.resultCount === 1 ? '' : 's'} · {formatDate(record.createdAt)}</small>
+											<div className="knowledge-record-main">
+												<div className="knowledge-record-title">
+													<strong>{record.query || '(empty query)'}</strong>
+													<span>{formatDate(record.createdAt)}</span>
+												</div>
+												<div className="knowledge-record-meta">
+													<span>{formatRecordSettings(record)}</span>
+													<span>{formatRecordPipeline(record)}</span>
+													<span>top {formatScore(record.evaluation?.topScore)} {record.evaluation?.topScoreType || ''}</span>
+												</div>
+												<div className="knowledge-record-chips">
+													{(record.evaluation?.finalTop?.length ? record.evaluation.finalTop : record.sources || []).slice(0, 3).map((item, index) => (
+														<span key={`${record.id}-${item.id || item.filename || index}`}>
+															{item.filename || 'source'}{item.score !== undefined ? ` · ${formatScore(item.score)}` : ''}
+														</span>
+													))}
+													{!record.evaluation?.finalTop?.length && !(record.sources || []).length && <span>no sources</span>}
+												</div>
 											</div>
-											<span>{(record.sources || []).map(source => source.filename).join(', ') || 'no sources'}</span>
 										</div>
 									))}
 									{retrievalRecords.length === 0 && (
