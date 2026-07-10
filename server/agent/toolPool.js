@@ -236,6 +236,9 @@ export function describeToolPool(toolPool) {
 	const pool = toolPool ?? assembleToolPool();
 	const orchestration = pool.features?.task_orchestration ?? {};
 	const knowledgeRuntime = pool.knowledgeRuntime ?? resolveKnowledgeRuntime(pool.features ?? {});
+	const mcpTools = (pool.tools ?? [])
+		.map(getToolName)
+		.filter(name => name.startsWith('mcp__'));
 	return {
 		runtimeRole: pool.runtimeRole || 'lead',
 		strategyId: pool.strategyId || '',
@@ -257,6 +260,10 @@ export function describeToolPool(toolPool) {
 			manifest: knowledgeRuntime.manifestEnabled,
 			autoRetrieve: knowledgeRuntime.autoRetrieve,
 			tools: knowledgeRuntime.knowledgeTools,
+		},
+		mcp: {
+			count: mcpTools.length,
+			names: mcpTools,
 		},
 	};
 }

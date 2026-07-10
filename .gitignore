@@ -46,6 +46,7 @@ harnesses/*
 scratch/
 .memory/
 .knowledge/
+.mcp/
 .qdrant_storage/
 docs/reference/*
 guidance/*

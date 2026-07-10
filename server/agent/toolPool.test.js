@@ -354,6 +354,10 @@ test('describeToolPool returns a compact Context Inspector summary', () => {
 			autoRetrieve: false,
 			tools: false,
 		},
+		mcp: {
+			count: 0,
+			names: [],
+		},
 	});
 });
 

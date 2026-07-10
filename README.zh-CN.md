@@ -75,11 +75,25 @@ LLM Space 是一个面向开发者的可视化 AI Agent Harness 实验平台与�
 ## 最近亮点
 
 - **Knowledge Base / RAG pipeline**：文档 loader、embedding provider、Local JSON / Qdrant 向量存储、Qwen3 rerank 和 retrieval evaluation records。
+- **MCP Studio**：配置 STDIO 和 Streamable HTTP MCP server，连接 Context7，将发现的工具挂载到当前 harness，并检查 MCP 工具调用。
 - **多供应商模型网关**：模型调用通过 Anthropic Messages 和 OpenAI-compatible Chat Completions 协议适配器。
 - **任务编排实验**：比较 TODO planning、DAG task-system、sub-agent delegation 和 async teammate coordination。
 - **定时任务调度器**：Harness 作用域的计划任务复用同一条 AgentExecutor 路径，并保留执行历史。
 
 详细历史见：[更新日志](./docs/changelog.zh-CN.md)。
+
+## MCP Servers
+
+进入 **MCP** 标签页，可以把外部 MCP server 配置成运行时工具。
+
+当前 MVP 支持：
+
+- 本地 STDIO MCP server，包括你自己写的脚本。
+- Streamable HTTP MCP server。
+- 内置 Context7 预设：`npx -y @upstash/context7-mcp`。
+- Harness 级挂载，不同 harness 可以暴露不同 MCP 工具集。
+
+自写 MCP、Context7、Streamable HTTP 的详细测试步骤见：[MCP 配置指南](./docs/mcp-setup.zh-CN.md)。
 
 ## 快速开始
 

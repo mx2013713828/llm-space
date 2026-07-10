@@ -75,11 +75,25 @@ After this first run, switch to Prompt Lab or another harness to enable advanced
 ## Recent Highlights
 
 - **Knowledge Base / RAG pipeline**: document loaders, embedding providers, Local JSON / Qdrant vector stores, Qwen3 rerank, and retrieval evaluation records.
+- **MCP Studio**: configure STDIO and Streamable HTTP MCP servers, connect Context7, mount discovered tools into a harness, and inspect MCP-backed tool calls.
 - **Multi-provider gateway**: model calls go through protocol adapters for Anthropic Messages and OpenAI-compatible Chat Completions.
 - **Task orchestration**: compare TODO planning, DAG task-system planning, sub-agent delegation, and async teammate coordination.
 - **Cron scheduler**: harness-scoped scheduled jobs reuse the same AgentExecutor path and keep execution history.
 
 Detailed history lives in [Changelog](./docs/changelog.md).
+
+## MCP Servers
+
+Open the **MCP** tab to configure external MCP servers as runtime tools.
+
+The first MVP supports:
+
+- Local STDIO MCP servers, including your own scripts.
+- Streamable HTTP MCP servers.
+- A built-in Context7 preset using `npx -y @upstash/context7-mcp`.
+- Harness-level mounting, so each harness can expose a different MCP tool set.
+
+See [MCP Setup Guide](./docs/mcp-setup.md) for custom server, Context7, and Streamable HTTP testing steps.
 
 ## Quick Start
 
