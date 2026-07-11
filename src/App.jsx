@@ -6,7 +6,7 @@ import { TrajectoryPage } from './pages/TrajectoryPage';
 import { PromptLabPage } from './pages/PromptLabPage';
 import { KnowledgePage } from './pages/KnowledgePage';
 import { McpPage } from './pages/McpPage';
-import { HarnessIdentity } from './components/HarnessIdentity';
+import { HarnessExplorer } from './components/HarnessExplorer';
 import { apiFetch } from './lib/apiClient';
 
 /* ===== 导航配置 ===== */
@@ -85,87 +85,98 @@ function AppContent() {
     }, 1000);
   };
 
-  // 新建 Harness 表单状态
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newError, setNewError] = useState('');
+  const loadHarnessList = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/harnesses');
+      if (!response.ok) throw new Error('Failed to load Harnesses');
+      const files = await response.json();
+      setHarnessFiles(files);
+      return files;
+    } catch (err) {
+      console.error('Failed to load Harness list:', err);
+      return null;
+    }
+  }, []);
 
-  // 右键菜单状态
-  const [ctxMenu, setCtxMenu] = useState(null); // { x, y, harnessId }
-
-  const loadHarnessList = () => {
-    apiFetch('/api/harnesses')
-      .then(r => r.json())
-      .then(setHarnessFiles)
-      .catch(err => console.error("加载文件列表失败:", err));
+  const readMutationResponse = async (response, fallback) => {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, error: data.error || fallback };
+    return { ok: true, ...data };
   };
 
-  const handleCreateHarness = async (e) => {
-    e.preventDefault();
-    setNewError('');
-    if (!newName.trim()) {
-      setNewError('Please enter a name');
-      return;
-    }
+  const handleCreateHarness = async ({ name, description }) => {
     try {
-      const res = await apiFetch('/api/harnesses', {
+      const response = await apiFetch('/api/harnesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() })
+        body: JSON.stringify({ name, description }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setNewError(data.error || 'Failed to create');
-        return;
-      }
+      const result = await readMutationResponse(response, 'Failed to create Harness');
+      if (!result.ok) return result;
       await loadHarnessList();
-      navigate(`/${data.harness.id}/${activeTab}`);
-      setNewName('');
-      setNewDesc('');
-      setShowNewForm(false);
+      navigate(`/${result.harness.id}/${activeTab}`);
+      return result;
     } catch (err) {
-      setNewError('Network error: ' + err.message);
+      return { ok: false, error: `Network error: ${err.message}` };
     }
   };
 
-  const handleDeleteHarness = async (id) => {
-    if (!confirm(`Are you sure you want to delete Harness "${id}"? This action cannot be undone.`)) return;
+  const handleEditHarness = async ({ id, name, description }) => {
     try {
-      const res = await apiFetch(`/api/harnesses/${id}`, { method: 'DELETE' });
-      if (!res.ok) { alert('Failed to delete'); return; }
+      const response = await apiFetch(`/api/harnesses/${id}/metadata`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      const result = await readMutationResponse(response, 'Failed to update Harness');
+      if (!result.ok) return result;
       await loadHarnessList();
       if (activeHarnessId === id) {
-        if (harnessFiles.length > 1) {
-          const nextHarness = harnessFiles.find(f => f.id !== id);
-          navigate(`/${nextHarness.id}/${activeTab}`);
-        } else {
-          navigate('/');
-        }
+        setHarness((current) => current ? { ...current, name, description } : current);
       }
-    } catch (err) { alert('Network error: ' + err.message); }
+      return result;
+    } catch (err) {
+      return { ok: false, error: `Network error: ${err.message}` };
+    }
   };
 
-  const handleCopyHarness = async (id) => {
+  const handleDuplicateHarness = async ({ id, name, description }) => {
     try {
-      const res = await apiFetch(`/api/harnesses/${id}/copy`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to copy'); return; }
+      const response = await apiFetch(`/api/harnesses/${id}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      const result = await readMutationResponse(response, 'Failed to duplicate Harness');
+      if (!result.ok) return result;
       await loadHarnessList();
-      navigate(`/${data.harness.id}/${activeTab}`);
-    } catch (err) { alert('Network error: ' + err.message); }
-    setCtxMenu(null);
+      navigate(`/${result.harness.id}/${activeTab}`);
+      return result;
+    } catch (err) {
+      return { ok: false, error: `Network error: ${err.message}` };
+    }
+  };
+
+  const handleDeleteHarness = async ({ id }) => {
+    try {
+      const response = await apiFetch(`/api/harnesses/${id}`, { method: 'DELETE' });
+      const result = await readMutationResponse(response, 'Failed to delete Harness');
+      if (!result.ok) return result;
+      const files = await loadHarnessList();
+      if (activeHarnessId === id) {
+        const nextHarness = files?.find((item) => item.id !== id);
+        navigate(nextHarness ? `/${nextHarness.id}/${activeTab}` : '/');
+      }
+      return result;
+    } catch (err) {
+      return { ok: false, error: `Network error: ${err.message}` };
+    }
   };
 
   // 加载列表
   useEffect(() => {
-    apiFetch('/api/harnesses')
-      .then(res => res.json())
-      .then(data => {
-        setHarnessFiles(data);
-      })
-      .catch(err => console.error("Failed to load harness list:", err));
-  }, []);
+    loadHarnessList();
+  }, [loadHarnessList]);
 
   // 当列表加载完毕且 URL 中缺失 harnessId 时，自动重定向到第一个有效 Harness
   useEffect(() => {
@@ -294,126 +305,16 @@ function AppContent() {
 
       {/* ===== 主体 ===== */}
       <div className="app-body">
-        {/* 侧边栏：Harness 文件列表 */}
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            Harness Explorer
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                className="icon-btn"
-                onClick={loadHarnessList}
-                title="Refresh List"
-              >
-                ↻
-              </button>
-              <button
-                style={{ padding: '2px 6px', fontSize: 12, borderRadius: 4, background: 'var(--green)', color: '#fff', border: '1px solid var(--green)', cursor: 'pointer' }}
-                onClick={() => setShowNewForm(v => !v)}
-                title="Create Harness"
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div className="sidebar-list">
-            {harnessFiles.map(file => (
-              <div
-                key={file.id}
-                id={`harness-${file.id}`}
-                className={`sidebar-item ${activeHarnessId === file.id ? 'active' : ''}`}
-                onClick={() => navigate(`/${file.id}/${activeTab}`)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setCtxMenu({ x: e.clientX, y: e.clientY, harnessId: file.id });
-                }}
-              >
-                <span className="sidebar-item-icon">📄</span>
-                <div className="sidebar-item-info">
-                  <HarnessIdentity harness={file} compact />
-                  <div className="sidebar-item-desc">{file.description}</div>
-                </div>
-                <button
-                  className="sidebar-item-delete"
-                  onClick={(e) => { e.stopPropagation(); handleDeleteHarness(file.id); }}
-                  title="Delete"
-                >
-                  🗑
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* 新建 Harness 表单 */}
-          {showNewForm && (
-            <form
-              onSubmit={handleCreateHarness}
-              style={{
-                padding: '10px 12px',
-                borderTop: '1px solid var(--border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Create New Harness</span>
-                <button
-                  type="button"
-                  onClick={() => { setShowNewForm(false); setNewError(''); }}
-                  style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1 }}
-                >
-                  ✕
-                </button>
-              </div>
-              <input
-                type="text"
-                placeholder="Name (e.g., 03-example)"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                style={{
-                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
-                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
-                }}
-                autoFocus
-              />
-              <input
-                type="text"
-                placeholder="Description (Optional)"
-                value={newDesc}
-                onChange={e => setNewDesc(e.target.value)}
-                style={{
-                  padding: '4px 8px', fontSize: 12, borderRadius: 4,
-                  border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
-                }}
-              />
-              {newError && (
-                <span style={{ fontSize: 11, color: 'var(--red)' }}>{newError}</span>
-              )}
-              <button
-                type="submit"
-                style={{
-                  padding: '4px 0', fontSize: 12, borderRadius: 4,
-                  background: 'var(--green)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600,
-                }}
-              >
-                Create
-              </button>
-            </form>
-          )}
-
-          {/* 侧边栏底部信息 */}
-          <div style={{
-            padding: '10px 12px',
-            borderTop: '1px solid var(--border)',
-            fontSize: 11, color: 'var(--text-muted)',
-            lineHeight: 1.5,
-          }}>
-            <div style={{ marginBottom: 6, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              📖 User Guide
-            </div>
-            <div>Select different harness configurations to observe agent behavior, and modify configurations in the lab in real-time.</div>
-          </div>
-        </aside>
+        <HarnessExplorer
+          harnesses={harnessFiles}
+          activeHarnessId={activeHarnessId}
+          onSelect={(id) => navigate(`/${id}/${activeTab}`)}
+          onRefresh={loadHarnessList}
+          onCreate={handleCreateHarness}
+          onEdit={handleEditHarness}
+          onDuplicate={handleDuplicateHarness}
+          onDelete={handleDeleteHarness}
+        />
 
         {/* 主内容区 */}
         <main className="main-content">
@@ -457,44 +358,6 @@ function AppContent() {
           )}
         </main>
       </div>
-
-      {/* 右键菜单 */}
-      {ctxMenu && (
-        <>
-          <div
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
-            onClick={() => setCtxMenu(null)}
-            onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }}
-          />
-          <div
-            style={{
-              position: 'fixed',
-              left: ctxMenu.x,
-              top: ctxMenu.y,
-              zIndex: 100,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              padding: '4px 0',
-              minWidth: 140,
-            }}
-          >
-            <button
-              onClick={() => handleCopyHarness(ctxMenu.harnessId)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '6px 12px', fontSize: 12, background: 'none', border: 'none',
-                color: 'var(--text)', cursor: 'pointer',
-              }}
-              onMouseEnter={e => e.target.style.background = 'var(--surface-hover)'}
-              onMouseLeave={e => e.target.style.background = 'none'}
-            >
-              📋 Copy Harness
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }

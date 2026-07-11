@@ -67,11 +67,11 @@
 - Consumes: Harness list, active ID, busy state, error state, and mutation callbacks.
 - Produces: one Explorer with row overflow menu, shared edit dialog, and delete confirmation.
 
-- [ ] Extract the existing list into `HarnessExplorer` with Lucide refresh, plus, ellipsis, edit, copy, and trash icons.
-- [ ] Add the three-mode form dialog and delete confirmation using state helpers from Task 2.
-- [ ] Replace native `confirm()` and `alert()` mutation paths with callback results and inline errors.
-- [ ] Replace the User Guide footer with Harness count/local workspace status.
-- [ ] Run `npm run build` and commit as `feat: redesign harness explorer management`.
+- [x] Extract the existing list into `HarnessExplorer` with Lucide refresh, plus, ellipsis, edit, copy, and trash icons.
+- [x] Add the three-mode form dialog and delete confirmation using state helpers from Task 2.
+- [x] Replace native `confirm()` and `alert()` mutation paths with callback results and inline errors.
+- [x] Replace the User Guide footer with Harness count/local workspace status.
+- [x] Run `npm run build` and commit as `feat: redesign harness explorer management`.
 
 ### Task 4: App Integration, Verification, And Documentation
 

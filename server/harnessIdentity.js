@@ -102,14 +102,12 @@ export function createCopiedHarnessDraft({
   const baseId = `${source.id}-copy`;
   const baseName = normalizeHarnessDisplayName(source.name) || source.id;
 
-  let suffix = '';
   let index = 1;
   let id = baseId;
 
   while (hasHarnessId(existingHarnesses, id)) {
     index += 1;
-    suffix = `-${index}`;
-    id = `${baseId}${suffix}`;
+    id = `${baseId}-${index}`;
   }
 
   return {
