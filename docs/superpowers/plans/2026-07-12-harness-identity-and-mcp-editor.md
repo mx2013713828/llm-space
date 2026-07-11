@@ -33,7 +33,7 @@
 - Produces: `createHarnessSummary(harness, filename): { id, name, filename, description, category }`
 - Changes: `createHarnessDraft()` stores display `name` and returns storage `filename` separately.
 
-- [ ] **Step 1: Write failing identity tests**
+- [x] **Step 1: Write failing identity tests**
 
 ```js
 assert.equal(normalizeHarnessDisplayName('My Bot.json'), 'My Bot');
@@ -45,17 +45,17 @@ assert.equal(draft.harness.name, 'My Bot');
 assert.equal(draft.filename, 'my-bot.json');
 ```
 
-- [ ] **Step 2: Run the focused test and confirm the old filename-in-name behavior fails**
+- [x] **Step 2: Run the focused test and confirm the old filename-in-name behavior fails**
 
 Run: `node --test server/harnessIdentity.test.js`
 
 Expected: FAIL because the normalization/summary functions and draft envelope do not exist.
 
-- [ ] **Step 3: Implement identity normalization and independent storage filename generation**
+- [x] **Step 3: Implement identity normalization and independent storage filename generation**
 
 `createHarnessDraft()` returns `{ harness, filename }`. `createCopiedHarnessDraft()` returns the same shape, uses a unique copied ID, and stores `${sourceDisplayName} Copy` in `harness.name`.
 
-- [ ] **Step 4: Update Harness routes and route tests**
+- [x] **Step 4: Update Harness routes and route tests**
 
 List responses use:
 
@@ -75,7 +75,7 @@ assert.deepEqual(list.body[0], {
 });
 ```
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run: `node --test server/harnessIdentity.test.js server/routes/harnessRoutes.test.js`
 
@@ -98,7 +98,7 @@ Commit: `refactor: separate harness identity from filenames`
 - Produces: `getHarnessPresentation(harness): { id, name, primary, secondary, title }`
 - Produces: `<HarnessIdentity harness compact className />`
 
-- [ ] **Step 1: Write failing presentation tests**
+- [x] **Step 1: Write failing presentation tests**
 
 ```js
 assert.deepEqual(getHarnessPresentation({ id: 'chat-bot', name: 'Basic Chatbot' }), {
@@ -112,21 +112,21 @@ assert.equal(getHarnessPresentation({ id: 'legacy', name: 'Legacy.json' }).prima
 assert.equal(getHarnessPresentation(null).primary, 'No harness selected');
 ```
 
-- [ ] **Step 2: Run the test and verify the helper is absent**
+- [x] **Step 2: Run the test and verify the helper is absent**
 
 Run: `node --test src/lib/harnessPresentation.test.js`
 
 Expected: FAIL with module-not-found.
 
-- [ ] **Step 3: Implement the pure helper and shared component**
+- [x] **Step 3: Implement the pure helper and shared component**
 
 The component renders fixed semantic elements for label, primary name, and monospace ID. It applies `title={presentation.title}` and leaves layout to shared CSS classes.
 
-- [ ] **Step 4: Update Harness Explorer to use display name plus ID**
+- [x] **Step 4: Update Harness Explorer to use display name plus ID**
 
 Replace direct `file.name` rendering with `<HarnessIdentity harness={file} compact />`; keep description below it. Do not show `filename` in the ordinary sidebar.
 
-- [ ] **Step 5: Run tests/build and commit**
+- [x] **Step 5: Run tests/build and commit**
 
 Run: `node --test src/lib/harnessPresentation.test.js && npm run build`
 
@@ -150,7 +150,7 @@ Commit: `feat: unify harness identity presentation`
 - Produces: `closeMcpEditor(state): { mode: 'detail', returnServerId }`
 - Produces: `isMcpEditorOpen(state): boolean`
 
-- [ ] **Step 1: Write failing state transition tests**
+- [x] **Step 1: Write failing state transition tests**
 
 ```js
 const base = createMcpEditorState();
@@ -160,17 +160,17 @@ assert.equal(closeMcpEditor(openMcpEdit(base, 'echo')).mode, 'detail');
 assert.equal(isMcpEditorOpen(base), false);
 ```
 
-- [ ] **Step 2: Run the test and verify the helper is absent**
+- [x] **Step 2: Run the test and verify the helper is absent**
 
 Run: `node --test src/lib/mcpEditorState.test.js`
 
 Expected: FAIL with module-not-found.
 
-- [ ] **Step 3: Implement the pure state helper and replace `showForm`**
+- [x] **Step 3: Implement the pure state helper and replace `showForm`**
 
 Use one `editorState` value. Add starts `create` with `EMPTY_FORM`; Edit starts `edit` with `serverToForm(selectedServer)`. Cancel restores `returnServerId`. Selecting a server closes the editor and selects that server.
 
-- [ ] **Step 4: Make editor and detail mutually exclusive**
+- [x] **Step 4: Make editor and detail mutually exclusive**
 
 Render:
 
@@ -184,7 +184,7 @@ Render:
 
 The existing selected server detail must not be present in the DOM while editing.
 
-- [ ] **Step 5: Run state tests/build and commit**
+- [x] **Step 5: Run state tests/build and commit**
 
 Run: `node --test src/lib/mcpEditorState.test.js && npm run build`
 
@@ -206,7 +206,7 @@ Commit: `feat: add focused mcp editor mode`
 - Consumes: `<HarnessIdentity harness />`
 - Produces: identical current-Harness header treatment in Knowledge and MCP.
 
-- [ ] **Step 1: Replace Knowledge and MCP direct name/ID rendering**
+- [x] **Step 1: Replace Knowledge and MCP direct name/ID rendering**
 
 Both pages render:
 
@@ -216,11 +216,11 @@ Both pages render:
 
 Knowledge keeps `bases` and `formats` as metrics; Harness identity is a separate fixed-width element rather than a metric value.
 
-- [ ] **Step 2: Implement focused editor and stable identity CSS**
+- [x] **Step 2: Implement focused editor and stable identity CSS**
 
 Add shared one-line ellipsis rules, fixed identity dimensions, a full-height MCP editor surface, and responsive constraints that do not alter existing desktop workbench density.
 
-- [ ] **Step 3: Run all relevant tests and build**
+- [x] **Step 3: Run all relevant tests and build**
 
 Run:
 
@@ -232,13 +232,15 @@ git diff --check
 
 Expected: all tests and build PASS; diff check is empty.
 
-- [ ] **Step 4: Run the full test suite**
+- [x] **Step 4: Run the full test suite**
 
 Run: `npm test`
 
 Expected: all tests PASS.
 
 - [ ] **Step 5: Browser visual verification**
+
+Blocked in automated verification: the in-app browser rejected the local `localhost:5175` URL under its URL safety policy. Manual user verification remains required; no alternate browser-control path was used.
 
 Verify desktop screenshots for:
 
@@ -248,7 +250,7 @@ Verify desktop screenshots for:
 - Knowledge and MCP showing the same name/ID.
 - A long Harness name remaining one line without moving metrics.
 
-- [ ] **Step 6: Mark the design implemented and commit**
+- [x] **Step 6: Mark the design implemented and commit**
 
 Add an implementation status note to the spec.
 

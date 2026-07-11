@@ -1,5 +1,7 @@
 # Harness Identity And MCP Editor UX Design
 
+> **Implementation status:** Implemented on `codex/mcp-runtime-mounting`. Automated tests and production build pass; manual browser visual verification remains pending because the in-app browser blocked the local development URL.
+
 ## Goal
 
 Make Harness identity consistent across Harness Explorer, Knowledge, and MCP Studio, and make MCP create/edit a focused workspace rather than stacking a form above the selected server detail.
