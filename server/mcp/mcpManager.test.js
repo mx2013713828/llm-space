@@ -68,3 +68,23 @@ test('returns mounted MCP tools for a harness mount', async () => {
 		await manager.disconnectAll();
 	}
 });
+
+test('tracks lifecycle and bounded call history for a managed server', async () => {
+	const manager = new McpManager({
+		servers: [{
+			id: 'echo', name: 'Echo', transport: 'stdio', command: process.execPath,
+			args: [path.resolve('examples/mcp/echo-server.js')], cwd: process.cwd(), enabled: true,
+		}],
+	});
+	try {
+		assert.equal((await manager.getServerStatus('echo')).status, 'stopped');
+		await manager.connectServer('echo');
+		assert.equal((await manager.getServerStatus('echo')).status, 'connected');
+		await manager.callTool('mcp__echo__echo', { text: 'history' });
+		assert.equal((await manager.listCallSummaries('echo')).length, 1);
+		await manager.disconnectServer('echo');
+		assert.equal((await manager.getServerStatus('echo')).status, 'stopped');
+	} finally {
+		await manager.disconnectAll();
+	}
+});
