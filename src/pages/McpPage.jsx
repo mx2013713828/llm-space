@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 
 import {
 	connectMcpServer,
@@ -10,6 +11,7 @@ import {
 	saveMcpServer,
 	testMcpTool,
 } from '../lib/mcpServers.js';
+import { editorRowsToMap, mapToEditorRows } from '../lib/mcpConfigPresentation.js';
 
 const EMPTY_FORM = {
 	id: '',
@@ -20,8 +22,9 @@ const EMPTY_FORM = {
 	argsText: '',
 	cwd: '.',
 	url: '',
-	authType: 'none',
-	authEnv: '',
+	envRows: [],
+	headerRows: [],
+	legacyAuthEnv: '',
 };
 
 function statusLabel(status) {
@@ -51,8 +54,9 @@ function serverToForm(server) {
 		argsText: (server?.args || []).join('\n'),
 		cwd: server?.cwd || '.',
 		url: server?.url || '',
-		authType: server?.auth?.type || 'none',
-		authEnv: server?.auth?.env || '',
+		envRows: mapToEditorRows(server?.env),
+		headerRows: mapToEditorRows(server?.headers),
+		legacyAuthEnv: server?.auth?.type === 'bearer' ? server.auth.env || '' : '',
 	};
 }
 
@@ -63,12 +67,13 @@ function formToServer(form) {
 		description: form.description,
 		transport: form.transport,
 		enabled: true,
+		env: editorRowsToMap(form.envRows),
 	};
 	if (form.transport === 'streamable_http') {
 		return {
 			...base,
 			url: form.url,
-			auth: form.authType === 'bearer' ? { type: 'bearer', env: form.authEnv } : { type: 'none' },
+			headers: editorRowsToMap(form.headerRows),
 		};
 	}
 	return {
@@ -78,6 +83,40 @@ function formToServer(form) {
 		cwd: form.cwd || '.',
 		env: {},
 	};
+}
+
+function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description }) {
+	const updateRow = (index, field, value) => {
+		onChange(rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
+	};
+	const removeRow = (index) => onChange(rows.filter((_, rowIndex) => rowIndex !== index));
+
+	return (
+		<div className="mcp-kv-editor wide">
+			<div className="mcp-kv-head">
+				<div>
+					<strong>{label}</strong>
+					<span>{description}</span>
+				</div>
+				<button type="button" className="mcp-icon-button" title={`Add ${label}`} onClick={() => onChange([...rows, { key: '', value: '' }])}>
+					<Plus size={15} aria-hidden="true" />
+				</button>
+			</div>
+			{rows.length > 0 && (
+				<div className="mcp-kv-rows">
+					{rows.map((row, index) => (
+						<div className="mcp-kv-row" key={`${row.key}-${index}`}>
+							<input className="input" value={row.key} aria-label={`${label} name`} placeholder="Name" onChange={event => updateRow(index, 'key', event.target.value)} />
+							<input className="input" value={row.value} aria-label={`${label} value`} placeholder={valuePlaceholder} onChange={event => updateRow(index, 'value', event.target.value)} />
+							<button type="button" className="mcp-icon-button danger" title={`Remove ${label}`} onClick={() => removeRow(index)}>
+								<Trash2 size={14} aria-hidden="true" />
+							</button>
+						</div>
+					))}
+				</div>
+			)}
+		</div>
+	);
 }
 
 function ServerCard({ server, status, selected, mounted, onClick }) {
@@ -338,7 +377,7 @@ export function McpPage({ harness }) {
 					{showForm && (
 						<form className="mcp-form" onSubmit={handleSaveForm}>
 							<div className="mcp-panel-title">
-								<span>New MCP server</span>
+								<span>{form.id ? 'Edit MCP server' : 'New MCP server'}</span>
 								<button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Close</button>
 							</div>
 							<div className="mcp-form-grid">
@@ -356,17 +395,25 @@ export function McpPage({ harness }) {
 										<label>Command<input className="input" value={form.command} onChange={e => setForm({ ...form, command: e.target.value })} required /></label>
 										<label>CWD<input className="input" value={form.cwd} onChange={e => setForm({ ...form, cwd: e.target.value })} /></label>
 										<label className="wide">Args, one per line<textarea className="textarea" value={form.argsText} onChange={e => setForm({ ...form, argsText: e.target.value })} /></label>
+										<KeyValueEditor
+											label="Environment"
+											rows={form.envRows}
+											onChange={envRows => setForm({ ...form, envRows })}
+											valuePlaceholder="Value stored locally"
+											description="Overrides same-named variables inherited from the shell."
+										/>
 									</>
 								) : (
 									<>
 										<label className="wide">URL<input className="input" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} required /></label>
-										<label>Auth
-											<select className="input" value={form.authType} onChange={e => setForm({ ...form, authType: e.target.value })}>
-												<option value="none">None</option>
-												<option value="bearer">Bearer env</option>
-											</select>
-										</label>
-										<label>Token env<input className="input" value={form.authEnv} onChange={e => setForm({ ...form, authEnv: e.target.value })} placeholder="MCP_TOKEN" /></label>
+										{form.legacyAuthEnv && <div className="mcp-legacy-note wide">Legacy bearer environment <code>{form.legacyAuthEnv}</code> is active. Saving this server removes it; add an <code>Authorization</code> header here to migrate deliberately.</div>}
+										<KeyValueEditor
+											label="HTTP headers"
+											rows={form.headerRows}
+											onChange={headerRows => setForm({ ...form, headerRows })}
+											valuePlaceholder="Header value stored locally"
+											description="Use any header, including Authorization, X-API-Key, or custom provider fields."
+										/>
 									</>
 								)}
 							</div>
