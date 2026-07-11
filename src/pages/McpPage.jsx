@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, CircleAlert, Link2Off, LoaderCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
+import { HarnessIdentity } from '../components/HarnessIdentity.jsx';
 import {
 	connectMcpServer,
 	deleteMcpServer,
@@ -425,10 +426,7 @@ export function McpPage({ harness }) {
 					<h1>MCP Studio</h1>
 					<p>Configure local STDIO and Streamable HTTP MCP servers, discover tools, and mount selected tools into the current harness.</p>
 				</div>
-				<div className="mcp-harness-chip">
-					<span>Current harness</span>
-					<strong>{harness?.id || 'none selected'}</strong>
-				</div>
+				<HarnessIdentity harness={harness} className="workspace-harness-identity" />
 			</section>
 
 			{(error || notice) && (
@@ -476,10 +474,17 @@ export function McpPage({ harness }) {
 
 				<main className="mcp-detail">
 					{editorOpen ? (
-						<form className="mcp-form" onSubmit={handleSaveForm}>
-							<div className="mcp-panel-title">
-								<span>{form.id ? 'Edit MCP server' : 'New MCP server'}</span>
-								<button type="button" className="btn btn-ghost" onClick={closeEditor}>Cancel</button>
+						<form className="mcp-form mcp-editor-surface" onSubmit={handleSaveForm}>
+							<div className="mcp-editor-head">
+								<div>
+									<div className="mcp-eyebrow">{editorState.mode === 'edit' ? 'Edit server' : 'New connection'}</div>
+									<h2>{editorState.mode === 'edit' ? form.name || form.id : 'Configure MCP server'}</h2>
+									<p>{editorState.mode === 'edit' ? 'Update transport and credentials for this server.' : 'Add a local STDIO process or Streamable HTTP endpoint.'}</p>
+								</div>
+								<div className="mcp-actions">
+									<button type="button" className="btn btn-ghost" onClick={closeEditor}>Cancel</button>
+									<button type="submit" className="btn btn-primary" disabled={busy === 'save'}>{busy === 'save' ? 'Saving...' : 'Save server'}</button>
+								</div>
 							</div>
 							<div className="mcp-form-grid">
 								<label>Name<input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></label>
@@ -519,7 +524,6 @@ export function McpPage({ harness }) {
 									</>
 								)}
 							</div>
-							<button className="btn btn-primary" disabled={busy === 'save'}>Save server</button>
 						</form>
 					) : selectedServer ? (
 						<div className="mcp-server-detail">

@@ -14,7 +14,12 @@ import {
 } from '../agent/guidance/agentGuidance.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
-import { createCopiedHarnessDraft, createHarnessDraft, createHarnessSummary } from '../harnessIdentity.js';
+import {
+  createCopiedHarnessDraft,
+  createHarnessDraft,
+  createHarnessSummary,
+  normalizeHarnessDisplayName,
+} from '../harnessIdentity.js';
 import { listMountedKnowledgeBases, loadKnowledgeBase } from '../knowledge/knowledgeStore.js';
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getToolSchemasForTools } from '../tools/index.js';
@@ -109,7 +114,7 @@ export function registerHarnessRoutes(app, {
         const data = JSON.parse(content);
         if (data.id === req.params.id) {
           return res.json(await hydrateHarnessGuidance({
-            harness: data,
+            harness: { ...data, name: normalizeHarnessDisplayName(data.name) || data.id },
             harnessId: req.params.id,
             guidanceRoot,
             fsImpl,
@@ -169,6 +174,7 @@ export function registerHarnessRoutes(app, {
       });
       const harnessToSave = {
         ...stripLegacySystemPrompt(data),
+        name: normalizeHarnessDisplayName(data.name) || req.params.id,
         guidance: {
           ...(data.guidance && typeof data.guidance === 'object' ? data.guidance : {}),
           file: guidance.file,

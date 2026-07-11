@@ -263,29 +263,9 @@ body {
   margin: 0;
 }
 
-.mcp-harness-chip {
-  min-width: 220px;
-  border: 1px solid var(--border);
-  background: rgba(15, 19, 32, 0.78);
-  border-radius: 8px;
-  padding: 12px 14px;
-}
-
-.mcp-harness-chip span {
-  display: block;
-  color: var(--text-muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.mcp-harness-chip strong {
-  display: block;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 4px;
+.mcp-header .workspace-harness-identity {
+  width: clamp(220px, 24vw, 320px);
+  flex: 0 0 clamp(220px, 24vw, 320px);
 }
 
 .mcp-alert {
@@ -664,8 +644,31 @@ body {
 }
 
 .mcp-form {
-  margin-bottom: 16px;
-  padding-bottom: 14px;
+  min-height: 100%;
+  padding-bottom: 18px;
+}
+
+.mcp-editor-surface {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.mcp-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 4px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mcp-editor-head h2 { margin-bottom: 7px; }
+.mcp-editor-head p { max-width: 580px; }
+
+.mcp-editor-surface .mcp-form-grid {
+  padding: 22px 4px 16px;
+  gap: 16px;
 }
 
 .mcp-form-grid {
@@ -686,10 +689,6 @@ body {
 
 .mcp-form-grid .wide {
   grid-column: 1 / -1;
-}
-
-.mcp-form > .btn {
-  margin-left: 14px;
 }
 
 .mcp-kv-editor {

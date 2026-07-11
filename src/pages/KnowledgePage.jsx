@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { HarnessIdentity } from '../components/HarnessIdentity.jsx';
 import { apiFetch } from '../lib/apiClient.js';
 import {
 	buildKnowledgeFilePayload,
@@ -498,10 +499,12 @@ export function KnowledgePage({ harness, onSave }) {
 					<h1>Knowledge Bases</h1>
 					<p>Keep local knowledge organized as mountable resources. Open a base to inspect files, settings, and retrieval behavior.</p>
 				</div>
-				<div className="knowledge-hero-stats">
-					<Metric label="bases" value={bases.length} />
-					<Metric label="current harness" value={harness?.name || '-'} />
-					<Metric label="formats" value="MD TXT JSON CSV PDF DOCX" />
+				<div className="knowledge-hero-context">
+					<HarnessIdentity harness={harness} className="workspace-harness-identity" />
+					<div className="knowledge-hero-stats">
+						<Metric label="bases" value={bases.length} />
+						<Metric label="formats" value="MD TXT JSON CSV PDF DOCX" />
+					</div>
 				</div>
 			</section>
 

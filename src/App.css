@@ -306,9 +306,33 @@
 
 .knowledge-hero-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: min(520px, 45vw);
-  flex: 0 0 min(520px, 45vw);
+  grid-template-columns: minmax(90px, 0.55fr) minmax(210px, 1.45fr);
+  width: 100%;
+}
+
+.knowledge-hero-context {
+  width: min(540px, 46vw);
+  flex: 0 0 min(540px, 46vw);
+  display: grid;
+  grid-template-columns: minmax(190px, 0.85fr) minmax(260px, 1.15fr);
+  gap: 10px;
+}
+
+.workspace-harness-identity {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  background: rgba(20, 25, 40, 0.78);
+}
+
+.workspace-harness-identity .harness-identity-name {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.workspace-harness-identity .harness-identity-id {
+  font-size: 11px;
 }
 
 .knowledge-metric {

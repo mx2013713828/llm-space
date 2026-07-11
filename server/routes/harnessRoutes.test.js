@@ -434,6 +434,7 @@ test('harness load initializes AGENTS.md from legacy system prompt', async (t) =
   const res = await dispatchJson(app, 'GET', '/api/harnesses/alpha');
 
   assert.equal(res.status, 200);
+  assert.equal(res.body.name, 'alpha');
   assert.equal(res.body.systemPrompt, 'Legacy prompt from JSON.');
   assert.deepEqual(res.body.guidance, {
     file: 'guidance/alpha/AGENTS.md',
@@ -479,6 +480,7 @@ test('harness save writes systemPrompt to AGENTS.md and strips it from JSON', as
     'Updated AGENTS guidance.',
   );
   const savedHarness = JSON.parse(await readFile(path.join(fixture.harnessDir, 'alpha.json'), 'utf-8'));
+  assert.equal(savedHarness.name, 'alpha');
   assert.equal(savedHarness.description, 'Alpha updated');
   assert.equal(savedHarness.systemPrompt, undefined);
   assert.deepEqual(savedHarness.tools, ['bash', 'read_file']);
