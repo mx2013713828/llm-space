@@ -51,10 +51,10 @@
 - Produces: `openHarnessDelete(state, harness)`
 - Produces: `getHarnessCountLabel(count)`
 
-- [ ] Write failing tests for Create/Edit/Duplicate/Delete drafts, generated ID preview, and count labels.
-- [ ] Run `node --test src/lib/harnessExplorerState.test.js` and verify module-not-found.
-- [ ] Implement minimal pure state and presentation helpers.
-- [ ] Run tests and commit as `feat: add harness explorer state model`.
+- [x] Write failing tests for Create/Edit/Duplicate/Delete drafts, generated ID preview, and count labels.
+- [x] Run `node --test src/lib/harnessExplorerState.test.js` and verify module-not-found.
+- [x] Implement minimal pure state and presentation helpers.
+- [x] Run tests and commit as `feat: add harness explorer state model`.
 
 ### Task 3: Extract And Build Harness Explorer UI
 
