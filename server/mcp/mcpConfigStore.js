@@ -28,7 +28,22 @@ function normalizeTransport(value) {
 	return 'stdio';
 }
 
-export function normalizeMcpServerConfig(server = {}) {
+function normalizeLegacyAuth(auth) {
+	if (auth?.type !== 'bearer') return null;
+	const env = String(auth.env || '').trim();
+	return env ? { type: 'bearer', env } : null;
+}
+
+export function normalizeMcpStringMap(value = {}) {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value)
+			.map(([key, entry]) => [String(key || '').trim(), String(entry || '').trim()])
+			.filter(([key, entry]) => key && entry),
+	);
+}
+
+export function normalizeMcpServerConfig(server = {}, { preserveLegacyAuth = true } = {}) {
 	const name = String(server.name || server.id || 'MCP Server').trim();
 	const id = normalizeMcpName(server.id || name);
 	const transport = normalizeTransport(server.transport);
@@ -38,22 +53,22 @@ export function normalizeMcpServerConfig(server = {}) {
 		description: String(server.description || '').trim(),
 		transport,
 		enabled: server.enabled !== false,
-		env: server.env && typeof server.env === 'object' && !Array.isArray(server.env) ? { ...server.env } : {},
-		auth: server.auth && typeof server.auth === 'object' && !Array.isArray(server.auth) ? { ...server.auth } : { type: 'none' },
+		env: normalizeMcpStringMap(server.env),
 		toolAllowlist: Array.isArray(server.toolAllowlist) ? [...server.toolAllowlist] : [],
 		lastTools: Array.isArray(server.lastTools) ? [...server.lastTools] : [],
 	};
 
 	if (transport === 'streamable_http') {
 		normalized.url = String(server.url || '').trim();
-		normalized.headers = server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)
-			? { ...server.headers }
-			: {};
+		normalized.headers = normalizeMcpStringMap(server.headers);
 	} else {
 		normalized.command = String(server.command || '').trim();
 		normalized.args = Array.isArray(server.args) ? server.args.map(String) : [];
 		normalized.cwd = String(server.cwd || '.').trim() || '.';
 	}
+
+	const legacyAuth = preserveLegacyAuth ? normalizeLegacyAuth(server.auth) : null;
+	if (legacyAuth) normalized.auth = legacyAuth;
 
 	return normalized;
 }
@@ -82,12 +97,14 @@ export async function saveMcpServers({ servers = [], rootDir = DEFAULT_ROOT_DIR,
 }
 
 export async function upsertMcpServer({ server, rootDir = DEFAULT_ROOT_DIR, fsImpl = fs } = {}) {
-	const nextServer = normalizeMcpServerConfig(server);
+	const nextServer = normalizeMcpServerConfig(server, { preserveLegacyAuth: false });
 	const servers = await listMcpServers({ rootDir, fsImpl });
 	const index = servers.findIndex(item => item.id === nextServer.id);
 	const nextServers = [...servers];
 	if (index >= 0) {
-		nextServers[index] = { ...servers[index], ...nextServer };
+		const existingWithoutLegacyAuth = { ...servers[index] };
+		delete existingWithoutLegacyAuth.auth;
+		nextServers[index] = { ...existingWithoutLegacyAuth, ...nextServer };
 	} else {
 		nextServers.push(nextServer);
 	}

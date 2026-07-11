@@ -51,23 +51,95 @@ test('saves and reloads normalized MCP stdio server config', async () => {
 	});
 });
 
-test('upserts streamable HTTP server config', async () => {
+test('loads a legacy streamable HTTP bearer-env config', async () => {
 	await withTempDir(async (rootDir) => {
-		const saved = await upsertMcpServer({
+		await saveMcpServers({
 			rootDir,
-			server: {
+			servers: [{
 				id: 'remote-docs',
 				name: 'Remote Docs',
 				transport: 'streamable_http',
 				url: 'https://example.test/mcp',
 				auth: { type: 'bearer', env: 'REMOTE_MCP_TOKEN' },
-			},
+			}],
 		});
 
-		assert.equal(saved.id, 'remote-docs');
 		const servers = await listMcpServers({ rootDir });
 		assert.equal(servers[0].url, 'https://example.test/mcp');
 		assert.equal(servers[0].auth.env, 'REMOTE_MCP_TOKEN');
+	});
+});
+
+test('saves generic environment and header maps without new auth metadata', async () => {
+	await withTempDir(async (rootDir) => {
+		const saved = await upsertMcpServer({
+			rootDir,
+			server: {
+				id: 'generic-remote',
+				name: 'Generic Remote',
+				transport: 'streamable_http',
+				url: 'https://example.test/mcp',
+				env: { SERVICE_TOKEN: 'local-token', blank: '   ' },
+				headers: { 'X-API-Key': 'local-key', Empty: '' },
+			},
+		});
+
+		assert.deepEqual(saved.env, { SERVICE_TOKEN: 'local-token' });
+		assert.deepEqual(saved.headers, { 'X-API-Key': 'local-key' });
+		assert.equal(Object.hasOwn(saved, 'auth'), false);
+	});
+});
+
+test('preserves unrelated legacy bearer config when saving another server', async () => {
+	await withTempDir(async (rootDir) => {
+		await saveMcpServers({
+			rootDir,
+			servers: [{
+				id: 'legacy',
+				name: 'Legacy',
+				transport: 'streamable_http',
+				url: 'https://legacy.test/mcp',
+				auth: { type: 'bearer', env: 'LEGACY_TOKEN' },
+			}],
+		});
+		await upsertMcpServer({
+			rootDir,
+			server: {
+				id: 'new-server',
+				name: 'New Server',
+				transport: 'stdio',
+				command: 'node',
+			},
+		});
+
+		const servers = await listMcpServers({ rootDir });
+		assert.deepEqual(servers.find(server => server.id === 'legacy')?.auth, {
+			type: 'bearer',
+			env: 'LEGACY_TOKEN',
+		});
+	});
+});
+
+test('migrates auth metadata away when its legacy server is edited', async () => {
+	await withTempDir(async (rootDir) => {
+		await saveMcpServers({
+			rootDir,
+			servers: [{
+				id: 'legacy', name: 'Legacy', transport: 'streamable_http',
+				url: 'https://legacy.test/mcp', auth: { type: 'bearer', env: 'LEGACY_TOKEN' },
+			}],
+		});
+		await upsertMcpServer({
+			rootDir,
+			server: {
+				id: 'legacy', name: 'Legacy edited', transport: 'streamable_http',
+				url: 'https://legacy.test/mcp', headers: { Authorization: 'Bearer local-token' },
+			},
+		});
+
+		const server = (await listMcpServers({ rootDir }))[0];
+		assert.equal(Object.hasOwn(server, 'auth'), false);
+		assert.deepEqual(server.headers, { Authorization: 'Bearer local-token' });
 	});
 });
 

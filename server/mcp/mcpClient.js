@@ -2,6 +2,36 @@ import { spawn } from 'child_process';
 
 import { encodeJsonRpcMessage, JsonRpcMessageParser } from './mcpJsonRpc.js';
 
+function hasHeader(headers, targetName) {
+	const normalizedTarget = String(targetName).toLowerCase();
+	return Object.keys(headers).some(name => name.toLowerCase() === normalizedTarget);
+}
+
+function setHeader(headers, name, value) {
+	const existingName = Object.keys(headers).find(key => key.toLowerCase() === String(name).toLowerCase());
+	if (existingName) delete headers[existingName];
+	headers[name] = value;
+}
+
+export function buildMcpStdioEnvironment(server = {}, inheritedEnv = process.env) {
+	return { ...inheritedEnv, ...(server.env || {}) };
+}
+
+export function buildMcpHttpHeaders(server = {}, processEnv = process.env) {
+	const headers = {
+		'content-type': 'application/json',
+		accept: 'application/json, text/event-stream',
+	};
+	for (const [name, value] of Object.entries(server.headers || {})) {
+		setHeader(headers, name, value);
+	}
+	if (server.auth?.type === 'bearer' && server.auth.env && !hasHeader(headers, 'authorization')) {
+		const token = processEnv[server.auth.env];
+		if (token) setHeader(headers, 'Authorization', `Bearer ${token}`);
+	}
+	return headers;
+}
+
 export class McpClient {
 	constructor({ server, fetchImpl = fetch, timeoutMs = 30000 } = {}) {
 		this.server = server;
@@ -28,7 +58,7 @@ export class McpClient {
 
 		this.process = spawn(this.server.command, this.server.args || [], {
 			cwd: this.server.cwd || process.cwd(),
-			env: { ...process.env, ...(this.server.env || {}) },
+			env: buildMcpStdioEnvironment(this.server),
 			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 
@@ -121,14 +151,7 @@ export class McpClient {
 
 	async #httpRequest(method, params) {
 		const id = this.nextId++;
-		const headers = {
-			'content-type': 'application/json',
-			accept: 'application/json, text/event-stream',
-			...(this.server.headers || {}),
-		};
-		if (this.server.auth?.type === 'bearer' && this.server.auth.env && process.env[this.server.auth.env]) {
-			headers.authorization = `Bearer ${process.env[this.server.auth.env]}`;
-		}
+		const headers = buildMcpHttpHeaders(this.server);
 		const res = await this.fetchImpl(this.server.url, {
 			method: 'POST',
 			headers,
