@@ -1,5 +1,5 @@
 export function formatMcpStatus(status = {}) {
-	const value = status.status || 'stopped';
+	const value = status?.status || 'stopped';
 	const labels = {
 		starting: 'Starting',
 		connected: 'Connected',
@@ -10,7 +10,7 @@ export function formatMcpStatus(status = {}) {
 }
 
 export function formatMcpAuthStatus(auth = {}) {
-	const value = auth.status || 'unknown';
+	const value = auth?.status || 'unknown';
 	const labels = {
 		anonymous: 'Anonymous',
 		configured: 'Credential configured',

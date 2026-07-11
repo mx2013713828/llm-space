@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { formatMcpAuthStatus, formatMcpCallSummary, formatMcpStatus } from './mcpRuntimePresentation.js';
 
 test('formats MCP lifecycle and authentication evidence', () => {
+	assert.deepEqual(formatMcpStatus(null), { value: 'stopped', label: 'Stopped', tone: 'stopped' });
 	assert.deepEqual(formatMcpStatus({ status: 'stopped' }), { value: 'stopped', label: 'Stopped', tone: 'stopped' });
+	assert.deepEqual(formatMcpAuthStatus(null), { value: 'unknown', label: 'Unknown', tone: 'unknown' });
 	assert.deepEqual(formatMcpAuthStatus({ status: 'verified' }), { value: 'verified', label: 'Verified', tone: 'verified' });
 });
 
