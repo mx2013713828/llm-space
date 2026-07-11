@@ -30,7 +30,7 @@
 - Produces: `normalizeMcpStringMap(value): Record<string, string>` for persisted `env` and `headers`.
 - Produces: `buildMcpHttpHeaders(server, processEnv): Record<string, string>` for protocol defaults, generic headers, and legacy compatibility.
 
-- [ ] **Step 1: Write failing config normalization tests**
+- [x] **Step 1: Write failing config normalization tests**
 
 ```js
 test('persists generic STDIO environment variables and HTTP headers without auth metadata', async () => {
@@ -47,11 +47,11 @@ test('persists generic STDIO environment variables and HTTP headers without auth
 });
 ```
 
-- [ ] **Step 2: Run the config test and verify it fails because `auth` is still persisted.**
+- [x] **Step 2: Run the config test and verify it fails because `auth` is still persisted.**
 
 Run: `node --test server/mcp/mcpConfigStore.test.js`
 
-- [ ] **Step 3: Normalize only non-empty string map entries and make legacy-auth migration explicit per saved server.**
+- [x] **Step 3: Normalize only non-empty string map entries and make legacy-auth migration explicit per saved server.**
 
 ```js
 export function normalizeMcpStringMap(value = {}) {
@@ -63,7 +63,7 @@ export function normalizeMcpStringMap(value = {}) {
 
 `listMcpServers()` preserves legacy `auth` for runtime use. `upsertMcpServer()` strips it only from the server supplied by the editor; `saveMcpServers()` preserves it for unrelated entries.
 
-- [ ] **Step 4: Write failing HTTP header precedence and legacy bearer compatibility tests.**
+- [x] **Step 4: Write failing HTTP header precedence and legacy bearer compatibility tests.**
 
 ```js
 assert.equal(headers['X-API-Key'], 'local-key');
@@ -71,11 +71,11 @@ assert.equal(headers.Authorization, 'Bearer shell-token');
 assert.equal(explicit.Authorization, 'Custom explicit value');
 ```
 
-- [ ] **Step 5: Implement generic header assembly.**
+- [x] **Step 5: Implement generic header assembly.**
 
 `server.headers` wins case-insensitively over defaults and legacy Authorization. Legacy bearer auth adds Authorization only when no explicit Authorization header exists.
 
-- [ ] **Step 6: Run focused tests and commit.**
+- [x] **Step 6: Run focused tests and commit.**
 
 Run: `node --test server/mcp/mcpConfigStore.test.js server/mcp/mcpClient.test.js server/mcp/mcpManager.test.js`
 
@@ -93,7 +93,7 @@ Commit: `feat: generalize mcp credentials and headers`
 - Produces: `mapToEditorRows(map)` and `editorRowsToMap(rows)` for plain key-value configuration maps.
 - Consumes: generic `server.env` and `server.headers` fields.
 
-- [ ] **Step 1: Write failing map-editor conversion tests.**
+- [x] **Step 1: Write failing map-editor conversion tests.**
 
 ```js
 assert.deepEqual(editorRowsToMap([
@@ -102,17 +102,17 @@ assert.deepEqual(editorRowsToMap([
 ]), { 'X-API-Key': 'key' });
 ```
 
-- [ ] **Step 2: Run the test and verify it fails because the helper is absent.**
+- [x] **Step 2: Run the test and verify it fails because the helper is absent.**
 
 Run: `node --test src/lib/mcpConfigPresentation.test.js`
 
-- [ ] **Step 3: Implement the pure map editor helpers.**
+- [x] **Step 3: Implement the pure map editor helpers.**
 
-- [ ] **Step 4: Replace the HTTP Auth selector with an HTTP Headers key-value editor. Add an Environment key-value editor to STDIO.**
+- [x] **Step 4: Replace the HTTP Auth selector with an HTTP Headers key-value editor. Add an Environment key-value editor to STDIO.**
 
 The forms bind direct values into `env` or `headers`; no vendor names, bearer fields, or special authentication controls remain. The editor notes local-only Git-ignored storage and STDIO override precedence.
 
-- [ ] **Step 5: Build and commit.**
+- [x] **Step 5: Build and commit.**
 
 Run: `node --test src/lib/mcpConfigPresentation.test.js && npm run build`
 
@@ -132,17 +132,17 @@ Commit: `feat: expose generic mcp credential editors`
 - Produces: current setup documentation for direct credentials, inherited environment, and generic headers.
 - Produces: roadmap status marking Task 17 complete and Task 18 as next.
 
-- [ ] **Step 1: Update setup documentation.**
+- [x] **Step 1: Update setup documentation.**
 
 Document that direct values save locally in `.mcp/servers.json`, STDIO `env` overrides inherited shell variables, HTTP headers are arbitrary, and Context7 is configured by an ordinary `CONTEXT7_API_KEY` environment entry.
 
-- [ ] **Step 2: Mark the Task 17 plan and consolidated roadmap complete.**
+- [x] **Step 2: Mark the Task 17 plan and consolidated roadmap complete.**
 
-- [ ] **Step 3: Verify existing local config non-destructively.**
+- [x] **Step 3: Verify existing local config non-destructively.**
 
 Run a read-only script that lists server IDs, transports, and map key names only. Confirm Echo and Context7 configurations still load and connect.
 
-- [ ] **Step 4: Run full verification and commit.**
+- [x] **Step 4: Run full verification and commit.**
 
 Run: `npm test && npm run build && git diff --check`
 

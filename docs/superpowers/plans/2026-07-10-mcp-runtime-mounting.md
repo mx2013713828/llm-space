@@ -4,6 +4,8 @@
 
 **Goal:** Build an MCP management and mounting experience that can connect user-authored MCP servers, connect Context7, expose discovered MCP tools to the active harness, and make the full runtime visible.
 
+**Status:** Complete. Follow-up runtime observability and permission UX are tracked as Task 18.
+
 **Architecture:** MCP is an external tool provider layer. Project-level MCP server definitions are stored separately from harness-level mounts; discovered MCP tools are adapted into the existing Runtime Tool Pool and dispatched through the existing AgentExecutor tool execution path.
 
 **Tech Stack:** Node.js ESM, Express routes, JSON-RPC over stdio/streamable HTTP, React, existing harness feature schema, node:test.
@@ -12,7 +14,7 @@
 
 - MVP supports `stdio` and `streamable_http` transport names.
 - MCP tool names must be namespaced as `mcp__<serverId>__<toolName>`.
-- Project-level MCP server definitions live under `.mcp/servers.json`; harness-level mounts live in harness features.
+- Project-level MCP server definitions live under `.mcp/servers.json`; harness-level mounts live under `.mcp/mounts/<harnessId>.json`.
 - Context7 must be available as a preset using `npx -y @upstash/context7-mcp`.
 - The UI must behave like Tools Mounting: configure, connect, test, mount, inspect.
 - Agent-assisted installation must never silently run install commands without user-visible confirmation.
@@ -141,4 +143,6 @@
 - [x] Document setup and testing steps.
 - [x] Run full test suite.
 - [x] Commit final result.
-
+- [x] Align runtime schema dispatch with dynamic MCP tool definitions.
+- [x] Align STDIO JSON-RPC framing with modern MCP JSONL servers such as Context7.
+- [x] Generalize local credentials as direct `env` and HTTP `headers` maps; retain read-compatible legacy bearer-env support.

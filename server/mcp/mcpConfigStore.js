@@ -43,6 +43,19 @@ export function normalizeMcpStringMap(value = {}) {
 	);
 }
 
+function normalizeMcpHeaders(value = {}) {
+	const headers = normalizeMcpStringMap(value);
+	const seen = new Set();
+	for (const name of Object.keys(headers)) {
+		const normalizedName = name.toLowerCase();
+		if (seen.has(normalizedName)) {
+			throw new Error(`Duplicate HTTP header name: ${name}`);
+		}
+		seen.add(normalizedName);
+	}
+	return headers;
+}
+
 export function normalizeMcpServerConfig(server = {}, { preserveLegacyAuth = true } = {}) {
 	const name = String(server.name || server.id || 'MCP Server').trim();
 	const id = normalizeMcpName(server.id || name);
@@ -60,7 +73,7 @@ export function normalizeMcpServerConfig(server = {}, { preserveLegacyAuth = tru
 
 	if (transport === 'streamable_http') {
 		normalized.url = String(server.url || '').trim();
-		normalized.headers = normalizeMcpStringMap(server.headers);
+		normalized.headers = normalizeMcpHeaders(server.headers);
 	} else {
 		normalized.command = String(server.command || '').trim();
 		normalized.args = Array.isArray(server.args) ? server.args.map(String) : [];

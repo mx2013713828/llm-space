@@ -1,6 +1,6 @@
 # MCP Generic Configuration Closure Design
 
-**Status:** Proposed for review
+**Status:** Implemented
 
 ## Goal
 

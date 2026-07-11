@@ -91,6 +91,7 @@ The first MVP supports:
 - Local STDIO MCP servers, including your own scripts.
 - Streamable HTTP MCP servers.
 - A built-in Context7 preset using `npx -y @upstash/context7-mcp`.
+- Generic local Environment and HTTP Header editors for API keys, tokens, and custom provider fields.
 - Harness-level mounting, so each harness can expose a different MCP tool set.
 
 See [MCP Setup Guide](./docs/mcp-setup.md) for custom server, Context7, and Streamable HTTP testing steps.

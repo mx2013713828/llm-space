@@ -91,6 +91,7 @@ LLM Space 是一个面向开发者的可视化 AI Agent Harness 实验平台与�
 - 本地 STDIO MCP server，包括你自己写的脚本。
 - Streamable HTTP MCP server。
 - 内置 Context7 预设：`npx -y @upstash/context7-mcp`。
+- 通用本地 Environment 与 HTTP Headers 编辑器，可配置 API Key、Token 和任意 provider 字段。
 - Harness 级挂载，不同 harness 可以暴露不同 MCP 工具集。
 
 自写 MCP、Context7、Streamable HTTP 的详细测试步骤见：[MCP 配置指南](./docs/mcp-setup.zh-CN.md)。

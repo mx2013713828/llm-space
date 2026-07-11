@@ -143,6 +143,22 @@ test('migrates auth metadata away when its legacy server is edited', async () =>
 	});
 });
 
+test('rejects duplicate HTTP header names that differ only by case', async () => {
+	await withTempDir(async (rootDir) => {
+		await assert.rejects(
+			upsertMcpServer({
+				rootDir,
+				server: {
+					id: 'ambiguous-headers', name: 'Ambiguous Headers', transport: 'streamable_http',
+					url: 'https://example.test/mcp',
+					headers: { authorization: 'one', Authorization: 'two' },
+				},
+			}),
+			/duplicate HTTP header/i,
+		);
+	});
+});
+
 test('includes Context7 preset', () => {
 	const presets = getMcpPresets();
 	const context7 = presets.find(preset => preset.id === 'context7');

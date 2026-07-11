@@ -7,10 +7,11 @@ LLM Space supports MCP as an external tool provider layer. MCP servers are confi
 - STDIO MCP servers launched as local processes.
 - Streamable HTTP MCP servers accessed through a URL.
 - Context7 preset: `npx -y @upstash/context7-mcp`.
+- Generic local Environment and HTTP Headers configuration. Values may be API keys, tokens, cookies, or provider-specific fields.
 - Harness-level mounting with per-server tool allowlists.
 - Tool names exposed to the model as `mcp__<serverId>__<toolName>`.
 
-OAuth UI is intentionally not part of the first MVP. Streamable HTTP supports no-auth and bearer-token environment references.
+OAuth UI is intentionally not part of the first MVP. Authentication is configured through transport-neutral Environment and HTTP Header fields.
 
 ## Open MCP Studio
 
@@ -80,6 +81,15 @@ The command used is:
 npx -y @upstash/context7-mcp
 ```
 
+Context7 works anonymously with lower rate limits. To save an API key locally, edit the Context7 server and add this Environment row:
+
+```text
+Name: CONTEXT7_API_KEY
+Value: ctx7sk-...
+```
+
+For STDIO servers, configured Environment values override same-named values inherited from the shell. If the row is absent, a previously exported `CONTEXT7_API_KEY` is inherited unchanged.
+
 After tools are discovered, mount the server and ask the agent:
 
 ```text
@@ -95,22 +105,17 @@ Name: Remote Docs
 ID: remote-docs
 Transport: Streamable HTTP
 URL: https://example.com/mcp
-Auth: None
 ```
 
-For bearer-token auth:
+Use **HTTP headers** for any authentication scheme or provider-specific field:
 
 ```text
-Auth: Bearer env
-Token env: REMOTE_MCP_TOKEN
+Authorization: Bearer local-token
+X-API-Key: local-api-key
+CONTEXT7_API_KEY: ctx7sk-...
 ```
 
-Then set the variable in your shell before starting LLM Space:
-
-```bash
-export REMOTE_MCP_TOKEN="..."
-npm run dev
-```
+The editor saves these values locally as part of the MCP server definition. There is no provider-specific authentication selector.
 
 ## Where Configuration Lives
 
@@ -126,7 +131,7 @@ Harness-level mounts:
 .mcp/mounts/<harnessId>.json
 ```
 
-Do not store raw secrets in MCP config. Use environment variable names for tokens.
+This local-only directory is Git-ignored. Raw credentials may be saved there for an experimental local setup; do not copy or commit `.mcp/servers.json` elsewhere.
 
 ## Debugging
 

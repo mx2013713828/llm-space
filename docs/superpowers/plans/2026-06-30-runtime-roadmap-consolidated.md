@@ -768,6 +768,8 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Goal:** Connect local MCP servers as an independent runtime capability before folding them into a unified resource registry.
 
+**Status:** Complete. Task 18 is the next MCP follow-up.
+
 **Why:** MCP has its own lifecycle: server configuration, startup, initialization, tool discovery, schema translation, tool execution, approval, and tracing. It should prove itself as a working loop before being abstracted as a generic mounted resource.
 
 **Loop stages:** Tool discovery, tool pool dispatch, tool execution, permission approval.
@@ -797,15 +799,16 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Steps:**
 
-- [ ] Write config tests for local stdio MCP server definitions and path-safe storage.
-- [ ] Implement MCP server config CRUD.
-- [ ] Write fake MCP server tests for initialize, list tools, and call tool.
-- [ ] Implement MCP client manager with lifecycle states.
-- [ ] Write schema adapter tests from MCP tool schema to internal tool schema.
-- [ ] Route MCP tool calls through existing security and permission approval paths.
-- [ ] Show MCP tools in tool schema dry-run / Context Inspector.
-- [ ] Add minimal MCP configuration UI.
-- [ ] Verify and commit with `feat: add standalone mcp client`.
+- [x] Write config tests for local stdio MCP server definitions and path-safe storage.
+- [x] Implement MCP server config CRUD.
+- [x] Write fake MCP server tests for initialize, list tools, and call tool.
+- [x] Implement MCP client manager with lifecycle states.
+- [x] Write schema adapter tests from MCP tool schema to internal tool schema.
+- [x] Route MCP tool calls through existing security and permission approval paths.
+- [x] Show MCP tools in tool schema dry-run / Context Inspector.
+- [x] Add minimal MCP configuration UI.
+- [x] Add generic local Environment / HTTP Header configuration with legacy bearer-env compatibility.
+- [x] Verify and commit with `feat: add standalone mcp client`.
 
 ### Task 18: MCP Observability And Permission UX
 
