@@ -56,8 +56,8 @@ test('harness routes list, load, create, copy, and delete harness files', async 
   const listRes = await dispatchJson(app, 'GET', '/api/harnesses');
   assert.equal(listRes.status, 200);
   assert.deepEqual(listRes.body, [
-    { id: 'alpha', name: 'alpha.json', description: 'Alpha', category: 'basic' },
-    { id: 'beta', name: 'beta.json', description: 'Beta', category: 'test' },
+    { id: 'alpha', name: 'alpha', filename: 'alpha.json', description: 'Alpha', category: 'basic' },
+    { id: 'beta', name: 'beta', filename: 'beta.json', description: 'Beta', category: 'test' },
   ]);
 
   const loadRes = await dispatchJson(app, 'GET', '/api/harnesses/beta');
@@ -69,11 +69,15 @@ test('harness routes list, load, create, copy, and delete harness files', async 
   });
   assert.equal(createRes.status, 200);
   assert.equal(createRes.body.harness.id, 'new-bot');
-  assert.equal(JSON.parse(await readFile(path.join(fixture.harnessDir, 'New Bot.json'), 'utf-8')).id, 'new-bot');
+  assert.equal(createRes.body.harness.name, 'New Bot');
+  assert.equal(createRes.body.filename, 'new-bot.json');
+  assert.equal(JSON.parse(await readFile(path.join(fixture.harnessDir, 'new-bot.json'), 'utf-8')).name, 'New Bot');
 
   const copyRes = await dispatchJson(app, 'POST', '/api/harnesses/beta/copy');
   assert.equal(copyRes.status, 200);
   assert.equal(copyRes.body.harness.id, 'beta-copy');
+  assert.equal(copyRes.body.harness.name, 'beta Copy');
+  assert.equal(copyRes.body.filename, 'beta-copy.json');
 
   const deleteRes = await dispatchJson(app, 'DELETE', '/api/harnesses/alpha');
   assert.equal(deleteRes.status, 200);

@@ -14,7 +14,7 @@ import {
 } from '../agent/guidance/agentGuidance.js';
 import { resolveSelectedStrategyId } from '../agent/strategies/strategyRegistry.js';
 import { describeToolPool } from '../agent/toolPool.js';
-import { createCopiedHarnessDraft, createHarnessDraft } from '../harnessIdentity.js';
+import { createCopiedHarnessDraft, createHarnessDraft, createHarnessSummary } from '../harnessIdentity.js';
 import { listMountedKnowledgeBases, loadKnowledgeBase } from '../knowledge/knowledgeStore.js';
 import { retrieveKnowledge } from '../knowledge/knowledgeRetrieve.js';
 import { getToolSchemasForTools } from '../tools/index.js';
@@ -91,12 +91,7 @@ export function registerHarnessRoutes(app, {
         const content = await fsImpl.readFile(path.join(harnessDir, file), 'utf-8');
         try {
           const data = JSON.parse(content);
-          harnesses.push({
-            id: data.id,
-            name: file,
-            description: data.description,
-            category: data.category || 'basic'
-          });
+          harnesses.push(createHarnessSummary(data, file));
         } catch (_) {}
       }
       res.json(harnesses.sort((a, b) => a.name.localeCompare(b.name)));
@@ -133,15 +128,15 @@ export function registerHarnessRoutes(app, {
       if (!name) return res.status(400).json({ error: '缺少 name 字段' });
 
       const existingHarnesses = await loadHarnessesFromDir({ harnessDir, fsImpl });
-      const harness = createHarnessDraft({ name, description, existingHarnesses });
-      const targetPath = path.join(harnessDir, harness.name);
+      const draft = createHarnessDraft({ name, description, existingHarnesses });
+      const targetPath = path.join(harnessDir, draft.filename);
 
       if (await fsImpl.access(targetPath).then(() => true).catch(() => false)) {
         return res.status(409).json({ error: '同名 Harness 已存在' });
       }
 
-      await fsImpl.writeFile(targetPath, JSON.stringify(harness, null, 2), 'utf-8');
-      res.json({ success: true, harness });
+      await fsImpl.writeFile(targetPath, JSON.stringify(draft.harness, null, 2), 'utf-8');
+      res.json({ success: true, harness: draft.harness, filename: draft.filename });
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message });
     }
@@ -214,9 +209,9 @@ export function registerHarnessRoutes(app, {
       const source = existingHarnesses.find(harness => harness.id === req.params.id);
       if (!source) return res.status(404).json({ error: 'Harness not found' });
 
-      const harness = createCopiedHarnessDraft({ source, existingHarnesses });
-      await fsImpl.writeFile(path.join(harnessDir, harness.name), JSON.stringify(harness, null, 2), 'utf-8');
-      res.json({ success: true, harness });
+      const draft = createCopiedHarnessDraft({ source, existingHarnesses });
+      await fsImpl.writeFile(path.join(harnessDir, draft.filename), JSON.stringify(draft.harness, null, 2), 'utf-8');
+      res.json({ success: true, harness: draft.harness, filename: draft.filename });
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message });
     }

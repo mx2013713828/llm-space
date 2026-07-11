@@ -11,12 +11,26 @@ export function slugifyHarnessId(name) {
     .replace(/^-+|-+$/g, '');
 }
 
-function hasHarnessId(existingHarnesses, id) {
-  return existingHarnesses.some(harness => harness?.id === id);
+export function normalizeHarnessDisplayName(value) {
+  return String(value || '').trim().replace(/\.json$/i, '').trim();
 }
 
-function hasHarnessName(existingHarnesses, name) {
-  return existingHarnesses.some(harness => harness?.name === name);
+export function getHarnessStorageFilename(id) {
+  return `${String(id || '').trim()}.json`;
+}
+
+export function createHarnessSummary(harness = {}, filename = '') {
+  return {
+    id: String(harness.id || ''),
+    name: normalizeHarnessDisplayName(harness.name) || String(harness.id || ''),
+    filename: String(filename || ''),
+    description: String(harness.description || ''),
+    category: harness.category || 'basic',
+  };
+}
+
+function hasHarnessId(existingHarnesses, id) {
+  return existingHarnesses.some(harness => harness?.id === id);
 }
 
 function assertValidHarnessId(id) {
@@ -32,30 +46,29 @@ function assertHarnessIdAvailable(existingHarnesses, id) {
 }
 
 export function createHarnessDraft({ name, description = '', existingHarnesses = [] }) {
-  const id = slugifyHarnessId(name);
+  const displayName = normalizeHarnessDisplayName(name);
+  const id = slugifyHarnessId(displayName);
   assertValidHarnessId(id);
   assertHarnessIdAvailable(existingHarnesses, id);
 
-  const filename = `${name}.json`;
-  if (hasHarnessName(existingHarnesses, filename)) {
-    throw createHttpError(409, 'Harness filename already exists.');
-  }
-
   return {
-    id,
-    name: filename,
-    description,
-    category: 'basic',
-    model: {
-      name: '',
-      response_format: 'text',
-      temperature: 1,
-      max_tokens: 4096,
-      top_p: 1,
+    filename: getHarnessStorageFilename(id),
+    harness: {
+      id,
+      name: displayName,
+      description,
+      category: 'basic',
+      model: {
+        name: '',
+        response_format: 'text',
+        temperature: 1,
+        max_tokens: 4096,
+        top_p: 1,
+      },
+      tools: [],
+      systemPrompt: '',
+      skills: [],
     },
-    tools: [],
-    systemPrompt: '',
-    skills: [],
   };
 }
 
@@ -65,24 +78,25 @@ export function createCopiedHarnessDraft({ source, existingHarnesses = [] }) {
   }
 
   const baseId = `${source.id}-copy`;
-  const baseName = source.name.replace(/\.json$/, '');
+  const baseName = normalizeHarnessDisplayName(source.name) || source.id;
 
   let suffix = '';
   let index = 1;
   let id = baseId;
-  let name = `${baseName}-copy.json`;
 
-  while (hasHarnessId(existingHarnesses, id) || hasHarnessName(existingHarnesses, name)) {
+  while (hasHarnessId(existingHarnesses, id)) {
     index += 1;
     suffix = `-${index}`;
     id = `${baseId}${suffix}`;
-    name = `${baseName}-copy${suffix}.json`;
   }
 
   return {
-    ...source,
-    id,
-    name,
-    description: `${source.description || ''} (副本)`,
+    filename: getHarnessStorageFilename(id),
+    harness: {
+      ...source,
+      id,
+      name: `${baseName} Copy${index > 1 ? ` ${index}` : ''}`,
+      description: `${source.description || ''} (副本)`,
+    },
   };
 }
