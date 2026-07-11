@@ -22,6 +22,8 @@ test('returns disabled empty mount by default', async () => {
 			mountedServers: [],
 			toolAllowlist: {},
 			approvalMode: 'auto_readonly',
+			serverApprovalModes: {},
+			toolApprovalModes: {},
 		});
 	});
 });
@@ -36,6 +38,8 @@ test('saves and reloads normalized harness MCP mount', async () => {
 				mountedServers: ['Context 7'],
 				toolAllowlist: { 'Context 7': ['get-library-docs'] },
 				approvalMode: 'ask_all',
+				serverApprovalModes: { 'Context 7': 'ask_all' },
+				toolApprovalModes: { 'Context 7': { 'get-library-docs': 'auto_all' } },
 			},
 		});
 		assert.deepEqual(saved, {
@@ -43,6 +47,8 @@ test('saves and reloads normalized harness MCP mount', async () => {
 			mountedServers: ['context_7'],
 			toolAllowlist: { context_7: ['get-library-docs'] },
 			approvalMode: 'ask_all',
+			serverApprovalModes: { context_7: 'ask_all' },
+			toolApprovalModes: { context_7: { 'get-library-docs': 'auto_all' } },
 		});
 		assert.deepEqual(await loadMcpMount({ rootDir, harnessId: 'h1' }), saved);
 	});

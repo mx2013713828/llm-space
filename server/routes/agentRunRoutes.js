@@ -167,10 +167,10 @@ export function registerAgentRunRoutes(app, {
     try {
       const mcpMount = await loadMcpMount({ harnessId });
       const mcpTools = await mcpManager.getMountedToolDefinitions(mcpMount);
-      mountedResources = { tools: mcpTools };
+      mountedResources = { tools: mcpTools, mcpMount };
     } catch (err) {
       logger.warn?.('[agentRunRoutes] Failed to mount MCP tools:', err.message);
-      mountedResources = { tools: [] };
+      mountedResources = { tools: [], mcpMount: null };
     }
 
     prepareSseResponse(res);

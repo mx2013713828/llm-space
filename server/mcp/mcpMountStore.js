@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import { normalizeMcpName } from './mcpNames.js';
 
 const DEFAULT_ROOT_DIR = process.cwd();
+const APPROVAL_MODES = new Set(['auto_readonly', 'ask_all', 'auto_all']);
 
 function assertHarnessId(harnessId) {
 	const id = String(harnessId || '').trim();
@@ -27,13 +28,40 @@ export function normalizeMcpMount(mount = {}) {
 			toolAllowlist[normalizeMcpName(serverId)] = Array.isArray(tools) ? tools.map(String) : [];
 		}
 	}
+	const serverApprovalModes = {};
+	if (mount.serverApprovalModes && typeof mount.serverApprovalModes === 'object' && !Array.isArray(mount.serverApprovalModes)) {
+		for (const [serverId, mode] of Object.entries(mount.serverApprovalModes)) {
+			const normalizedServerId = normalizeMcpName(serverId);
+			if (normalizedServerId && APPROVAL_MODES.has(mode)) {
+				serverApprovalModes[normalizedServerId] = mode;
+			}
+		}
+	}
+	const toolApprovalModes = {};
+	if (mount.toolApprovalModes && typeof mount.toolApprovalModes === 'object' && !Array.isArray(mount.toolApprovalModes)) {
+		for (const [serverId, tools] of Object.entries(mount.toolApprovalModes)) {
+			const normalizedServerId = normalizeMcpName(serverId);
+			if (!normalizedServerId || !tools || typeof tools !== 'object' || Array.isArray(tools)) continue;
+			const normalizedTools = {};
+			for (const [toolName, mode] of Object.entries(tools)) {
+				if (String(toolName).trim() && APPROVAL_MODES.has(mode)) {
+					normalizedTools[String(toolName).trim()] = mode;
+				}
+			}
+			if (Object.keys(normalizedTools).length > 0) {
+				toolApprovalModes[normalizedServerId] = normalizedTools;
+			}
+		}
+	}
 	return {
 		enabled: mount.enabled === true,
 		mountedServers,
 		toolAllowlist,
-		approvalMode: ['auto_readonly', 'ask_all', 'auto_all'].includes(mount.approvalMode)
+		approvalMode: APPROVAL_MODES.has(mount.approvalMode)
 			? mount.approvalMode
 			: 'auto_readonly',
+		serverApprovalModes,
+		toolApprovalModes,
 	};
 }
 

@@ -254,11 +254,12 @@ export function registerHarnessRoutes(app, {
 
       const safeSkills = Array.isArray(skills) ? skills : [];
       const dryRunNotificationQueue = createRuntimeNotificationQueue();
-      let mountedResources = { tools: [] };
+      let mountedResources = { tools: [], mcpMount: null };
       try {
         const mcpMount = await loadMcpMount({ harnessId });
         mountedResources = {
           tools: await mcpManager.getMountedToolDefinitions(mcpMount),
+          mcpMount,
         };
       } catch (err) {
         console.warn('[harnessRoutes dry-run] Failed to mount MCP tools:', err.message);

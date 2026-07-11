@@ -1,4 +1,6 @@
 import path from 'path';
+import { parseMcpToolName } from '../../mcp/mcpNames.js';
+import { resolveMcpApprovalPolicy } from '../../mcp/mcpPolicy.js';
 
 // 硬拦截黑名单（直接拒绝，不弹窗）
 const DENY_LIST = [
@@ -162,8 +164,30 @@ export const SecurityPlugin = {
 
     // 2. 闸门二：敏感规则扫描，判断是否需要人工审批
     let matchedReason = null;
+    let mcpApproval = null;
+    const parsedMcpTool = parseMcpToolName(toolName);
 
-    if (securityMode === 'strict') {
+    if (parsedMcpTool) {
+      const toolDefinition = (executor.tools || []).find((entry) => {
+        const name = typeof entry === 'string' ? entry : entry?.name;
+        return name === toolName;
+      });
+      const policy = resolveMcpApprovalPolicy({
+        mount: executor.mcpMount,
+        toolDefinition: toolDefinition || {
+          mcp: parsedMcpTool,
+          annotations: {},
+        },
+      });
+      mcpApproval = {
+        ...parsedMcpTool,
+        policyMode: policy.mode,
+        policySource: policy.source,
+      };
+      if (policy.requiresApproval) {
+        matchedReason = `MCP approval policy (${policy.source}: ${policy.mode}) requires confirmation before calling ${parsedMcpTool.serverId}/${parsedMcpTool.toolName}.`;
+      }
+    } else if (securityMode === 'strict') {
       // 严格模式 (Level 2: Fail-Closed 白名单)
       if (toolName === 'bash') {
         const command = toolInput.command || '';
@@ -200,7 +224,8 @@ export const SecurityPlugin = {
       toolCallId: tool.id,
       toolName,
       toolInput,
-      reason: matchedReason
+      reason: matchedReason,
+      ...(mcpApproval ? { mcp: mcpApproval } : {}),
     };
     executor.pendingPermission = pendingRequestInfo;
 

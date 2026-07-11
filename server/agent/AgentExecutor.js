@@ -185,6 +185,7 @@ export class AgentExecutor {
       mountedResources,
     });
     this.tools = this.toolPool.tools;
+    this.mcpMount = mountedResources?.mcpMount || null;
 
     this.model = model;
     this.compactionThresholds = getCompactionTokenThresholds(model);

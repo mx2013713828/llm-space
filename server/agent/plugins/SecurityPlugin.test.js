@@ -78,3 +78,57 @@ test('bash cannot bypass sensitive file policy through node', async () => {
   assert.match(tool.toolOutput, /Sensitive file access/i);
   assert.equal(SecurityPlugin.pendingRequests.has(tool.id), false);
 });
+
+test('auto_readonly MCP policy lets explicitly read-only tools run without approval', async () => {
+  const tool = {
+    id: 'toolu_mcp_readonly',
+    toolName: 'mcp__context7__resolve_library_id',
+    toolInput: { libraryName: 'react' },
+  };
+  const executor = {
+    features: { security_mode: 'relaxed' },
+    mcpMount: { approvalMode: 'auto_readonly' },
+    tools: [{
+      name: tool.toolName,
+      mcp: { serverId: 'context7', toolName: 'resolve_library_id' },
+      annotations: { readOnlyHint: true },
+    }],
+    pendingPermission: null,
+    onEvent() {},
+  };
+
+  await SecurityPlugin.preToolUse({ executor, tool });
+
+  assert.equal(tool.handled, undefined);
+  assert.equal(SecurityPlugin.pendingRequests.has(tool.id), false);
+});
+
+test('auto_readonly MCP policy asks for approval when annotations are missing', async () => {
+  const tool = {
+    id: 'toolu_mcp_unknown_side_effect',
+    toolName: 'mcp__github__create_issue',
+    toolInput: { title: 'Example' },
+  };
+  const events = [];
+  const executor = {
+    features: { security_mode: 'relaxed' },
+    mcpMount: { approvalMode: 'auto_readonly' },
+    tools: [{
+      name: tool.toolName,
+      mcp: { serverId: 'github', toolName: 'create_issue' },
+      annotations: {},
+    }],
+    pendingPermission: null,
+    onEvent(type, payload) { events.push({ type, payload }); },
+  };
+
+  const pending = SecurityPlugin.preToolUse({ executor, tool });
+  await waitForPendingRequest(tool.id);
+  assert.equal(events[0].type, 'permission_request');
+  assert.equal(events[0].payload.mcp.policyMode, 'auto_readonly');
+  assert.equal(events[0].payload.mcp.policySource, 'harness');
+
+  SecurityPlugin.resolvePermission(tool.id, 'deny');
+  await pending;
+  assert.equal(tool.handled, true);
+});
