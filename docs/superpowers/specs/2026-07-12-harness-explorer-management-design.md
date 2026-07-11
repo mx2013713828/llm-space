@@ -1,5 +1,7 @@
 # Harness Explorer Management UX Design
 
+**Status:** Implemented on 2026-07-12. Automated verification is complete; final browser interaction acceptance remains with the user because localhost browser automation is blocked by the host policy.
+
 ## Goal
 
 Turn Harness Explorer into a focused local Harness manager with clear creation, metadata editing, duplication, deletion, and scan-friendly presentation while keeping full runtime configuration in Prompt Lab.
@@ -189,3 +191,11 @@ Supporting pure modules own dialog state and presentation rules. `App.jsx` remai
 6. Delete uses an application confirmation dialog, not native `confirm()`.
 7. Names, IDs, and descriptions remain readable without changing row dimensions.
 8. App routing and active Harness selection remain correct after every mutation.
+
+## Implementation Notes
+
+- `HarnessExplorer` is now a standalone component; `App.jsx` owns only data loading, mutations, and navigation.
+- Create, Edit, Duplicate, and Delete share the same controlled dialog system and preserve failed drafts.
+- The metadata endpoint preserves immutable IDs, physical filenames, and all runtime configuration.
+- The duplicate endpoint supports custom display metadata while keeping the original automatic-copy behavior.
+- The list supports overflow and right-click menus, Escape dismissal, long-text truncation, refresh errors, and a compact local-workspace footer.

@@ -83,8 +83,8 @@
 **Interfaces:**
 - App callbacks return `{ ok, error?, harness? }` so Explorer can preserve failed drafts.
 
-- [ ] Ensure create selects the new Harness, edit refreshes active Harness metadata, duplicate selects the copy, and delete selects the next post-delete Harness.
-- [ ] Run `node --test server/harnessIdentity.test.js server/routes/harnessRoutes.test.js src/lib/harnessExplorerState.test.js`.
-- [ ] Run `npm test`, `npm run build`, and `git diff --check`.
-- [ ] Manually verify long-name truncation, menu actions, all dialogs, and active deletion.
-- [ ] Mark the spec/plan implemented and commit as `docs: close harness explorer management ux`.
+- [x] Ensure create selects the new Harness, edit refreshes active Harness metadata, duplicate selects the copy, and delete selects the next post-delete Harness.
+- [x] Run `node --test server/harnessIdentity.test.js server/routes/harnessRoutes.test.js src/lib/harnessExplorerState.test.js`.
+- [x] Run `npm test`, `npm run build`, and `git diff --check`.
+- [ ] Manually verify long-name truncation, menu actions, all dialogs, and active deletion. *(User acceptance pending; host policy blocks localhost browser automation.)*
+- [x] Mark the spec/plan implemented and commit as `docs: close harness explorer management ux`.

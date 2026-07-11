@@ -166,6 +166,7 @@ export function HarnessExplorer({
 	const [state, setState] = useState(createHarnessExplorerState);
 	const [submitting, setSubmitting] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+	const [refreshError, setRefreshError] = useState('');
 	const menuHarness = harnesses.find((item) => item.id === state.menu?.harnessId);
 
 	const openDialog = (mode, harness) => setState((current) => openHarnessDialog(current, mode, harness));
@@ -190,9 +191,21 @@ export function HarnessExplorer({
 
 	const handleRefresh = async () => {
 		setRefreshing(true);
-		await onRefresh();
+		setRefreshError('');
+		const result = await onRefresh();
+		if (!result) setRefreshError('Could not refresh Harnesses. Showing the last loaded list.');
 		setRefreshing(false);
 	};
+
+	useEffect(() => {
+		if (!state.dialog && !state.menu) return undefined;
+		const handleKeyDown = (event) => {
+			if (event.key !== 'Escape' || submitting) return;
+			setState(closeHarnessDialog());
+		};
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [state.dialog, state.menu, submitting]);
 
 	const updateDraft = (field, value) => {
 		setState((current) => ({
@@ -250,6 +263,7 @@ export function HarnessExplorer({
 					</button>
 				</div>
 			</div>
+			{refreshError && <div className="harness-explorer-refresh-error" role="status">{refreshError}</div>}
 
 			<div className="sidebar-list harness-explorer-list">
 				{harnesses.map((harness) => (
@@ -263,7 +277,7 @@ export function HarnessExplorer({
 						<span className="harness-explorer-file-icon"><FileCode2 size={15} /></span>
 						<div className="sidebar-item-info">
 							<HarnessIdentity harness={harness} compact />
-							<div className="sidebar-item-desc">{harness.description || 'No description'}</div>
+							<div className="sidebar-item-desc" title={harness.description || 'No description'}>{harness.description || 'No description'}</div>
 						</div>
 						<button
 							type="button"
