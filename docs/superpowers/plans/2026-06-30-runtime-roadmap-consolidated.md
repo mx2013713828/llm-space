@@ -768,7 +768,7 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Goal:** Connect local MCP servers as an independent runtime capability before folding them into a unified resource registry.
 
-**Status:** Complete. Task 18 is the next MCP follow-up.
+**Status:** Complete. Task 18 has completed the runtime-observability follow-up.
 
 **Why:** MCP has its own lifecycle: server configuration, startup, initialization, tool discovery, schema translation, tool execution, approval, and tracing. It should prove itself as a working loop before being abstracted as a generic mounted resource.
 
@@ -814,6 +814,8 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Goal:** Make MCP runtime behavior visible and controllable without dumping raw server output into the main trajectory.
 
+**Status:** Complete. Task 19 is the next planned phase.
+
 **Why:** MCP servers can be powerful and risky. Users need clear status, tool schemas, call logs, approval prompts, and failure states.
 
 **Files:**
@@ -828,12 +830,12 @@ Stage 5 now treats prompt guidance, memory, knowledge, and future mounted resour
 
 **Steps:**
 
-- [ ] Add MCP server status and reconnect state tests.
-- [ ] Add bounded MCP call logs with lazy detail loading.
-- [ ] Reuse child-agent permission approval UI for MCP tool calls.
-- [ ] Show MCP errors as structured events with server ID, tool name, and safe message.
-- [ ] Add Context Inspector section for active MCP tool schemas.
-- [ ] Verify and commit with `feat: improve mcp observability`.
+- [x] Add MCP server status, disconnect, and reconnect state tests.
+- [x] Add bounded MCP call logs with lazy detail loading.
+- [x] Reuse the existing SecurityPlugin permission approval UI for MCP tool calls.
+- [x] Show MCP errors as structured states with safe diagnostics and authentication evidence.
+- [x] Add Context Inspector runtime metadata for active MCP mount policy alongside MCP tool schemas.
+- [x] Verify and commit with `feat: add mcp runtime observability controls`.
 
 ---
 

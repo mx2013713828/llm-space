@@ -1,6 +1,6 @@
 # MCP Observability And Permission UX Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Complete. Task 19, Runtime Resource Mount Registry, is the next planned phase.
 
 **Goal:** Make MCP lifecycle, authentication evidence, tool-call records, and harness-scoped approvals observable and controllable while preserving MCP as an independent runtime layer.
 
@@ -33,7 +33,7 @@
 - Produces: `resolveMcpValue(value, processEnv): { value: string, source: 'literal'|'environment'|'bearer'|'oauth', configured: boolean } | null`
 - Produces: editor rows `{ key, value, source }` for literal and environment-reference entries.
 
-- [ ] **Step 1: Write failing credential compatibility tests.**
+- [x] **Step 1: Write failing credential compatibility tests.**
 
 ```js
 assert.deepEqual(resolveMcpValue({ source: 'environment', name: 'TOKEN' }, { TOKEN: 'secret' }), {
@@ -43,19 +43,19 @@ assert.equal(resolveMcpValue({ source: 'environment', name: 'MISSING' }, {}), nu
 assert.equal(resolveMcpValue('legacy-literal', {})?.value, 'legacy-literal');
 ```
 
-- [ ] **Step 2: Run focused tests and verify they fail because object values are coerced to strings.**
+- [x] **Step 2: Run focused tests and verify they fail because object values are coerced to strings.**
 
 Run: `node --test server/mcp/mcpConfigStore.test.js server/mcp/mcpClient.test.js src/lib/mcpConfigPresentation.test.js`
 
-- [ ] **Step 3: Implement normalization and resolution.**
+- [x] **Step 3: Implement normalization and resolution.**
 
 Preserve legacy strings, validate only `literal`, `environment`, `bearer`, and `oauth` object sources, and omit an unresolved environment binding from a spawned STDIO environment or HTTP header. Bearer resolves to `Bearer <token>` only when it is bound to a header.
 
-- [ ] **Step 4: Extend the Studio key-value row model with a source selector.**
+- [x] **Step 4: Extend the Studio key-value row model with a source selector.**
 
 Direct value remains the default. Environment reference stores the variable name, not its resolved value. OAuth remains a disabled future source with explanatory copy.
 
-- [ ] **Step 5: Run focused tests and commit.**
+- [x] **Step 5: Run focused tests and commit.**
 
 Run: `node --test server/mcp/mcpConfigStore.test.js server/mcp/mcpClient.test.js src/lib/mcpConfigPresentation.test.js && npm run build`
 
@@ -77,7 +77,7 @@ Commit: `feat: add generic mcp credential sources`
 - Produces: `listCallSummaries(serverId, { limit })` and `getCallDetail(serverId, callId)`.
 - Produces: `disconnectServer(serverId)`.
 
-- [ ] **Step 1: Write failing lifecycle and log tests.**
+- [x] **Step 1: Write failing lifecycle and log tests.**
 
 ```js
 assert.equal((await manager.getServerStatus('echo')).status, 'stopped');
@@ -87,23 +87,23 @@ assert.equal((await manager.listCallSummaries('echo')).length, 1);
 assert.deepEqual((await manager.getCallDetail('echo', callId)).argumentKeys, ['text']);
 ```
 
-- [ ] **Step 2: Run tests and verify they fail because manager only reports connected/disconnected and has no log store.**
+- [x] **Step 2: Run tests and verify they fail because manager only reports connected/disconnected and has no log store.**
 
 Run: `node --test server/mcp/mcpManager.test.js server/mcp/mcpClient.test.js`
 
-- [ ] **Step 3: Implement `mcpRuntimeLog.js`.**
+- [x] **Step 3: Implement `mcpRuntimeLog.js`.**
 
 Keep at most 50 summaries per server and at most 2,000 characters per output preview. Store only argument key names. Detail lookup returns one bounded record or `null`.
 
-- [ ] **Step 4: Add client diagnostic capture and error classification.**
+- [x] **Step 4: Add client diagnostic capture and error classification.**
 
 Capture trailing STDIO stderr, redact configured literal environment values, and classify `spawn_failed`, `initialize_failed`, `timeout`, `process_exited`, `transport_error`, `authentication_failed`, and `tool_call_failed`.
 
-- [ ] **Step 5: Make McpManager own transitions and authentication evidence.**
+- [x] **Step 5: Make McpManager own transitions and authentication evidence.**
 
 Set `starting` before connect, `connected` only after tool discovery, `error` on failures, and `stopped` after disconnect or managed exit. Mark auth `verified` only after a successful tool call, and `invalid` after classified HTTP 401/403.
 
-- [ ] **Step 6: Run focused tests and commit.**
+- [x] **Step 6: Run focused tests and commit.**
 
 Run: `node --test server/mcp/mcpClient.test.js server/mcp/mcpManager.test.js server/mcp/mcpRuntimeLog.test.js`
 
@@ -127,7 +127,7 @@ Commit: `feat: add mcp runtime lifecycle and logs`
 - Consumes: `serverApprovalModes` and `toolApprovalModes` from the mount snapshot.
 - Produces: `mcpMount` on AgentExecutor for the current run.
 
-- [ ] **Step 1: Write failing policy inheritance tests.**
+- [x] **Step 1: Write failing policy inheritance tests.**
 
 ```js
 assert.deepEqual(resolveMcpApprovalPolicy({ mount, toolDefinition: readOnlyTool }), {
@@ -137,23 +137,23 @@ assert.equal(resolveMcpApprovalPolicy({ mount, toolDefinition: writeTool }).requ
 assert.equal(resolveMcpApprovalPolicy({ mount: toolOverrideMount, toolDefinition: writeTool }).source, 'tool');
 ```
 
-- [ ] **Step 2: Run tests and verify they fail because override maps are absent.**
+- [x] **Step 2: Run tests and verify they fail because override maps are absent.**
 
 Run: `node --test server/mcp/mcpMountStore.test.js server/mcp/mcpPolicy.test.js`
 
-- [ ] **Step 3: Normalize mount override maps and implement resolver.**
+- [x] **Step 3: Normalize mount override maps and implement resolver.**
 
 Only valid modes remain. Normalize server IDs and drop empty tool overrides. Missing `readOnlyHint` is treated as non-read-only.
 
-- [ ] **Step 4: Pass the exact mount snapshot into real and dry-run AgentExecutor construction.**
+- [x] **Step 4: Pass the exact mount snapshot into real and dry-run AgentExecutor construction.**
 
 `AgentExecutor` stores `this.mcpMount`; no provider identity is added to AgentExecutor logic.
 
-- [ ] **Step 5: Add the MCP branch to SecurityPlugin before generic suspicious-rule evaluation.**
+- [x] **Step 5: Add the MCP branch to SecurityPlugin before generic suspicious-rule evaluation.**
 
 For names parsed by `parseMcpToolName`, locate the dynamic tool definition from `executor.tools`, resolve policy, and create the existing `permission_request` when required. `auto_all` and annotated read-only defaults continue directly to ToolRegistry.
 
-- [ ] **Step 6: Run focused tests and commit.**
+- [x] **Step 6: Run focused tests and commit.**
 
 Run: `node --test server/mcp/mcpMountStore.test.js server/mcp/mcpPolicy.test.js server/agent/plugins/SecurityPlugin.test.js server/routes/agentRunRoutes.test.js`
 
@@ -177,7 +177,7 @@ Commit: `feat: enforce harness mcp approval policies`
 - Produces: `formatMcpStatus`, `formatMcpAuthStatus`, and `formatMcpCallSummary`.
 - Produces: Context Inspector policy summary without logs or credential values.
 
-- [ ] **Step 1: Write failing route and presentation tests.**
+- [x] **Step 1: Write failing route and presentation tests.**
 
 ```js
 assert.equal((await dispatchJson(app, 'GET', '/api/mcp/servers/echo/status')).body.status, 'stopped');
@@ -185,23 +185,23 @@ assert.equal((await dispatchJson(app, 'POST', '/api/mcp/servers/echo/disconnect'
 assert.equal(formatMcpAuthStatus({ status: 'verified' }).label, 'Verified');
 ```
 
-- [ ] **Step 2: Run tests and verify they fail because routes and presentation helpers are absent.**
+- [x] **Step 2: Run tests and verify they fail because routes and presentation helpers are absent.**
 
 Run: `node --test server/routes/mcpRoutes.test.js src/lib/mcpRuntimePresentation.test.js src/lib/contextInspectorModel.test.js`
 
-- [ ] **Step 3: Implement the four focused runtime endpoints and client helpers.**
+- [x] **Step 3: Implement the four focused runtime endpoints and client helpers.**
 
 Do not include runtime log details in `/api/mcp/servers`; fetch summaries only when the selected server is visible and a detail only when the user expands a record.
 
-- [ ] **Step 4: Update MCP Studio.**
+- [x] **Step 4: Update MCP Studio.**
 
 Show starting state immediately, status/diagnostic/auth facts, Connect/Reconnect/Disconnect controls, default/server/tool policy selectors, and lazy recent-call detail panel. Do not render raw credentials, raw arguments, or full outputs in status cards.
 
-- [ ] **Step 5: Add Context Inspector policy summary.**
+- [x] **Step 5: Add Context Inspector policy summary.**
 
 Show active mounted server policy sources and effective defaults, not MCP runtime call records.
 
-- [ ] **Step 6: Build, visually inspect MCP Studio, and commit.**
+- [x] **Step 6: Build, visually inspect MCP Studio, and commit.**
 
 Run: `node --test server/routes/mcpRoutes.test.js src/lib/mcpRuntimePresentation.test.js src/lib/contextInspectorModel.test.js && npm run build`
 
@@ -219,11 +219,11 @@ Commit: `feat: add mcp runtime observability controls`
 - Modify: `docs/superpowers/plans/2026-06-30-runtime-roadmap-consolidated.md`
 - Modify: `docs/superpowers/specs/2026-07-11-mcp-observability-permission-design.md`
 
-- [ ] **Step 1: Document lifecycle, credential sources, authentication evidence, policy inheritance, and privacy limits for call logs.**
+- [x] **Step 1: Document lifecycle, credential sources, authentication evidence, policy inheritance, and privacy limits for call logs.**
 
-- [ ] **Step 2: Mark Task 18 complete and set Task 19 Runtime Resource Mount Registry as the next planned phase.**
+- [x] **Step 2: Mark Task 18 complete and set Task 19 Runtime Resource Mount Registry as the next planned phase.**
 
-- [ ] **Step 3: Run full verification and commit.**
+- [x] **Step 3: Run full verification and commit.**
 
 Run: `npm test && npm run build && git diff --check`
 

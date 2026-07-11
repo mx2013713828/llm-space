@@ -9,9 +9,13 @@ LLM Space supports MCP as an external tool provider layer. MCP servers are confi
 - Context7 preset: `npx -y @upstash/context7-mcp`.
 - Generic local Environment and HTTP Headers configuration. Values may be API keys, tokens, cookies, or provider-specific fields.
 - Harness-level mounting with per-server tool allowlists.
+- Lifecycle controls: starting, connected, error, and stopped.
+- Authentication evidence: anonymous, credential configured, verified after a successful call, or invalid after a 401/403 failure.
+- Harness, server, and tool-level MCP approval policies.
+- Bounded, redacted recent-call summaries with on-demand detail loading.
 - Tool names exposed to the model as `mcp__<serverId>__<toolName>`.
 
-OAuth UI is intentionally not part of the first MVP. Authentication is configured through transport-neutral Environment and HTTP Header fields.
+OAuth UI is intentionally not part of the current MVP. The config model reserves an OAuth source for a future transport adapter, but it does not launch a browser flow or store refresh tokens today.
 
 ## Open MCP Studio
 
@@ -30,6 +34,33 @@ OAuth UI is intentionally not part of the first MVP. Authentication is configure
 3. Select the **MCP** tab.
 
 The page shows configured servers, connection status, discovered tools, and the current harness mount.
+
+## Runtime State And Safe Diagnostics
+
+Clicking **Connect** immediately shows `Starting`, then changes to `Connected` only after initialization and tool discovery succeed. A failure becomes `Error` with a structured category such as `timeout`, `initialize_failed`, `authentication_failed`, or `process_exited`.
+
+The Studio only shows a bounded diagnostic tail. Configured literal credentials are redacted before the diagnostic reaches the UI. Authentication state is evidence, not a credential viewer:
+
+- **Anonymous**: no credential binding is configured.
+- **Credential configured**: a direct value or environment reference exists.
+- **Verified**: a tool call succeeded for this server process.
+- **Invalid credential**: the runtime observed an HTTP 401 or 403.
+
+Use **Disconnect** to terminate a managed STDIO process or clear the active HTTP client state. Recent calls retain only the tool name, argument key names, duration, success/error state, and a bounded output preview. Full request arguments, headers, and credentials are never added to the runtime log.
+
+## Approval Policies
+
+Each harness mount has a default policy, optionally overridden by server and then individual tool:
+
+```text
+tool override > server override > harness default
+```
+
+- **Auto read-only** (default): only tools annotated with `readOnlyHint: true` run directly. Missing annotations fail closed and open the existing approval dialog.
+- **Ask every call**: every MCP call uses the existing approval dialog.
+- **Auto allow**: bypasses MCP-specific approval for that scope.
+
+This policy is scoped to the harness, not the server definition. The same server can therefore be permissive in a disposable experiment and approval-gated in a coding harness. Global hard security blocks still take priority.
 
 ## Test A Local MCP Server
 
@@ -147,3 +178,5 @@ If a tool does not appear in the model payload, check:
 2. Server is mounted into the current harness.
 3. At least one tool is checked in the allowlist.
 4. Context Inspector shows the MCP tool schema.
+
+Context Inspector also exposes a **MCP Mount Policy** runtime-metadata section. It is an observability-only summary and is not inserted into the model prompt.

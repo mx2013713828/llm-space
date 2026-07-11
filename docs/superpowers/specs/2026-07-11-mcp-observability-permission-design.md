@@ -1,5 +1,7 @@
 # MCP Observability And Permission UX Design
 
+> **Implementation status:** Complete on `codex/mcp-runtime-mounting`. Task 19, Runtime Resource Mount Registry, is next.
+
 **Status:** Proposed for revised review
 
 ## Goal

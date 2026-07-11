@@ -154,4 +154,5 @@ LLM-Space 是实验平台，不应把商业 Agent 的“智能执行模式”完
 - Knowledge Runtime Strategies 已完成：支持 Auto RAG、Agentic RAG、Manual Lab；Mounted Knowledge Manifest 与 Retrieved Knowledge 已拆分，Agentic RAG 暴露 `list_mounted_knowledge_bases` / `query_knowledge_base` 工具，Context Inspector 可分层查看实际发送给模型的知识上下文。
 - Task 16（RAG Retrieval Quality Extensions）已完成到真实向量化闭环：支持 Markdown/text/JSON/CSV/PDF/DOCX loader、智谱 `embedding-3` / OpenAI-compatible embedding provider、Local JSON / Qdrant 向量存储、keyword/vector/hybrid 检索、Retrieval Records 与 Context Inspector 知识上下文分层。
 - Task 17（Standalone MCP Client MVP）已完成：支持 STDIO / Streamable HTTP、自编 Echo server、Context7、Harness 级工具挂载、动态工具 schema、通用本地 Environment / HTTP Headers 配置，以及旧 bearer-env 配置读取兼容。
-- 下一阶段优先处理 Task 18：MCP 运行状态、连接诊断、调用日志与权限审批体验。
+- Task 18（MCP Observability And Permission UX）已完成：MCP runtime 具备 starting / connected / error / stopped 生命周期、脱敏结构化诊断、认证证据、断开/重连、惰性调用详情，以及复用 SecurityPlugin 的 harness/server/tool 三层审批策略。
+- 下一阶段是 Task 19：在 RAG 与 MCP 已分别形成可观测闭环后，抽取 Runtime Resource Mount Registry。
