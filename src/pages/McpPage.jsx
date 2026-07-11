@@ -16,6 +16,13 @@ import {
 } from '../lib/mcpServers.js';
 import { editorRowsToMap, mapToEditorRows } from '../lib/mcpConfigPresentation.js';
 import { formatMcpAuthStatus, formatMcpCallSummary, formatMcpStatus } from '../lib/mcpRuntimePresentation.js';
+import {
+	closeMcpEditor,
+	createMcpEditorState,
+	isMcpEditorOpen,
+	openMcpCreate,
+	openMcpEdit,
+} from '../lib/mcpEditorState.js';
 
 const EMPTY_FORM = {
 	id: '',
@@ -149,7 +156,7 @@ export function McpPage({ harness }) {
 	const [mount, setMount] = useState({ enabled: false, mountedServers: [], toolAllowlist: {} });
 	const [mountedDefinitions, setMountedDefinitions] = useState([]);
 	const [form, setForm] = useState(EMPTY_FORM);
-	const [showForm, setShowForm] = useState(false);
+	const [editorState, setEditorState] = useState(createMcpEditorState);
 	const [busy, setBusy] = useState('');
 	const [notice, setNotice] = useState('');
 	const [error, setError] = useState('');
@@ -168,6 +175,7 @@ export function McpPage({ harness }) {
 	const selectedAllowlist = selectedServer ? new Set(mount.toolAllowlist?.[selectedServer.id] || []) : new Set();
 	const lifecycle = formatMcpStatus(selectedStatus);
 	const auth = formatMcpAuthStatus(selectedStatus?.auth);
+	const editorOpen = isMcpEditorOpen(editorState);
 
 	const loadAll = useCallback(async () => {
 		setError('');
@@ -220,6 +228,7 @@ export function McpPage({ harness }) {
 			const saved = await saveMcpServer(preset);
 			setNotice(`Added ${saved.name}. Connect it to discover tools.`);
 			setSelectedId(saved.id);
+			setEditorState(createMcpEditorState());
 			await loadAll();
 		} catch (err) {
 			setError(err.message);
@@ -236,7 +245,7 @@ export function McpPage({ harness }) {
 			const saved = await saveMcpServer(formToServer(form));
 			setNotice(`Saved ${saved.name}.`);
 			setSelectedId(saved.id);
-			setShowForm(false);
+			setEditorState(createMcpEditorState());
 			setForm(EMPTY_FORM);
 			await loadAll();
 		} catch (err) {
@@ -244,6 +253,27 @@ export function McpPage({ harness }) {
 		} finally {
 			setBusy('');
 		}
+	};
+
+	const openCreateEditor = () => {
+		setForm(EMPTY_FORM);
+		setEditorState(state => openMcpCreate(state, selectedServer?.id));
+	};
+
+	const openEditEditor = () => {
+		if (!selectedServer) return;
+		setForm(serverToForm(selectedServer));
+		setEditorState(state => openMcpEdit(state, selectedServer.id));
+	};
+
+	const closeEditor = () => {
+		if (editorState.returnServerId) setSelectedId(editorState.returnServerId);
+		setEditorState(state => closeMcpEditor(state));
+	};
+
+	const selectServer = (serverId) => {
+		setSelectedId(serverId);
+		setEditorState(createMcpEditorState());
 	};
 
 	const handleConnect = async (serverId) => {
@@ -409,7 +439,7 @@ export function McpPage({ harness }) {
 				<aside className="mcp-sidebar">
 					<div className="mcp-panel-title">
 						<span>Configured servers</span>
-						<button className="btn btn-ghost" onClick={() => setShowForm(value => !value)}>Add</button>
+						<button className="btn btn-ghost" onClick={openCreateEditor}>Add</button>
 					</div>
 					<div className="mcp-server-list">
 						{servers.map(server => (
@@ -419,7 +449,7 @@ export function McpPage({ harness }) {
 								status={statuses[server.id]}
 								selected={selectedServer?.id === server.id}
 								mounted={mountedServers.has(server.id)}
-								onClick={() => setSelectedId(server.id)}
+								onClick={() => selectServer(server.id)}
 							/>
 						))}
 						{servers.length === 0 && <div className="mcp-empty">No MCP servers configured yet.</div>}
@@ -445,11 +475,11 @@ export function McpPage({ harness }) {
 				</aside>
 
 				<main className="mcp-detail">
-					{showForm && (
+					{editorOpen ? (
 						<form className="mcp-form" onSubmit={handleSaveForm}>
 							<div className="mcp-panel-title">
 								<span>{form.id ? 'Edit MCP server' : 'New MCP server'}</span>
-								<button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Close</button>
+								<button type="button" className="btn btn-ghost" onClick={closeEditor}>Cancel</button>
 							</div>
 							<div className="mcp-form-grid">
 								<label>Name<input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></label>
@@ -491,9 +521,7 @@ export function McpPage({ harness }) {
 							</div>
 							<button className="btn btn-primary" disabled={busy === 'save'}>Save server</button>
 						</form>
-					)}
-
-					{selectedServer ? (
+					) : selectedServer ? (
 						<div className="mcp-server-detail">
 							<div className="mcp-detail-head">
 								<div>
@@ -502,7 +530,7 @@ export function McpPage({ harness }) {
 									<p>{selectedServer.description || selectedServer.id}</p>
 								</div>
 								<div className="mcp-actions">
-									<button className="btn btn-ghost" onClick={() => { setForm(serverToForm(selectedServer)); setShowForm(true); }}>Edit</button>
+									<button className="btn btn-ghost" onClick={openEditEditor}>Edit</button>
 									{selectedStatus?.status === 'connected' ? (
 										<button className="btn btn-ghost" disabled={busy === `disconnect:${selectedServer.id}`} onClick={() => handleDisconnect(selectedServer.id)}>
 											<Link2Off size={14} aria-hidden="true" /> Disconnect
