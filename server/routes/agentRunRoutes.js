@@ -120,7 +120,7 @@ export function registerAgentRunRoutes(app, {
   buildRuntimeRequest = defaultBuildRuntimeRequest,
   resolveRunTeamContext = defaultResolveRunTeamContext,
   resolveSelectedStrategyId = defaultResolveSelectedStrategyId,
-  resolvePermission = SecurityPlugin.resolvePermission,
+  resolvePermission = (toolCallId, decision) => SecurityPlugin.resolvePermission(toolCallId, decision),
   mcpManager = defaultMcpManager,
   loadMcpMount = defaultLoadMcpMount,
   logger = console,

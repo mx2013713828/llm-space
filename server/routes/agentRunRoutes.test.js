@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createActiveJobRegistry } from '../agent/activeJobs.js';
+import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
 import { registerAgentRunRoutes } from './agentRunRoutes.js';
-import { createRouteApp, findRouteHandler } from './routeTestUtils.js';
+import { createRouteApp, dispatchJson, findRouteHandler } from './routeTestUtils.js';
 
 function deferred() {
   let resolve;
@@ -127,4 +128,29 @@ test('agent run route reserves active job before awaiting async startup work', a
   assert.equal(executorCount, 1);
   assert.deepEqual(parseSseTypes(firstRes), ['background_tasks_update', 'done']);
   assert.deepEqual(parseSseTypes(secondRes), ['done']);
+});
+
+test('permission route keeps the SecurityPlugin receiver when using default dependencies', async (t) => {
+  const app = createRouteApp();
+  registerAgentRunRoutes(app, { activeJobs: createActiveJobRegistry() });
+
+  let decision = '';
+  const timeoutId = setTimeout(() => {}, 60_000);
+  SecurityPlugin.pendingRequests.set('toolu_route_permission', {
+    executor: {},
+    timeoutId,
+    resolve(value) { decision = value; },
+  });
+  t.after(() => {
+    clearTimeout(timeoutId);
+    SecurityPlugin.pendingRequests.delete('toolu_route_permission');
+  });
+
+  const result = await dispatchJson(app, 'POST', '/api/agent/permission', {
+    body: { toolCallId: 'toolu_route_permission', decision: 'allow' },
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, { success: true });
+  assert.equal(decision, 'allow');
 });
