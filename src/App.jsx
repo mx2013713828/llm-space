@@ -6,6 +6,7 @@ import { TrajectoryPage } from './pages/TrajectoryPage';
 import { PromptLabPage } from './pages/PromptLabPage';
 import { KnowledgePage } from './pages/KnowledgePage';
 import { McpPage } from './pages/McpPage';
+import { HarnessIdentity } from './components/HarnessIdentity';
 import { apiFetch } from './lib/apiClient';
 
 /* ===== 导航配置 ===== */
@@ -328,7 +329,7 @@ function AppContent() {
               >
                 <span className="sidebar-item-icon">📄</span>
                 <div className="sidebar-item-info">
-                  <div className="sidebar-item-name">{file.name}</div>
+                  <HarnessIdentity harness={file} compact />
                   <div className="sidebar-item-desc">{file.description}</div>
                 </div>
                 <button

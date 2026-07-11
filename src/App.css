@@ -190,7 +190,8 @@
 }
 .sidebar-item-icon { font-size: 14px; flex-shrink: 0; }
 .sidebar-item-info { flex: 1; min-width: 0; }
-.sidebar-item-name {
+.sidebar-item-name,
+.harness-identity-name {
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
@@ -198,7 +199,35 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar-item.active .sidebar-item-name { color: var(--blue); }
+.sidebar-item.active .sidebar-item-name,
+.sidebar-item.active .harness-identity-name { color: var(--blue); }
+.harness-identity { min-width: 0; }
+.harness-identity-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.harness-identity-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.harness-identity-id {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-top: 3px;
+}
+.harness-identity.compact .harness-identity-name { font-size: 12px; }
 .sidebar-item-desc {
   font-size: 11px;
   color: var(--text-muted);
