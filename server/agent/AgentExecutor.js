@@ -3,6 +3,7 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { spawn } from 'child_process';
 import { toolRegistry } from '../tools/ToolRegistry.js';
+import { getToolSchemasForTools } from '../tools/index.js';
 import {
   buildBashEnvironment,
   buildBashSpawnInvocation,
@@ -763,9 +764,8 @@ export class AgentExecutor {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const modelProfile = normalizeModelProfile(this.model);
 
-      // 提取目前启用的工具清单并生成后端统一定义的 Schema
-      const enabledToolNames = tools.map(t => typeof t === 'string' ? t : t.name);
-      const toolSchemas = toolRegistry.getSchemas(enabledToolNames) || [];
+      // Keep runtime calls and Context Inspector on the same schema assembly path.
+      const toolSchemas = getToolSchemasForTools(tools, toolRegistry);
 
       const request = buildModelGatewayRequest({
         modelProfile,

@@ -1,6 +1,5 @@
 export function encodeJsonRpcMessage(message) {
-	const body = JSON.stringify(message);
-	return `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`;
+	return `${JSON.stringify(message)}\n`;
 }
 
 export class JsonRpcMessageParser {

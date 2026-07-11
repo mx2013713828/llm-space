@@ -16,6 +16,50 @@ function sseResponse(events) {
   return { ok: true, body };
 }
 
+test('sends mounted MCP tool schemas to the model gateway', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  let requestBody;
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return sseResponse([
+      { type: 'message_start', message: { model: 'deepseek-v4', usage: { input_tokens: 10 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Ready.' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+    ]);
+  };
+
+  const mcpTool = {
+    name: 'mcp__echo__echo',
+    description: '[MCP: Echo] Echo text',
+    parameters: {
+      text: { type: 'string', description: 'Text to echo', required: true },
+    },
+  };
+  const executor = new AgentExecutor({
+    model: { id: 'deepseek', modelId: 'deepseek-v4', key: 'test', url: 'https://api.deepseek.com/anthropic' },
+    tools: [],
+    mountedResources: { tools: [mcpTool] },
+  });
+
+  await executor._callLLM({
+    apiMessages: [{ role: 'user', content: 'echo hello' }],
+    turnIndex: 1,
+    systemPrompt: '',
+    tools: executor.tools,
+  }, { continuation_tokens: [] });
+
+  const schema = requestBody.tools.find(tool => tool.name === 'mcp__echo__echo');
+  assert.ok(schema, 'mounted MCP tool schema should be sent to the model');
+  assert.deepEqual(schema.input_schema.required, ['text']);
+  assert.equal(schema.input_schema.properties.text.description, 'Text to echo');
+});
+
 test('stores a text block separately after a thinking block', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

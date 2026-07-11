@@ -1,36 +1,7 @@
 #!/usr/bin/env node
 
 import { stdin, stdout } from 'node:process';
-
-function encode(message) {
-	const body = JSON.stringify(message);
-	return `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`;
-}
-
-class Parser {
-	constructor() {
-		this.buffer = Buffer.alloc(0);
-	}
-
-	push(chunk) {
-		this.buffer = Buffer.concat([this.buffer, chunk]);
-		const messages = [];
-		while (true) {
-			const headerEnd = this.buffer.indexOf('\r\n\r\n');
-			if (headerEnd < 0) break;
-			const header = this.buffer.slice(0, headerEnd).toString('utf8');
-			const match = /content-length:\s*(\d+)/i.exec(header);
-			if (!match) break;
-			const length = Number(match[1]);
-			const bodyStart = headerEnd + 4;
-			const bodyEnd = bodyStart + length;
-			if (this.buffer.length < bodyEnd) break;
-			messages.push(JSON.parse(this.buffer.slice(bodyStart, bodyEnd).toString('utf8')));
-			this.buffer = this.buffer.slice(bodyEnd);
-		}
-		return messages;
-	}
-}
+import { encodeJsonRpcMessage, JsonRpcMessageParser } from '../../server/mcp/mcpJsonRpc.js';
 
 const tools = [{
 	name: 'echo',
@@ -46,7 +17,7 @@ const tools = [{
 }];
 
 function send(message) {
-	stdout.write(encode(message));
+	stdout.write(encodeJsonRpcMessage(message));
 }
 
 async function handle(message) {
@@ -89,7 +60,7 @@ async function handle(message) {
 	}
 }
 
-const parser = new Parser();
+const parser = new JsonRpcMessageParser();
 stdin.on('data', (chunk) => {
 	for (const message of parser.push(chunk)) {
 		handle(message).catch((err) => {

@@ -6,8 +6,10 @@ import {
 	JsonRpcMessageParser,
 } from './mcpJsonRpc.js';
 
-test('encodes and parses Content-Length framed JSON-RPC messages', () => {
+test('encodes stdio JSON-RPC as one newline-delimited message', () => {
 	const encoded = encodeJsonRpcMessage({ jsonrpc: '2.0', id: 1, result: { ok: true } });
+	assert.equal(encoded, '{"jsonrpc":"2.0","id":1,"result":{"ok":true}}\n');
+
 	const parser = new JsonRpcMessageParser();
 	const chunks = [
 		encoded.slice(0, 8),
@@ -18,7 +20,14 @@ test('encodes and parses Content-Length framed JSON-RPC messages', () => {
 	assert.deepEqual(messages, [{ jsonrpc: '2.0', id: 1, result: { ok: true } }]);
 });
 
-test('parses newline-delimited JSON-RPC as a fallback', () => {
+test('parses legacy Content-Length framed JSON-RPC responses', () => {
+	const body = '{"jsonrpc":"2.0","id":1,"result":"ok"}';
+	const parser = new JsonRpcMessageParser();
+	const messages = parser.push(Buffer.from(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`));
+	assert.deepEqual(messages, [{ jsonrpc: '2.0', id: 1, result: 'ok' }]);
+});
+
+test('parses newline-delimited JSON-RPC responses', () => {
 	const parser = new JsonRpcMessageParser();
 	const messages = parser.push(Buffer.from('{"jsonrpc":"2.0","id":1,"result":"ok"}\n'));
 	assert.deepEqual(messages, [{ jsonrpc: '2.0', id: 1, result: 'ok' }]);
