@@ -46,3 +46,17 @@ test('adds the current-time tool exactly once to every executor', () => {
   assert.equal(withoutExplicitTool.tools.filter(name => name === 'get_current_time').length, 1);
   assert.equal(withExplicitTool.tools.filter(name => name === 'get_current_time').length, 1);
 });
+
+test('exposes the MCP mount policy as observable runtime metadata only', () => {
+  const executor = createExecutor({
+    mountedResources: {
+      tools: [],
+      mcpMount: { enabled: true, mountedServers: ['echo'], approvalMode: 'auto_readonly' },
+    },
+  });
+
+  const section = executor.promptAssemblySections.find(item => item.id === 'mcp_mount_policy');
+  assert.equal(section.sentToModel, false);
+  assert.equal(section.observable, true);
+  assert.match(section.content, /echo/);
+});

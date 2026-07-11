@@ -2,6 +2,25 @@ import { spawn } from 'child_process';
 
 import { encodeJsonRpcMessage, JsonRpcMessageParser } from './mcpJsonRpc.js';
 
+const MAX_DIAGNOSTIC_LENGTH = 2000;
+
+export function classifyMcpError(error) {
+	const message = String(error?.message || error || 'Unknown MCP error');
+	let code = 'transport_error';
+	if (/\b(401|403)\b|unauthori[sz]ed|invalid (api )?key|authentication/i.test(message)) code = 'authentication_failed';
+	else if (/timed out|timeout/i.test(message)) code = 'timeout';
+	else if (/server exited|process exited|\bexit\b/i.test(message)) code = 'process_exited';
+	else if (/spawn|enoent|eacces/i.test(message)) code = 'spawn_failed';
+	else if (/initialize/i.test(message)) code = 'initialize_failed';
+	else if (/tools\/call|tool call|tools\/list/i.test(message)) code = 'tool_call_failed';
+	return { code, message };
+}
+
+function appendDiagnostic(current, chunk) {
+	const next = `${current || ''}${String(chunk || '')}`;
+	return next.length <= MAX_DIAGNOSTIC_LENGTH ? next : next.slice(-MAX_DIAGNOSTIC_LENGTH);
+}
+
 function hasHeader(headers, targetName) {
 	const normalizedTarget = String(targetName).toLowerCase();
 	return Object.keys(headers).some(name => name.toLowerCase() === normalizedTarget);
@@ -68,6 +87,7 @@ export class McpClient {
 		this.initialized = false;
 		this.serverInfo = null;
 		this.instructions = '';
+		this.diagnostic = '';
 	}
 
 	async connect() {
@@ -92,7 +112,9 @@ export class McpClient {
 			}
 		});
 
-		this.process.stderr.on('data', () => {});
+		this.process.stderr.on('data', chunk => {
+			this.diagnostic = appendDiagnostic(this.diagnostic, chunk);
+		});
 		this.process.on('exit', () => {
 			for (const { reject } of this.pending.values()) {
 				reject(new Error(`MCP server exited: ${this.server.id}`));

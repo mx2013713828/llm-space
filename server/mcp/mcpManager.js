@@ -1,5 +1,5 @@
 import { listMcpServers } from './mcpConfigStore.js';
-import { McpClient } from './mcpClient.js';
+import { McpClient, classifyMcpError, resolveMcpValue } from './mcpClient.js';
 import { normalizeMcpName, parseMcpToolName } from './mcpNames.js';
 import { adaptMcpTools } from './mcpToolAdapter.js';
 import { McpRuntimeLog } from './mcpRuntimeLog.js';
@@ -15,6 +15,31 @@ function formatMcpToolResult(result) {
 		return JSON.stringify(result.structuredContent, null, 2);
 	}
 	return JSON.stringify(result ?? {}, null, 2);
+}
+
+function configuredValues(server = {}) {
+	const values = [];
+	for (const entry of Object.values(server.env || {})) {
+		const resolved = resolveMcpValue(entry);
+		if (resolved?.value) values.push(resolved.value.replace(/^Bearer\s+/i, ''));
+	}
+	for (const entry of Object.values(server.headers || {})) {
+		const resolved = resolveMcpValue(entry);
+		if (resolved?.value) values.push(resolved.value.replace(/^Bearer\s+/i, ''));
+	}
+	return values.filter(Boolean);
+}
+
+function redactDiagnostic(value, server) {
+	let text = String(value || '').slice(-2000);
+	for (const secret of configuredValues(server)) {
+		if (secret.length > 2) text = text.split(secret).join('[redacted]');
+	}
+	return text;
+}
+
+function initialAuthStatus(server = {}) {
+	return configuredValues(server).length > 0 ? 'configured' : 'anonymous';
 }
 
 export class McpManager {
@@ -43,7 +68,15 @@ export class McpManager {
 	async connectServer(serverId) {
 		const server = await this.getServer(serverId);
 		if (!server) throw new Error(`Unknown MCP server: ${serverId}`);
-		this.status.set(server.id, { ...(await this.getServerStatus(server.id)), server, status: 'starting', lastError: '', diagnostic: '' });
+		this.status.set(server.id, {
+			...(await this.getServerStatus(server.id)),
+			server,
+			status: 'starting',
+			error: null,
+			lastError: '',
+			diagnostic: '',
+			auth: { status: initialAuthStatus(server) },
+		});
 		let client = this.clients.get(server.id);
 		if (!client) {
 			client = new this.ClientClass({ server, fetchImpl: this.fetchImpl });
@@ -55,14 +88,20 @@ export class McpManager {
 			this.toolCache.set(server.id, tools);
 			const nextStatus = {
 				...status, server, status: 'connected', connectedAt: new Date().toISOString(),
-				tools, toolDefinitions: adaptMcpTools({ server, tools }), lastError: '', diagnostic: '',
+				tools, toolDefinitions: adaptMcpTools({ server, tools }), error: null, lastError: '',
+				diagnostic: redactDiagnostic(client.diagnostic, server),
+				auth: { status: initialAuthStatus(server) },
 			};
 			this.status.set(server.id, nextStatus);
 			return nextStatus;
 		} catch (err) {
+			const error = classifyMcpError(err);
 			this.status.set(server.id, {
 				...(await this.getServerStatus(server.id)), server, status: 'error',
-				lastError: String(err.message || err), diagnostic: '',
+				error,
+				lastError: error.message,
+				diagnostic: redactDiagnostic(client?.diagnostic, server),
+				auth: { status: error.code === 'authentication_failed' ? 'invalid' : initialAuthStatus(server) },
 			});
 			throw err;
 		}
@@ -83,6 +122,9 @@ export class McpManager {
 			tools: [],
 			toolDefinitions: [],
 			lastError: '',
+			diagnostic: '',
+			error: null,
+			auth: { status: server ? initialAuthStatus(server) : 'unknown' },
 		};
 	}
 
@@ -115,9 +157,20 @@ export class McpManager {
 			const result = await this.clients.get(status.server.id).callTool(parsed.toolName, input);
 			const output = formatMcpToolResult(result);
 			this.runtimeLog.record({ serverId: parsed.serverId, toolName: parsed.toolName, argumentKeys: Object.keys(input || {}), output, durationMs: Date.now() - startedAt });
+			const current = await this.getServerStatus(parsed.serverId);
+			this.status.set(parsed.serverId, { ...current, auth: { status: 'verified' } });
 			return output;
 		} catch (err) {
 			this.runtimeLog.record({ serverId: parsed.serverId, toolName: parsed.toolName, argumentKeys: Object.keys(input || {}), error: String(err.message || err), durationMs: Date.now() - startedAt });
+			const current = await this.getServerStatus(parsed.serverId);
+			const error = classifyMcpError(err);
+			this.status.set(parsed.serverId, {
+				...current,
+				status: 'error',
+				error,
+				lastError: error.message,
+				auth: { status: error.code === 'authentication_failed' ? 'invalid' : current.auth?.status || 'unknown' },
+			});
 			throw err;
 		}
 	}
@@ -131,7 +184,7 @@ export class McpManager {
 		if (client) await client.disconnect();
 		this.clients.delete(id);
 		const previous = await this.getServerStatus(id);
-		const next = { ...previous, status: 'stopped', connectedAt: null, lastError: '', diagnostic: '' };
+		const next = { ...previous, status: 'stopped', connectedAt: null, error: null, lastError: '', diagnostic: '' };
 		this.status.set(id, next);
 		return next;
 	}

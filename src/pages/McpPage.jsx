@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, CircleAlert, Link2Off, LoaderCircle, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import {
 	connectMcpServer,
 	deleteMcpServer,
+	disconnectMcpServer,
+	fetchMcpCallDetail,
+	fetchMcpCallSummaries,
 	fetchHarnessMcpMount,
 	fetchMcpPresets,
 	fetchMcpServers,
@@ -12,6 +15,7 @@ import {
 	testMcpTool,
 } from '../lib/mcpServers.js';
 import { editorRowsToMap, mapToEditorRows } from '../lib/mcpConfigPresentation.js';
+import { formatMcpAuthStatus, formatMcpCallSummary, formatMcpStatus } from '../lib/mcpRuntimePresentation.js';
 
 const EMPTY_FORM = {
 	id: '',
@@ -26,12 +30,6 @@ const EMPTY_FORM = {
 	headerRows: [],
 	legacyAuthEnv: '',
 };
-
-function statusLabel(status) {
-	if (status === 'connected') return 'Connected';
-	if (status === 'connecting') return 'Connecting';
-	return 'Disconnected';
-}
 
 function transportLabel(value) {
 	return value === 'streamable_http' ? 'Streamable HTTP' : 'STDIO';
@@ -125,17 +123,18 @@ function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description, 
 }
 
 function ServerCard({ server, status, selected, mounted, onClick }) {
+	const lifecycle = formatMcpStatus(status);
 	return (
 		<button className={`mcp-server-card ${selected ? 'selected' : ''}`} onClick={onClick}>
 			<div className="mcp-server-card-main">
-				<span className={`mcp-status-dot ${status?.status === 'connected' ? 'online' : ''}`} />
+				<span className={`mcp-status-dot ${lifecycle.tone}`} />
 				<div>
 					<div className="mcp-server-name">{server.name}</div>
 					<div className="mcp-server-subtitle">{server.id} · {transportLabel(server.transport)}</div>
 				</div>
 			</div>
 			<div className="mcp-server-card-meta">
-				<span className={`mcp-pill ${status?.status === 'connected' ? 'green' : ''}`}>{statusLabel(status?.status)}</span>
+				<span className={`mcp-pill ${lifecycle.tone}`}>{lifecycle.label}</span>
 				{mounted && <span className="mcp-pill blue">Mounted</span>}
 			</div>
 		</button>
@@ -155,6 +154,9 @@ export function McpPage({ harness }) {
 	const [notice, setNotice] = useState('');
 	const [error, setError] = useState('');
 	const [testOutput, setTestOutput] = useState('');
+	const [callSummaries, setCallSummaries] = useState([]);
+	const [expandedCallId, setExpandedCallId] = useState('');
+	const [callDetail, setCallDetail] = useState(null);
 
 	const selectedServer = useMemo(
 		() => servers.find(server => server.id === selectedId) || servers[0] || null,
@@ -164,6 +166,8 @@ export function McpPage({ harness }) {
 	const selectedTools = selectedStatus?.tools || [];
 	const mountedServers = new Set(mount.mountedServers || []);
 	const selectedAllowlist = selectedServer ? new Set(mount.toolAllowlist?.[selectedServer.id] || []) : new Set();
+	const lifecycle = formatMcpStatus(selectedStatus);
+	const auth = formatMcpAuthStatus(selectedStatus?.auth);
 
 	const loadAll = useCallback(async () => {
 		setError('');
@@ -189,6 +193,18 @@ export function McpPage({ harness }) {
 	useEffect(() => {
 		void loadAll();
 	}, [loadAll]);
+
+	useEffect(() => {
+		if (!selectedServer?.id) {
+			setCallSummaries([]);
+			return undefined;
+		}
+		let active = true;
+		void fetchMcpCallSummaries(selectedServer.id)
+			.then(calls => { if (active) setCallSummaries(calls); })
+			.catch(() => { if (active) setCallSummaries([]); });
+		return () => { active = false; };
+	}, [selectedServer?.id, selectedStatus?.status]);
 
 	const refreshMount = useCallback(async () => {
 		if (!harness?.id) return;
@@ -234,11 +250,26 @@ export function McpPage({ harness }) {
 		setBusy(`connect:${serverId}`);
 		setError('');
 		setTestOutput('');
+		setStatuses(prev => ({ ...prev, [serverId]: { ...(prev[serverId] || {}), status: 'starting' } }));
 		try {
 			const status = await connectMcpServer(serverId);
 			setStatuses(prev => ({ ...prev, [serverId]: status }));
 			setNotice(`${serverId} connected with ${status.tools?.length || 0} tools.`);
 			await refreshMount();
+		} catch (err) {
+			setError(err.message);
+		} finally {
+			setBusy('');
+		}
+	};
+
+	const handleDisconnect = async (serverId) => {
+		setBusy(`disconnect:${serverId}`);
+		setError('');
+		try {
+			const status = await disconnectMcpServer(serverId);
+			setStatuses(prev => ({ ...prev, [serverId]: status }));
+			setNotice(`${serverId} disconnected.`);
 		} catch (err) {
 			setError(err.message);
 		} finally {
@@ -258,10 +289,45 @@ export function McpPage({ harness }) {
 		try {
 			const result = await testMcpTool(selectedServer.id, firstTool.name, args);
 			setTestOutput(result.output || '');
+			setCallSummaries(await fetchMcpCallSummaries(selectedServer.id));
 		} catch (err) {
 			setError(err.message);
 		} finally {
 			setBusy('');
+		}
+	};
+
+	const setMountPolicy = async (scope, value, toolName = '') => {
+		if (!selectedServer) return;
+		let nextMount;
+		if (scope === 'harness') {
+			nextMount = { ...mount, approvalMode: value };
+		} else if (scope === 'server') {
+			nextMount = { ...mount, serverApprovalModes: { ...(mount.serverApprovalModes || {}), [selectedServer.id]: value } };
+		} else {
+			nextMount = {
+				...mount,
+				toolApprovalModes: {
+					...(mount.toolApprovalModes || {}),
+					[selectedServer.id]: { ...(mount.toolApprovalModes?.[selectedServer.id] || {}), [toolName]: value },
+				},
+			};
+		}
+		await persistMount(nextMount);
+	};
+
+	const toggleCallDetail = async (callId) => {
+		if (!selectedServer || expandedCallId === callId) {
+			setExpandedCallId('');
+			setCallDetail(null);
+			return;
+		}
+		setExpandedCallId(callId);
+		setCallDetail(null);
+		try {
+			setCallDetail(await fetchMcpCallDetail(selectedServer.id, callId));
+		} catch (err) {
+			setError(err.message);
 		}
 	};
 
@@ -437,7 +503,15 @@ export function McpPage({ harness }) {
 								</div>
 								<div className="mcp-actions">
 									<button className="btn btn-ghost" onClick={() => { setForm(serverToForm(selectedServer)); setShowForm(true); }}>Edit</button>
-									<button className="btn btn-ghost" disabled={busy === `connect:${selectedServer.id}`} onClick={() => handleConnect(selectedServer.id)}>Connect</button>
+									{selectedStatus?.status === 'connected' ? (
+										<button className="btn btn-ghost" disabled={busy === `disconnect:${selectedServer.id}`} onClick={() => handleDisconnect(selectedServer.id)}>
+											<Link2Off size={14} aria-hidden="true" /> Disconnect
+										</button>
+									) : (
+										<button className="btn btn-ghost" disabled={busy === `connect:${selectedServer.id}`} onClick={() => handleConnect(selectedServer.id)}>
+											{busy === `connect:${selectedServer.id}` ? <LoaderCircle size={14} className="mcp-spin" aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />} Connect
+										</button>
+									)}
 									<button className="btn btn-danger" disabled={busy === `delete:${selectedServer.id}`} onClick={handleDelete}>Delete</button>
 								</div>
 							</div>
@@ -447,6 +521,14 @@ export function McpPage({ harness }) {
 								<code>{selectedServer.transport === 'stdio'
 									? `${selectedServer.command} ${(selectedServer.args || []).join(' ')}`
 									: selectedServer.url}</code>
+							</div>
+
+							<div className="mcp-runtime-facts" aria-label="MCP runtime status">
+								<div><span>Lifecycle</span><strong className={`mcp-status-text ${lifecycle.tone}`}>{lifecycle.label}</strong></div>
+								<div><span>Authentication</span><strong className={`mcp-auth-text ${auth.tone}`}>{auth.label}</strong></div>
+								<div><span>Tools</span><strong>{selectedTools.length}</strong></div>
+								{selectedStatus?.error && <div className="mcp-runtime-error"><CircleAlert size={14} aria-hidden="true" /><span>{selectedStatus.error.code}: {selectedStatus.error.message}</span></div>}
+								{selectedStatus?.diagnostic && <pre className="mcp-diagnostic">{selectedStatus.diagnostic}</pre>}
 							</div>
 
 							<div className="mcp-detail-grid">
@@ -466,6 +548,12 @@ export function McpPage({ harness }) {
 												<div>
 													<strong>{tool.name}</strong>
 													<span>{tool.description || 'No description provided.'}</span>
+													<select className="input mcp-tool-policy" value={mount.toolApprovalModes?.[selectedServer.id]?.[tool.name] || ''} onChange={event => event.target.value && setMountPolicy('tool', event.target.value, tool.name)} aria-label={`${tool.name} approval policy`}>
+														<option value="">Use server default</option>
+														<option value="auto_readonly">Auto read-only</option>
+														<option value="ask_all">Ask every call</option>
+														<option value="auto_all">Auto allow</option>
+													</select>
 												</div>
 											</label>
 										))}
@@ -484,10 +572,24 @@ export function McpPage({ harness }) {
 										<div><span>Enabled</span><strong>{mount.enabled ? 'Yes' : 'No'}</strong></div>
 										<div><span>Mounted servers</span><strong>{mount.mountedServers?.length || 0}</strong></div>
 										<div><span>Mounted tools</span><strong>{mountedDefinitions.length}</strong></div>
+										<label className="mcp-policy-select"><span>Harness policy</span><select className="input" value={mount.approvalMode || 'auto_readonly'} onChange={event => setMountPolicy('harness', event.target.value)}><option value="auto_readonly">Auto read-only</option><option value="ask_all">Ask every call</option><option value="auto_all">Auto allow</option></select></label>
+										<label className="mcp-policy-select"><span>Server override</span><select className="input" value={mount.serverApprovalModes?.[selectedServer.id] || ''} onChange={event => event.target.value && setMountPolicy('server', event.target.value)}><option value="">Use harness policy</option><option value="auto_readonly">Auto read-only</option><option value="ask_all">Ask every call</option><option value="auto_all">Auto allow</option></select></label>
 									</div>
 									{testOutput && (
 										<pre className="mcp-output">{testOutput}</pre>
 									)}
+									<div className="mcp-call-log">
+										<div className="mcp-section-label">Recent calls</div>
+										{callSummaries.map(call => {
+											const summary = formatMcpCallSummary(call);
+											return <div className="mcp-call-row" key={summary.id}>
+												<button type="button" onClick={() => toggleCallDetail(summary.id)}><span><strong>{summary.label}</strong><small>{summary.meta}</small></span><ChevronDown size={14} className={expandedCallId === summary.id ? 'mcp-call-open' : ''} aria-hidden="true" /></button>
+												{summary.error && <span className="mcp-call-error">{summary.error}</span>}
+												{expandedCallId === summary.id && callDetail && <pre className="mcp-call-detail">{callDetail.outputPreview || callDetail.error || 'No output preview.'}</pre>}
+											</div>;
+										})}
+										{callSummaries.length === 0 && <div className="mcp-empty">No calls recorded for this server.</div>}
+									</div>
 								</section>
 							</div>
 						</div>

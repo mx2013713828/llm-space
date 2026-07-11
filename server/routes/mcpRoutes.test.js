@@ -48,11 +48,29 @@ test('MCP routes create, connect, test, mount, and list servers', async (t) => {
 	assert.equal(connectRes.body.status, 'connected');
 	assert.equal(connectRes.body.tools[0].name, 'echo');
 
+	const statusRes = await dispatchJson(app, 'GET', '/api/mcp/servers/echo/status');
+	assert.equal(statusRes.status, 200);
+	assert.equal(statusRes.body.status, 'connected');
+	assert.equal(statusRes.body.auth.status, 'anonymous');
+
 	const testRes = await dispatchJson(app, 'POST', '/api/mcp/servers/echo/test-tool', {
 		body: { toolName: 'echo', arguments: { text: 'route' } },
 	});
 	assert.equal(testRes.status, 200);
 	assert.match(testRes.body.output, /route/);
+
+	const callsRes = await dispatchJson(app, 'GET', '/api/mcp/servers/echo/calls');
+	assert.equal(callsRes.status, 200);
+	assert.equal(callsRes.body.calls.length, 1);
+	assert.deepEqual(callsRes.body.calls[0].argumentKeys, ['text']);
+
+	const detailRes = await dispatchJson(app, 'GET', `/api/mcp/servers/echo/calls/${callsRes.body.calls[0].id}`);
+	assert.equal(detailRes.status, 200);
+	assert.equal(detailRes.body.toolName, 'echo');
+
+	const disconnectRes = await dispatchJson(app, 'POST', '/api/mcp/servers/echo/disconnect');
+	assert.equal(disconnectRes.status, 200);
+	assert.equal(disconnectRes.body.status, 'stopped');
 
 	const mountRes = await dispatchJson(app, 'POST', '/api/harnesses/h1/mcp', {
 		body: {

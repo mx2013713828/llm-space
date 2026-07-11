@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMcpHttpHeaders, buildMcpStdioEnvironment, resolveMcpValue } from './mcpClient.js';
+import { buildMcpHttpHeaders, buildMcpStdioEnvironment, classifyMcpError, resolveMcpValue } from './mcpClient.js';
 
 test('resolves literal and environment credential sources without exposing unresolved values', () => {
 	assert.deepEqual(resolveMcpValue('legacy-literal', {}), {
@@ -50,4 +50,12 @@ test('uses legacy bearer env only when no explicit authorization header exists',
 	}, { LEGACY_TOKEN: 'shell-token' });
 	assert.equal(explicitHeaders.authorization, 'Explicit value');
 	assert.equal(explicitHeaders.Authorization, undefined);
+});
+
+test('classifies transport failures without leaking credential values', () => {
+	assert.deepEqual(classifyMcpError(new Error('MCP HTTP 401: invalid key')), {
+		code: 'authentication_failed', message: 'MCP HTTP 401: invalid key',
+	});
+	assert.equal(classifyMcpError(new Error('MCP request timed out: initialize')).code, 'timeout');
+	assert.equal(classifyMcpError(new Error('MCP server exited: echo')).code, 'process_exited');
 });

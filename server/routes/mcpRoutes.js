@@ -18,6 +18,9 @@ function sanitizeStatus(status) {
 		serverInfo: status.serverInfo || null,
 		instructions: status.instructions || '',
 		lastError: status.lastError || '',
+		error: status.error || null,
+		diagnostic: status.diagnostic || '',
+		auth: status.auth || { status: 'unknown' },
 		tools: (status.tools || []).map(tool => ({
 			name: tool.name,
 			description: tool.description || '',
@@ -89,6 +92,22 @@ export function registerMcpRoutes(app, {
 		}
 	});
 
+	app.get('/api/mcp/servers/:serverId/status', async (req, res) => {
+		try {
+			res.json(sanitizeStatus(await manager.getServerStatus(req.params.serverId)));
+		} catch (err) {
+			res.status(404).json({ error: err.message });
+		}
+	});
+
+	app.post('/api/mcp/servers/:serverId/disconnect', async (req, res) => {
+		try {
+			res.json(sanitizeStatus(await manager.disconnectServer(req.params.serverId)));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
 	app.post('/api/mcp/servers/:serverId/refresh-tools', async (req, res) => {
 		try {
 			res.json(sanitizeStatus(await manager.refreshTools(req.params.serverId)));
@@ -103,6 +122,24 @@ export function registerMcpRoutes(app, {
 			const toolName = req.body?.toolName;
 			const output = await manager.callTool(`mcp__${serverId}__${toolName}`, req.body?.arguments || {});
 			res.json({ output });
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
+	app.get('/api/mcp/servers/:serverId/calls', async (req, res) => {
+		try {
+			res.json({ calls: await manager.listCallSummaries(req.params.serverId, { limit: req.query?.limit }) });
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
+	app.get('/api/mcp/servers/:serverId/calls/:callId', async (req, res) => {
+		try {
+			const call = await manager.getCallDetail(req.params.serverId, req.params.callId);
+			if (!call) return res.status(404).json({ error: 'MCP call record not found' });
+			res.json(call);
 		} catch (err) {
 			res.status(400).json({ error: err.message });
 		}

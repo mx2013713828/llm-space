@@ -186,6 +186,29 @@ export class AgentExecutor {
     });
     this.tools = this.toolPool.tools;
     this.mcpMount = mountedResources?.mcpMount || null;
+    if (this.mcpMount?.enabled) {
+      const mountedServers = Array.isArray(this.mcpMount.mountedServers) ? this.mcpMount.mountedServers : [];
+      this.promptAssemblySections.push({
+        id: 'mcp_mount_policy',
+        label: 'MCP Mount Policy',
+        target: 'runtime',
+        lifecycle: 'pinned',
+        source: 'mcp/mount',
+        content: [
+          `Harness policy: ${this.mcpMount.approvalMode || 'auto_readonly'}`,
+          `Mounted servers: ${mountedServers.join(', ') || 'none'}`,
+          `Server overrides: ${Object.keys(this.mcpMount.serverApprovalModes || {}).length}`,
+          `Tool overrides: ${Object.values(this.mcpMount.toolApprovalModes || {}).reduce((count, tools) => count + Object.keys(tools || {}).length, 0)}`,
+        ].join('\n'),
+        order: 90,
+        sentToModel: false,
+        observable: true,
+        cacheImpact: 'runtime_metadata_only',
+        chars: 0,
+        metadata: {},
+      });
+      this.promptAssemblySections[this.promptAssemblySections.length - 1].chars = this.promptAssemblySections[this.promptAssemblySections.length - 1].content.length;
+    }
 
     this.model = model;
     this.compactionThresholds = getCompactionTokenThresholds(model);

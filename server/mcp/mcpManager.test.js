@@ -80,11 +80,31 @@ test('tracks lifecycle and bounded call history for a managed server', async () 
 		assert.equal((await manager.getServerStatus('echo')).status, 'stopped');
 		await manager.connectServer('echo');
 		assert.equal((await manager.getServerStatus('echo')).status, 'connected');
+		assert.equal((await manager.getServerStatus('echo')).auth.status, 'anonymous');
 		await manager.callTool('mcp__echo__echo', { text: 'history' });
+		assert.equal((await manager.getServerStatus('echo')).auth.status, 'verified');
 		assert.equal((await manager.listCallSummaries('echo')).length, 1);
 		await manager.disconnectServer('echo');
 		assert.equal((await manager.getServerStatus('echo')).status, 'stopped');
 	} finally {
 		await manager.disconnectAll();
 	}
+});
+
+test('records structured connection errors and authentication failures', async () => {
+	class FailingClient {
+		constructor() { this.diagnostic = 'remote rejected bearer credential'; }
+		async connect() { throw new Error('MCP HTTP 401: invalid key'); }
+		async disconnect() {}
+	}
+	const manager = new McpManager({
+		ClientClass: FailingClient,
+		servers: [{ id: 'remote', name: 'Remote', transport: 'streamable_http', url: 'https://example.test/mcp', headers: { Authorization: { source: 'bearer', value: 'secret' } } }],
+	});
+	await assert.rejects(() => manager.connectServer('remote'), /401/);
+	const status = await manager.getServerStatus('remote');
+	assert.equal(status.status, 'error');
+	assert.equal(status.error.code, 'authentication_failed');
+	assert.equal(status.auth.status, 'invalid');
+	assert.doesNotMatch(status.diagnostic, /secret/);
 });

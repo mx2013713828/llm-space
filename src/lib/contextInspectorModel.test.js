@@ -99,6 +99,27 @@ test('buildContextInspectorModel separates mounted manifest and retrieved knowle
   assert.equal(model.groups[2].rows[0].cacheImpact, 'changes_per_user_turn');
 });
 
+test('buildContextInspectorModel exposes MCP policy as observable runtime metadata without treating it as a prompt', () => {
+  const model = buildContextInspectorModel({
+    promptAssembly: {
+      sections: [{
+        id: 'mcp_mount_policy',
+        label: 'MCP Mount Policy',
+        target: 'runtime',
+        lifecycle: 'pinned',
+        source: 'mcp/mount',
+        content: 'Harness policy: auto_readonly',
+        sentToModel: false,
+        observable: true,
+      }],
+    },
+  });
+
+  const group = model.groups.find(item => item.id === 'mcp_policy');
+  assert.deepEqual(group.rows.map(row => row.id), ['mcp_mount_policy']);
+  assert.equal(group.rows[0].content, 'Harness policy: auto_readonly');
+});
+
 test('buildContextInspectorModel exposes skipped retrieved knowledge as observable but unsent', () => {
   const model = buildContextInspectorModel({
     promptAssembly: {

@@ -134,6 +134,10 @@ export function buildContextInspectorModel({
     .filter(section => section?.id === 'retrieved_knowledge' || section?.id === 'retrieved_knowledge_skipped')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map(section => createPromptSectionRow(section, 'user'));
+  const mcpPolicyRows = observableSections
+    .filter(section => section?.id === 'mcp_mount_policy')
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(section => createPromptSectionRow(section, 'runtime'));
   const sentPromptSections = sentSections
     .filter(section => section?.target === 'system' && section?.id !== 'mounted_knowledge_manifest')
     .sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -162,10 +166,11 @@ export function buildContextInspectorModel({
     { id: 'system', label: 'System Prompt', rows: systemRows },
     { id: 'mounted_knowledge', label: 'Mounted Knowledge Manifest', rows: mountedKnowledgeRows },
     { id: 'retrieved_knowledge', label: 'Retrieved Knowledge', rows: retrievedKnowledgeRows },
+    { id: 'mcp_policy', label: 'MCP Mount Policy', rows: mcpPolicyRows },
     { id: 'dynamic', label: 'Dynamic Context', rows: dynamicRows },
     { id: 'messages', label: 'Messages Payload', rows: messageRows },
     { id: 'tools', label: 'Provider Tool Schema', rows: toolRows },
-  ].filter(group => ['dynamic', 'mounted_knowledge', 'retrieved_knowledge'].includes(group.id) ? group.rows.length > 0 : true);
+  ].filter(group => ['dynamic', 'mounted_knowledge', 'retrieved_knowledge', 'mcp_policy'].includes(group.id) ? group.rows.length > 0 : true);
   const firstRow = groups.flatMap(group => group.rows)[0] || null;
 
   return {

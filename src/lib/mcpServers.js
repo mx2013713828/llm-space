@@ -37,6 +37,34 @@ export async function connectMcpServer(serverId) {
 	return data;
 }
 
+export async function disconnectMcpServer(serverId) {
+	const res = await apiFetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/disconnect`, { method: 'POST' });
+	const data = await res.json();
+	if (!res.ok) throw new Error(data.error || `Failed to disconnect MCP server (${res.status})`);
+	return data;
+}
+
+export async function fetchMcpServerStatus(serverId) {
+	const res = await apiFetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/status`);
+	const data = await res.json();
+	if (!res.ok) throw new Error(data.error || `Failed to load MCP status (${res.status})`);
+	return data;
+}
+
+export async function fetchMcpCallSummaries(serverId, limit = 20) {
+	const res = await apiFetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/calls?limit=${encodeURIComponent(limit)}`);
+	const data = await res.json();
+	if (!res.ok) throw new Error(data.error || `Failed to load MCP calls (${res.status})`);
+	return data.calls || [];
+}
+
+export async function fetchMcpCallDetail(serverId, callId) {
+	const res = await apiFetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/calls/${encodeURIComponent(callId)}`);
+	const data = await res.json();
+	if (!res.ok) throw new Error(data.error || `Failed to load MCP call (${res.status})`);
+	return data;
+}
+
 export async function testMcpTool(serverId, toolName, args = {}) {
 	const res = await apiFetch(`/api/mcp/servers/${encodeURIComponent(serverId)}/test-tool`, {
 		method: 'POST',
