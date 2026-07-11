@@ -85,6 +85,76 @@ test('harness routes list, load, create, copy, and delete harness files', async 
   await assert.rejects(access(path.join(fixture.sessionsDir, 'alpha.json')));
 });
 
+test('harness metadata updates preserve identity, filename, and runtime configuration', async (t) => {
+  const fixture = await createFixture(t);
+  const original = {
+    id: 'alpha',
+    name: 'Alpha',
+    description: 'Original description',
+    model: { name: 'deepseek-v4', max_tokens: 8192 },
+    tools: ['bash', 'read_file'],
+    features: { task_orchestration: { enabled: true } },
+  };
+  await writeFile(
+    path.join(fixture.harnessDir, 'custom-storage-name.json'),
+    JSON.stringify(original),
+    'utf-8',
+  );
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const response = await dispatchJson(app, 'PATCH', '/api/harnesses/alpha/metadata', {
+    body: { name: 'Alpha Research', description: 'Updated description' },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.filename, 'custom-storage-name.json');
+  assert.equal(response.body.harness.id, 'alpha');
+  assert.equal(response.body.harness.name, 'Alpha Research');
+  assert.equal(response.body.harness.description, 'Updated description');
+
+  const persisted = JSON.parse(await readFile(
+    path.join(fixture.harnessDir, 'custom-storage-name.json'),
+    'utf-8',
+  ));
+  assert.deepEqual(persisted.model, original.model);
+  assert.deepEqual(persisted.tools, original.tools);
+  assert.deepEqual(persisted.features, original.features);
+  await assert.rejects(access(path.join(fixture.harnessDir, 'alpha.json')));
+});
+
+test('harness copy route accepts custom display metadata', async (t) => {
+  const fixture = await createFixture(t);
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'Alpha',
+    description: 'Original',
+    tools: ['bash'],
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const response = await dispatchJson(app, 'POST', '/api/harnesses/alpha/copy', {
+    body: { name: 'Alpha Sandbox', description: 'Safe experiments' },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.filename, 'alpha-sandbox.json');
+  assert.equal(response.body.harness.id, 'alpha-sandbox');
+  assert.equal(response.body.harness.name, 'Alpha Sandbox');
+  assert.equal(response.body.harness.description, 'Safe experiments');
+  assert.deepEqual(response.body.harness.tools, ['bash']);
+});
+
 test('harness dry-run returns compact tool pool summary from runtime tools', async (t) => {
   const fixture = await createFixture(t);
   await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({

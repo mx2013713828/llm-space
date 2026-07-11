@@ -80,3 +80,25 @@ test('createCopiedHarnessDraft chooses the next available copy id and filename',
   assert.equal(copy.harness.description, 'original (副本)');
   assert.deepEqual(copy.harness.tools, ['read_file']);
 });
+
+test('createCopiedHarnessDraft accepts custom copy metadata and derives a new id', () => {
+  const copy = createCopiedHarnessDraft({
+    source: {
+      id: 'demo',
+      name: 'Demo',
+      description: 'original',
+      model: { name: 'deepseek-v4' },
+      tools: ['read_file'],
+    },
+    name: 'Review Lab',
+    description: 'Focused review workflow',
+    existingHarnesses: [{ id: 'demo', name: 'Demo' }],
+  });
+
+  assert.equal(copy.filename, 'review-lab.json');
+  assert.equal(copy.harness.id, 'review-lab');
+  assert.equal(copy.harness.name, 'Review Lab');
+  assert.equal(copy.harness.description, 'Focused review workflow');
+  assert.deepEqual(copy.harness.model, { name: 'deepseek-v4' });
+  assert.deepEqual(copy.harness.tools, ['read_file']);
+});

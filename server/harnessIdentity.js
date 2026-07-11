@@ -72,9 +72,31 @@ export function createHarnessDraft({ name, description = '', existingHarnesses =
   };
 }
 
-export function createCopiedHarnessDraft({ source, existingHarnesses = [] }) {
+export function createCopiedHarnessDraft({
+  source,
+  existingHarnesses = [],
+  name,
+  description,
+}) {
   if (!source?.id || !source?.name) {
     throw createHttpError(400, 'Source harness is invalid.');
+  }
+
+  if (name !== undefined) {
+    const displayName = normalizeHarnessDisplayName(name);
+    const id = slugifyHarnessId(displayName);
+    assertValidHarnessId(id);
+    assertHarnessIdAvailable(existingHarnesses, id);
+
+    return {
+      filename: getHarnessStorageFilename(id),
+      harness: {
+        ...source,
+        id,
+        name: displayName,
+        description: description === undefined ? source.description || '' : String(description),
+      },
+    };
   }
 
   const baseId = `${source.id}-copy`;

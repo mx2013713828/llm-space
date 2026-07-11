@@ -187,6 +187,32 @@ export function registerHarnessRoutes(app, {
     }
   });
 
+  app.patch('/api/harnesses/:id/metadata', async (req, res) => {
+    try {
+      const targetPath = await findSafeHarnessPath(req.params.id, { harnessDir, fsImpl });
+      if (!targetPath) return res.status(404).json({ error: 'Harness not found' });
+
+      const displayName = normalizeHarnessDisplayName(req.body?.name);
+      if (!displayName) return res.status(400).json({ error: 'Harness name is required' });
+
+      const existing = JSON.parse(await fsImpl.readFile(targetPath, 'utf-8'));
+      const harness = {
+        ...existing,
+        name: displayName,
+        description: String(req.body?.description || ''),
+      };
+      const filename = path.basename(targetPath);
+      await fsImpl.writeFile(targetPath, JSON.stringify(harness, null, 2), 'utf-8');
+      res.json({
+        success: true,
+        harness: createHarnessSummary(harness, filename),
+        filename,
+      });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
   app.delete('/api/harnesses/:id', async (req, res) => {
     try {
       const files = await fsImpl.readdir(harnessDir);
@@ -215,7 +241,12 @@ export function registerHarnessRoutes(app, {
       const source = existingHarnesses.find(harness => harness.id === req.params.id);
       if (!source) return res.status(404).json({ error: 'Harness not found' });
 
-      const draft = createCopiedHarnessDraft({ source, existingHarnesses });
+      const draft = createCopiedHarnessDraft({
+        source,
+        existingHarnesses,
+        name: req.body?.name,
+        description: req.body?.description,
+      });
       await fsImpl.writeFile(path.join(harnessDir, draft.filename), JSON.stringify(draft.harness, null, 2), 'utf-8');
       res.json({ success: true, harness: draft.harness, filename: draft.filename });
     } catch (err) {

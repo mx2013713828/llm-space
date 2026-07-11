@@ -59,6 +59,7 @@ test('createServerApp installs runtime middleware and core route groups', () => 
       'POST /api/harnesses/:harnessId/mcp',
       'POST /api/harnesses/:id',
       'POST /api/harnesses/:id/copy',
+      'PATCH /api/harnesses/:id/metadata',
       'POST /api/knowledge-bases',
       'POST /api/knowledge-bases/:knowledgeBaseId/files',
       'POST /api/knowledge-bases/preview-chunks',

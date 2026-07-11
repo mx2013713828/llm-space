@@ -32,11 +32,11 @@
 - Produces: `createCopiedHarnessDraft({ source, existingHarnesses, name?, description? })`
 - Produces: `PATCH /api/harnesses/:id/metadata`
 
-- [ ] Write failing tests proving custom duplicate names generate unique IDs and metadata updates preserve model/tools/features.
-- [ ] Run `node --test server/harnessIdentity.test.js server/routes/harnessRoutes.test.js` and verify expected failures.
-- [ ] Extend duplicate identity generation and add the narrow metadata route.
-- [ ] Add the new route to the server endpoint contract snapshot.
-- [ ] Run focused tests and commit as `feat: add harness metadata management api`.
+- [x] Write failing tests proving custom duplicate names generate unique IDs and metadata updates preserve model/tools/features.
+- [x] Run `node --test server/harnessIdentity.test.js server/routes/harnessRoutes.test.js` and verify expected failures.
+- [x] Extend duplicate identity generation and add the narrow metadata route.
+- [x] Add the new route to the server endpoint contract snapshot.
+- [x] Run focused tests and commit as `feat: add harness metadata management api`.
 
 ### Task 2: Explorer State And Presentation Model
 
