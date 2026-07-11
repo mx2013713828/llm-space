@@ -1,7 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildMcpHttpHeaders, buildMcpStdioEnvironment } from './mcpClient.js';
+import { buildMcpHttpHeaders, buildMcpStdioEnvironment, resolveMcpValue } from './mcpClient.js';
+
+test('resolves literal and environment credential sources without exposing unresolved values', () => {
+	assert.deepEqual(resolveMcpValue('legacy-literal', {}), {
+		value: 'legacy-literal', source: 'literal', configured: true,
+	});
+	assert.deepEqual(resolveMcpValue({ source: 'environment', name: 'TOKEN' }, { TOKEN: 'from-shell' }), {
+		value: 'from-shell', source: 'environment', configured: true,
+	});
+	assert.equal(resolveMcpValue({ source: 'environment', name: 'MISSING' }, {}), null);
+	assert.deepEqual(resolveMcpValue({ source: 'bearer', value: 'local-token' }, {}), {
+		value: 'Bearer local-token', source: 'bearer', configured: true,
+	});
+});
 
 test('lets configured STDIO environment values override inherited values', () => {
 	const env = buildMcpStdioEnvironment({

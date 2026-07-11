@@ -13,8 +13,31 @@ function setHeader(headers, name, value) {
 	headers[name] = value;
 }
 
+export function resolveMcpValue(entry, processEnv = process.env) {
+	if (typeof entry === 'string' && entry) {
+		return { value: entry, source: 'literal', configured: true };
+	}
+	if (!entry || typeof entry !== 'object') return null;
+	if (entry.source === 'literal' && entry.value) {
+		return { value: String(entry.value), source: 'literal', configured: true };
+	}
+	if (entry.source === 'environment' && entry.name && processEnv[entry.name]) {
+		return { value: String(processEnv[entry.name]), source: 'environment', configured: true };
+	}
+	if (entry.source === 'bearer') {
+		const token = entry.value || (entry.name ? processEnv[entry.name] : '');
+		if (token) return { value: `Bearer ${token}`, source: 'bearer', configured: true };
+	}
+	return null;
+}
+
 export function buildMcpStdioEnvironment(server = {}, inheritedEnv = process.env) {
-	return { ...inheritedEnv, ...(server.env || {}) };
+	const configured = {};
+	for (const [name, entry] of Object.entries(server.env || {})) {
+		const resolved = resolveMcpValue(entry, inheritedEnv);
+		if (resolved) configured[name] = resolved.value;
+	}
+	return { ...inheritedEnv, ...configured };
 }
 
 export function buildMcpHttpHeaders(server = {}, processEnv = process.env) {
@@ -22,8 +45,9 @@ export function buildMcpHttpHeaders(server = {}, processEnv = process.env) {
 		'content-type': 'application/json',
 		accept: 'application/json, text/event-stream',
 	};
-	for (const [name, value] of Object.entries(server.headers || {})) {
-		setHeader(headers, name, value);
+	for (const [name, entry] of Object.entries(server.headers || {})) {
+		const resolved = resolveMcpValue(entry, processEnv);
+		if (resolved) setHeader(headers, name, resolved.value);
 	}
 	if (server.auth?.type === 'bearer' && server.auth.env && !hasHeader(headers, 'authorization')) {
 		const token = processEnv[server.auth.env];

@@ -85,7 +85,7 @@ function formToServer(form) {
 	};
 }
 
-function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description }) {
+function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description, allowBearer = false }) {
 	const updateRow = (index, field, value) => {
 		onChange(rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
 	};
@@ -98,7 +98,7 @@ function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description }
 					<strong>{label}</strong>
 					<span>{description}</span>
 				</div>
-				<button type="button" className="mcp-icon-button" title={`Add ${label}`} onClick={() => onChange([...rows, { key: '', value: '' }])}>
+				<button type="button" className="mcp-icon-button" title={`Add ${label}`} onClick={() => onChange([...rows, { key: '', value: '', source: 'literal' }])}>
 					<Plus size={15} aria-hidden="true" />
 				</button>
 			</div>
@@ -107,6 +107,11 @@ function KeyValueEditor({ label, rows, onChange, valuePlaceholder, description }
 					{rows.map((row, index) => (
 						<div className="mcp-kv-row" key={`${row.key}-${index}`}>
 							<input className="input" value={row.key} aria-label={`${label} name`} placeholder="Name" onChange={event => updateRow(index, 'key', event.target.value)} />
+							<select className="input" value={row.source || 'literal'} aria-label={`${label} source`} onChange={event => updateRow(index, 'source', event.target.value)}>
+								<option value="literal">Stored value</option>
+								<option value="environment">Environment reference</option>
+								{allowBearer && <option value="bearer">Bearer token</option>}
+							</select>
 							<input className="input" value={row.value} aria-label={`${label} value`} placeholder={valuePlaceholder} onChange={event => updateRow(index, 'value', event.target.value)} />
 							<button type="button" className="mcp-icon-button danger" title={`Remove ${label}`} onClick={() => removeRow(index)}>
 								<Trash2 size={14} aria-hidden="true" />
@@ -400,7 +405,7 @@ export function McpPage({ harness }) {
 											rows={form.envRows}
 											onChange={envRows => setForm({ ...form, envRows })}
 											valuePlaceholder="Value stored locally"
-											description="Overrides same-named variables inherited from the shell."
+											description="Stored values override the shell. Environment references resolve when the server starts."
 										/>
 									</>
 								) : (
@@ -413,6 +418,7 @@ export function McpPage({ harness }) {
 											onChange={headerRows => setForm({ ...form, headerRows })}
 											valuePlaceholder="Header value stored locally"
 											description="Use any header, including Authorization, X-API-Key, or custom provider fields."
+											allowBearer
 										/>
 									</>
 								)}

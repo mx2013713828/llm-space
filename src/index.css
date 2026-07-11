@@ -646,7 +646,7 @@ body {
 }
 
 .mcp-kv-row {
-  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.3fr) 30px;
+	grid-template-columns: minmax(110px, 0.7fr) minmax(150px, 0.85fr) minmax(0, 1.2fr) 30px;
 }
 
 .mcp-icon-button {

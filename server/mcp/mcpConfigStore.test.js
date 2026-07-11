@@ -7,6 +7,7 @@ import os from 'node:os';
 import {
 	getMcpPresets,
 	listMcpServers,
+	normalizeMcpServerConfig,
 	saveMcpServers,
 	upsertMcpServer,
 } from './mcpConfigStore.js';
@@ -157,6 +158,23 @@ test('rejects duplicate HTTP header names that differ only by case', async () =>
 			/duplicate HTTP header/i,
 		);
 	});
+});
+
+test('preserves literal and environment credential sources beside legacy string values', () => {
+	const config = normalizeMcpServerConfig({
+		id: 'credential-sources', name: 'Credential Sources', transport: 'streamable_http', url: 'https://example.test/mcp',
+		env: {
+			LEGACY: 'local-value',
+			FROM_ENV: { source: 'environment', name: 'SERVICE_TOKEN' },
+		},
+		headers: {
+			Authorization: { source: 'bearer', name: 'HTTP_TOKEN' },
+		},
+	});
+
+	assert.equal(config.env.LEGACY, 'local-value');
+	assert.deepEqual(config.env.FROM_ENV, { source: 'environment', name: 'SERVICE_TOKEN' });
+	assert.deepEqual(config.headers.Authorization, { source: 'bearer', name: 'HTTP_TOKEN' });
 });
 
 test('includes Context7 preset', () => {

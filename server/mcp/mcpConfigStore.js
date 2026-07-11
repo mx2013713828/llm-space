@@ -34,11 +34,32 @@ function normalizeLegacyAuth(auth) {
 	return env ? { type: 'bearer', env } : null;
 }
 
+export function normalizeMcpValue(value) {
+	if (typeof value === 'string') return value.trim();
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+	const source = String(value.source || '').trim();
+	if (source === 'literal' || source === 'bearer') {
+		const literal = String(value.value || '').trim();
+		if (literal) return { source, value: literal };
+		if (source === 'bearer') {
+			const name = String(value.name || '').trim();
+			return name ? { source, name } : '';
+		}
+		return '';
+	}
+	if (source === 'environment') {
+		const name = String(value.name || '').trim();
+		return name ? { source, name } : '';
+	}
+	if (source === 'oauth') return { source };
+	return '';
+}
+
 export function normalizeMcpStringMap(value = {}) {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 	return Object.fromEntries(
 		Object.entries(value)
-			.map(([key, entry]) => [String(key || '').trim(), String(entry || '').trim()])
+			.map(([key, entry]) => [String(key || '').trim(), normalizeMcpValue(entry)])
 			.filter(([key, entry]) => key && entry),
 	);
 }
