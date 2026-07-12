@@ -32,7 +32,7 @@
 - Produces: `saveWorkbenchPanelState(storage, key, state, defaults)`.
 - Produces: `toggleWorkbenchPanel(state)` and focus helpers `enterWorkbenchFocus(panels)` / `restoreWorkbenchFocus(panels, focusSnapshot)`.
 
-- [ ] **Step 1: Write failing state tests**
+- [x] **Step 1: Write failing state tests**
 
 ```js
 test('normalizes invalid widths and preserves collapsed state', () => {
@@ -53,13 +53,13 @@ test('focus snapshots restore only panels collapsed by focus mode', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test file and verify it fails**
+- [x] **Step 2: Run the test file and verify it fails**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
 Expected: module-not-found failure for `workbenchPanelState.js`.
 
-- [ ] **Step 3: Implement the pure helpers**
+- [x] **Step 3: Implement the pure helpers**
 
 ```js
 export function normalizeWorkbenchPanelState(value, defaults) {
@@ -82,13 +82,13 @@ export function enterWorkbenchFocus(panels) {
 
 Use `try/catch` inside storage functions. `saveWorkbenchPanelState` writes only normalized `width` and `collapsed` values and returns the persisted state even if storage is unavailable.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
 Expected: all panel-state tests pass.
 
-- [ ] **Step 5: Commit the state layer**
+- [x] **Step 5: Commit the state layer**
 
 ```bash
 git add src/lib/workbenchPanelState.js src/lib/workbenchPanelState.test.js
