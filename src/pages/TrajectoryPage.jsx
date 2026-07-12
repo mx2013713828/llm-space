@@ -12,12 +12,15 @@ import { useWorkbenchLayout } from '../components/WorkbenchLayoutContext';
 import { apiFetch } from '../lib/apiClient';
 import {
   enterWorkbenchFocus,
+  getWorkbenchPanelPresentation,
+  getWorkbenchStorage,
   loadWorkbenchPanelState,
   restoreWorkbenchFocus,
   saveWorkbenchPanelState,
 } from '../lib/workbenchPanelState';
 
 const CONFIG_STORAGE_KEY = 'llm-space.workbench.trajectory-config.v1';
+const NARROW_WORKBENCH_QUERY = '(max-width: 900px)';
 const CONFIG_DEFAULTS = {
   width: 340,
   minWidth: 280,
@@ -29,14 +32,21 @@ function panelsMatch(left, right) {
   return left?.width === right?.width && left?.collapsed === right?.collapsed;
 }
 
+function isNarrowWorkbenchViewport() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(NARROW_WORKBENCH_QUERY).matches;
+}
+
 export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessionReset, onHarnessUpdate }) {
   const {
     explorerPanel,
     updateExplorerPanel,
   } = useWorkbenchLayout();
   const [configPanel, setConfigPanel] = useState(() => (
-    loadWorkbenchPanelState(window.localStorage, CONFIG_STORAGE_KEY, CONFIG_DEFAULTS)
+    loadWorkbenchPanelState(getWorkbenchStorage(), CONFIG_STORAGE_KEY, CONFIG_DEFAULTS)
   ));
+  const [isNarrowViewport, setIsNarrowViewport] = useState(isNarrowWorkbenchViewport);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const focusSnapshotRef = useRef(null);
   const expectedExplorerPanelRef = useRef(null);
@@ -55,13 +65,22 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
   const commitConfigPanel = useCallback((nextPanel) => {
     cancelFocusMode();
     const persistedPanel = saveWorkbenchPanelState(
-      window.localStorage,
+      getWorkbenchStorage(),
       CONFIG_STORAGE_KEY,
       nextPanel,
       CONFIG_DEFAULTS,
     );
     setConfigPanel(persistedPanel);
   }, [cancelFocusMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+
+    const mediaQuery = window.matchMedia(NARROW_WORKBENCH_QUERY);
+    const updateViewport = (event) => setIsNarrowViewport(event.matches);
+    mediaQuery.addEventListener('change', updateViewport);
+    return () => mediaQuery.removeEventListener('change', updateViewport);
+  }, []);
 
   useEffect(() => {
     if (!focusSnapshotRef.current) return;
@@ -300,6 +319,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
   // 5. 自动滚动 Hook
   const { chatEndRef, scrollContainerRef } = useAutoScroll(agentState.messages, activeRightTab);
+  const presentedConfigPanel = getWorkbenchPanelPresentation(configPanel, isNarrowViewport);
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
@@ -308,7 +328,7 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         id="trajectory-config-panel"
         label="Runtime Configuration"
         icon={<SlidersHorizontal size={16} />}
-        panel={configPanel}
+        panel={presentedConfigPanel}
         minWidth={CONFIG_DEFAULTS.minWidth}
         maxWidth={CONFIG_DEFAULTS.maxWidth}
         onPanelChange={updateConfigPanel}

@@ -2620,6 +2620,16 @@
   .sidebar { display: none; }
   #harness-explorer-panel,
   .trajectory-focus-toggle { display: none; }
+
+  #trajectory-config-panel {
+    max-width: 100%;
+  }
+
+  #trajectory-config-panel .workbench-panel-rail,
+  #trajectory-config-panel .workbench-panel-toggle,
+  #trajectory-config-panel .workbench-resize-handle {
+    display: none;
+  }
 }
 
 /* ===== 模型选择器 ===== */

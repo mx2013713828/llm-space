@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   enterWorkbenchFocus,
+  getWorkbenchPanelPresentation,
+  getWorkbenchStorage,
   loadWorkbenchPanelState,
   normalizeWorkbenchPanelState,
   restoreWorkbenchFocus,
@@ -16,6 +18,37 @@ const defaults = {
   maxWidth: 480,
   collapsed: false,
 };
+
+test('handles a window whose localStorage getter throws', () => {
+  const windowLike = {
+    get localStorage() {
+      throw new DOMException('Storage is disabled', 'SecurityError');
+    },
+  };
+  const storage = getWorkbenchStorage(windowLike);
+
+  assert.equal(storage, null);
+  assert.doesNotThrow(() => loadWorkbenchPanelState(storage, 'panel', defaults));
+  assert.deepEqual(loadWorkbenchPanelState(storage, 'panel', defaults), {
+    width: defaults.width,
+    collapsed: defaults.collapsed,
+  });
+  assert.deepEqual(saveWorkbenchPanelState(storage, 'panel', { width: 999, collapsed: true }, defaults), {
+    width: defaults.maxWidth,
+    collapsed: true,
+  });
+});
+
+test('presents a collapsed panel as expanded without changing its desktop preference', () => {
+  const panel = { width: 340, collapsed: true };
+
+  assert.deepEqual(getWorkbenchPanelPresentation(panel, true), {
+    width: 340,
+    collapsed: false,
+  });
+  assert.equal(getWorkbenchPanelPresentation(panel, false), panel);
+  assert.deepEqual(panel, { width: 340, collapsed: true });
+});
 
 test('normalizes invalid widths and preserves collapsed state', () => {
   assert.deepEqual(

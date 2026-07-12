@@ -11,7 +11,11 @@ import { HarnessExplorer } from './components/HarnessExplorer';
 import { ResizableWorkbenchPanel } from './components/ResizableWorkbenchPanel';
 import { WorkbenchLayoutContext } from './components/WorkbenchLayoutContext';
 import { apiFetch } from './lib/apiClient';
-import { loadWorkbenchPanelState, saveWorkbenchPanelState } from './lib/workbenchPanelState';
+import {
+  getWorkbenchStorage,
+  loadWorkbenchPanelState,
+  saveWorkbenchPanelState,
+} from './lib/workbenchPanelState';
 
 const EXPLORER_STORAGE_KEY = 'llm-space.workbench.harness-explorer.v1';
 const EXPLORER_DEFAULTS = {
@@ -82,12 +86,12 @@ function AppContent() {
   const [harness, setHarness] = useState(null);
   const [sessions, setSessions] = useState({});
   const [explorerPanel, updateExplorerPanel] = useState(() => (
-    loadWorkbenchPanelState(window.localStorage, EXPLORER_STORAGE_KEY, EXPLORER_DEFAULTS)
+    loadWorkbenchPanelState(getWorkbenchStorage(), EXPLORER_STORAGE_KEY, EXPLORER_DEFAULTS)
   ));
 
   const commitExplorerPanel = useCallback((nextPanel) => {
     const persistedPanel = saveWorkbenchPanelState(
-      window.localStorage,
+      getWorkbenchStorage(),
       EXPLORER_STORAGE_KEY,
       nextPanel,
       EXPLORER_DEFAULTS,
