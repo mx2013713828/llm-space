@@ -1,6 +1,6 @@
 {
   "id": "chat-bot",
-  "name": "Basic Chatbot",
+  "name": "01-chat-bot",
   "description": "Understand the basic ReAct tool call loop with weather query tools.",
   "category": "basic",
   "model": {
@@ -44,7 +44,6 @@
       }
     }
   ],
-  "systemPrompt": "You are a helpful assistant.\n\nWhen the user asks about the weather, please:\n1. Analyze the city mentioned by the user.\n2. Call the weather_report tool to get the weather information.\n3. Reply to the user with the result in natural language.\n\n",
   "skills": [
     "skill-creator"
   ],
@@ -82,6 +81,15 @@
       "memory_extract": false,
       "memory_consolidate": false
     },
+    "knowledge_bases": {
+      "enabled": false,
+      "strategy": "agentic_rag",
+      "auto_retrieve": false,
+      "knowledge_tools": true,
+      "topK": 5,
+      "maxChars": 8000,
+      "scoreThreshold": 0
+    },
     "error_recovery": {
       "enabled": false,
       "max_tokens_escalation": false,
@@ -92,5 +100,10 @@
       "diminishing_returns": false
     },
     "parallel_tool_execution": false
+  },
+  "guidance": {
+    "file": "guidance/chat-bot/AGENTS.md",
+    "filename": "AGENTS.md",
+    "source": "file"
   }
 }

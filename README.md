@@ -360,3 +360,7 @@ export default {
 ## Contributing
 
 This project is a local experimental workbench. Contributions that improve observability, safety, runtime modularity, prompt assembly, model adapters, task orchestration, or knowledge mounting are especially welcome.
+
+## Community
+
+[LINUX DO](https://linux.do/)

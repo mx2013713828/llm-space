@@ -1,6 +1,6 @@
 {
   "id": "04-subagent",
-  "name": "Multi-Agent System",
+  "name": "04-sub-agent",
   "description": "Explore multi-agent delegation, subagent task planning, and context isolation.",
   "category": "basic",
   "model": {
@@ -113,14 +113,13 @@
       }
     }
   ],
-  "systemPrompt": "You are a friendly and helpful assistant. Please answer the user's questions accurately and concisely.",
   "skills": [
     "git-conventions"
   ],
   "features": {
     "security_mode": "relaxed",
     "context_compaction": {
-      "enabled": true,
+      "enabled": false,
       "thinking_compaction": true,
       "output_offload": true,
       "soft_compact": true,
@@ -151,6 +150,15 @@
       "memory_extract": false,
       "memory_consolidate": false
     },
+    "knowledge_bases": {
+      "enabled": true,
+      "strategy": "agentic_rag",
+      "auto_retrieve": false,
+      "knowledge_tools": true,
+      "topK": 5,
+      "maxChars": 8000,
+      "scoreThreshold": 0
+    },
     "error_recovery": {
       "enabled": true,
       "max_tokens_escalation": true,
@@ -161,5 +169,10 @@
       "diminishing_returns": true
     },
     "parallel_tool_execution": true
+  },
+  "guidance": {
+    "file": "guidance/04-subagent/AGENTS.md",
+    "filename": "AGENTS.md",
+    "source": "file"
   }
 }

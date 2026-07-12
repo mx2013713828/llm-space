@@ -360,3 +360,7 @@ export default {
 ## 参与贡献
 
 这是一个本地实验工作台。欢迎改进可观察性、安全性、运行时模块化、prompt assembly、模型适配、任务编排和知识库挂载。
+
+## 社区
+
+[LINUX DO](https://linux.do/)

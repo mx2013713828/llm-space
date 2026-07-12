@@ -1,6 +1,6 @@
 {
   "id": "deep-research",
-  "name": "Deep Research Agent",
+  "name": "03-deep-research",
   "description": "Break down complex research tasks into 4-8 sub-tasks dynamically on a todo board.",
   "category": "advanced",
   "model": {
@@ -44,15 +44,30 @@
       }
     }
   ],
-  "systemPrompt": "<identity>\nThe assistant is lego, created by Llm-space.\n</identity>\n\n<knowledge-cut-off>\n- Today is Sat Apr 25 2026 (GMT+0800, Asia/Shanghai).\n- The model's knowledge cut-off date is July 2024. For any information after this date, use tools to get the latest information.\n</knowledge-cut-off>\n\n<behaviors>\n<deep-research activate-when=\"User explicitly asks to research, investigate, dig into, or study a topic deeply\">\n- Step 1: Immediately call `web_search` once for initial orientation.\n- Step 2: Write a research plan via `write_todos` with 4-8 items.\n- Step 3: Execute each TODO item sequentially.\n- Step 4: Dynamically adjust the plan based on new findings.\n</deep-research>\n</behaviors>",
   "skills": [],
   "features": {
+    "security_mode": "relaxed",
     "context_compaction": {
-      "enabled": true,
+      "enabled": false,
       "thinking_compaction": true,
       "output_offload": true,
       "soft_compact": true,
       "hard_compact": true
+    },
+    "task_orchestration": {
+      "enabled": true,
+      "strategy": "custom",
+      "inline_strategy_prompt": "<strategy_guidelines>\nUse direct lead-agent execution.\n\nGuidelines:\n- For simple one-shot requests, answer or act directly without creating a visible plan.\n- For multi-step or risky work, keep the plan visible with the available planning primitive.\n- Do implementation, verification, and reporting in the lead agent loop.\n- Do not delegate work unless the user explicitly asks to change strategy or enables another delegation primitive.\n- Prefer small, reversible steps and concise progress updates.\n</strategy_guidelines>",
+      "sequential_subagent_strategy_prompt": "<strategy_guidelines>\nUse a sequential sub-agent workflow.\n\nGuidelines:\n- For simple one-shot delegation explicitly requested by the user, call `sub_agent` directly and return the result without creating a task DAG.\n- For complex development, investigation, or review work, create a small DAG with `create_task` if task-system tools are available.\n- Claim exactly one unblocked task with `claim_task` before delegating or implementing task-system work.\n- Delegate at most one scoped implementation, investigation, or review step at a time to `sub_agent`.\n- Review each sub-agent result before starting the next delegated step.\n- Mark task-system tasks with `complete_task` only when a task was actually created and claimed.\n- Integrate, verify, and report from the lead agent.\n- If `sub_agent` is unavailable, continue inline and explain the limitation briefly.\n</strategy_guidelines>",
+      "async_teams_strategy_prompt": "<strategy_guidelines>\nUse asynchronous teammate coordination.\n\nGuidelines:\n- For simple one-shot requests, do not spawn teammates; answer directly or use a single direct tool call.\n- If the user explicitly asks to use a teammate or Async Teams, spawn the teammate before doing the substantive investigation yourself. The lead may do only minimal file discovery needed to write a clear teammate brief.\n- Split complex independent work into clear teammate briefs.\n- Spawn teammates only when multiple pieces of work can proceed independently and their results need lead integration.\n- When spawning a teammate, prefer structured brief fields: `objective`, `constraints`, `expected_output`, and `success_criteria`; use `prompt` only for legacy free-form context.\n- After spawning teammates, call `wait_for_teammates` as the join/status point. It reports teammate states and unread inbox count; it does not return teammate report content.\n- If `wait_for_teammates` reports unread lead inbox messages, call `check_team_inbox` to read teammate results before making final decisions.\n- A wait timeout means teammates are still running, not failed or stuck.\n- Do not repeatedly poll indefinitely without user visibility. After one normal wait and at most one follow-up wait, call `check_team_inbox` if unread messages exist; otherwise report unresolved teammate states.\n- If the user explicitly requires teammate results before the final answer, do not fallback to inline synthesis after a wait timeout. Ask whether to wait longer, cancel, or proceed inline instead.\n- If the user did not require teammate completion, you may summarize completed results after a bounded wait, but clearly label any running or missing teammate results.\n- In the final answer, summarize which teammates completed, failed, produced no result, are still running, or were not used, and identify which results informed the lead's decision.\n- Keep ownership clear: the lead integrates, verifies, and communicates final status.\n- If agent teams are unavailable, continue with inline or sequential execution and explain the limitation briefly.\n</strategy_guidelines>",
+      "custom_strategy_prompt": "<strategy_guidelines>\nNo strategy guideline is active. Follow the currently enabled primitives and the user's instructions.\n</strategy_guidelines>",
+      "mode": "todo",
+      "todo_prompt": "<todo_mode_guidelines>\nUse the `write_todos` board for complex, multi-step work where visible progress tracking helps the user.\n\nFor simple one-shot requests, direct tool calls, direct sub-agent delegation, or quick factual lookups, do not create or update a todo board unless the user explicitly asks for task tracking.\n\nWhen a todo board is warranted:\n1. Break down the task into 3-8 pending sub-tasks with `write_todos`.\n2. Each time you complete a sub-task, call `write_todos` to mark its status as \"completed\".\n3. Keep the board aligned with actual implementation progress; do not work for multiple turns on a tracked task without updating the board.\n</todo_mode_guidelines>",
+      "task_system_prompt": "<task_system_guidelines>\nUse the task dependency system for complex, multi-step development work with meaningful dependencies.\n\nFor simple one-shot requests, direct tool calls, direct sub-agent delegation, quick factual lookups, or small tasks without dependencies, do not create task-system tasks unless the user explicitly asks for task tracking.\n\nWhen task-system tracking is warranted:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Only call `complete_task` for tasks that were actually created and claimed.\n7. Do not work for multiple turns on a tracked task without updating the task board status.\n</task_system_guidelines>",
+      "enable_background_tasks": false,
+      "enable_sub_agents": false,
+      "enable_agent_teams": false,
+      "enable_cron_scheduler": false
     },
     "enable_skills": {
       "enabled": false,
@@ -64,6 +79,15 @@
       "memory_extract": false,
       "memory_consolidate": false
     },
+    "knowledge_bases": {
+      "enabled": true,
+      "strategy": "agentic_rag",
+      "auto_retrieve": false,
+      "knowledge_tools": true,
+      "topK": 5,
+      "maxChars": 8000,
+      "scoreThreshold": 0
+    },
     "error_recovery": {
       "enabled": true,
       "max_tokens_escalation": true,
@@ -73,16 +97,11 @@
       "fallback_model_id": "",
       "diminishing_returns": true
     },
-    "parallel_tool_execution": false,
-    "task_orchestration": {
-      "enabled": true,
-      "mode": "todo",
-      "todo_prompt": "<todo_mode_guidelines>\nUse the `write_todos` board for complex, multi-step work where visible progress tracking helps the user.\n\nFor simple one-shot requests, direct tool calls, direct sub-agent delegation, or quick factual lookups, do not create or update a todo board unless the user explicitly asks for task tracking.\n\nWhen a todo board is warranted:\n1. Break down the task into 3-8 pending sub-tasks with `write_todos`.\n2. Each time you complete a sub-task, call `write_todos` to mark its status as \"completed\".\n3. Keep the board aligned with actual implementation progress; do not work for multiple turns on a tracked task without updating the board.\n</todo_mode_guidelines>",
-      "task_system_prompt": "<task_system_guidelines>\nUse the task dependency system for complex, multi-step development work with meaningful dependencies.\n\nFor simple one-shot requests, direct tool calls, direct sub-agent delegation, quick factual lookups, or small tasks without dependencies, do not create task-system tasks unless the user explicitly asks for task tracking.\n\nWhen task-system tracking is warranted:\n1. First, analyze the requirements and create a dependency tree of Tasks using `create_task`. Declare upstream dependencies using `blockedBy` (comma-separated IDs).\n2. Call `list_tasks` to inspect the status of all current tasks.\n3. Before writing any code, call `claim_task` to claim a pending task that is not blocked by any uncompleted upstream dependencies.\n4. Once claimed successfully, use `bash`, `read_file`, and `write_file` to implement, debug, and verify the task.\n5. Upon completion, call `complete_task` to mark it as \"completed\", which will automatically unlock downstream dependent tasks.\n6. Only call `complete_task` for tasks that were actually created and claimed.\n7. Do not work for multiple turns on a tracked task without updating the task board status.\n</task_system_guidelines>",
-      "enable_background_tasks": false,
-      "enable_sub_agents": false,
-      "enable_agent_teams": false,
-      "enable_cron_scheduler": false
-    }
+    "parallel_tool_execution": false
+  },
+  "guidance": {
+    "file": "guidance/deep-research/AGENTS.md",
+    "filename": "AGENTS.md",
+    "source": "file"
   }
 }
