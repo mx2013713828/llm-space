@@ -1,3 +1,13 @@
+export function getWorkbenchStorage(
+  windowLike = typeof window === 'undefined' ? null : window,
+) {
+  try {
+    return windowLike?.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeWorkbenchPanelState(value, defaults) {
   const width = Number(value?.width);
 
@@ -7,6 +17,12 @@ export function normalizeWorkbenchPanelState(value, defaults) {
       : defaults.width,
     collapsed: Boolean(value?.collapsed),
   };
+}
+
+export function getWorkbenchPanelPresentation(panel, forceExpanded = false) {
+  return forceExpanded && panel.collapsed
+    ? { ...panel, collapsed: false }
+    : panel;
 }
 
 export function loadWorkbenchPanelState(storage, key, defaults) {

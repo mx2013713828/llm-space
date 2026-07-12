@@ -4,7 +4,7 @@
 
 **Goal:** Give Harness Explorer and the Trajectory configuration panel independent, persistent resize and collapse behavior so the agent trajectory can use the available workspace.
 
-**Architecture:** A pure `workbenchPanelState` module normalizes browser-local state and focus restoration without knowing React. `ResizableWorkbenchPanel` owns pointer capture, drag cleanup, and the expanded/collapsed presentation. `App.jsx` and `TrajectoryPage.jsx` each own one panel record; `TrajectoryView` only receives the focus action and state.
+**Architecture:** A pure `workbenchPanelState` module normalizes browser-local state and focus restoration without knowing React. `ResizableWorkbenchPanel` owns pointer capture, drag cleanup, and the expanded/collapsed presentation. `App.jsx` owns the Explorer panel record and exposes it through a narrow `WorkbenchLayoutContext`; `TrajectoryPage.jsx` owns the configuration record and uses that context to coordinate focus mode. `TrajectoryView` only receives the focus action and state.
 
 **Tech Stack:** React 19, CSS custom properties, Pointer Events, `localStorage`, Lucide React, `node:test`, Vite.
 
@@ -16,7 +16,7 @@
 - Persist only `{ width, collapsed }` in versioned browser-local keys; do not modify Harness JSON or server APIs.
 - Persist width on pointer release, never on every pointer move.
 - Do not re-mount `TrajectoryView`, `ConfigPanel`, or the agent loop while the user resizes.
-- Keep current narrow-screen behavior; desktop panel rails do not appear below the existing responsive breakpoint.
+- Keep current narrow-screen behavior: Harness Explorer remains hidden, runtime configuration remains usable as an expanded panel, and desktop rails/resize/focus controls do not appear below the existing responsive breakpoint.
 
 ---
 
@@ -155,14 +155,15 @@ git commit -m "feat: add resizable workbench panel primitive"
 - Modify: `src/App.jsx`
 - Modify: `src/pages/TrajectoryPage.jsx`
 - Modify: `src/components/TrajectoryView.jsx`
+- Create: `src/components/WorkbenchLayoutContext.jsx`
 - Modify: `src/App.css`
 
 **Interfaces:**
-- `App.jsx` owns `llm-space.workbench.harness-explorer.v1`.
-- `TrajectoryPage.jsx` owns `llm-space.workbench.trajectory-config.v1`.
+- `App.jsx` owns `llm-space.workbench.harness-explorer.v1` and provides `WorkbenchLayoutContext` with Explorer panel update/commit operations.
+- `TrajectoryPage.jsx` owns `llm-space.workbench.trajectory-config.v1` and reads the Explorer controls through `WorkbenchLayoutContext`.
 - `TrajectoryView` consumes `isFocusMode` and `onToggleFocusMode` for a toolbar control only.
 
-- [ ] **Step 1: Add failing focus semantics tests**
+- [x] **Step 1: Add focus semantics regression test (already green from Task 1 behavior)**
 
 ```js
 test('focus mode preserves an already collapsed explorer after restore', () => {
@@ -177,34 +178,34 @@ test('focus mode preserves an already collapsed explorer after restore', () => {
 });
 ```
 
-- [ ] **Step 2: Run the state test file and verify the focus test fails**
+- [x] **Step 2: Run the state test file and confirm the focus test is already green**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
-Expected: the restore behavior fails until the helper distinguishes already-collapsed panels.
+Expected: the restore behavior passes because Task 1 already snapshots every panel's prior `collapsed` flag and restores it correctly; no helper change is needed.
 
-- [ ] **Step 3: Wrap Harness Explorer in `App.jsx`**
+- [x] **Step 3: Create `WorkbenchLayoutContext` and wrap Harness Explorer in `App.jsx`**
 
-Initialize state via `loadWorkbenchPanelState(window.localStorage, 'llm-space.workbench.harness-explorer.v1', explorerDefaults)`. Render `HarnessExplorer` as the child of `ResizableWorkbenchPanel`; call `saveWorkbenchPanelState` on commit. Keep `main-content` as a `min-width: 0` flex sibling so route content grows into reclaimed space.
+Create `WorkbenchLayoutContext` with `{ explorerPanel, updateExplorerPanel, commitExplorerPanel }`. Initialize Explorer state via `loadWorkbenchPanelState(window.localStorage, 'llm-space.workbench.harness-explorer.v1', explorerDefaults)`. Render `HarnessExplorer` as the child of `ResizableWorkbenchPanel`; call `saveWorkbenchPanelState` on commit. Keep `main-content` as a `min-width: 0` flex sibling so route content grows into reclaimed space.
 
-- [ ] **Step 4: Wrap ConfigPanel in `TrajectoryPage.jsx`**
+- [x] **Step 4: Wrap ConfigPanel in `TrajectoryPage.jsx`**
 
 Initialize independent config state under `llm-space.workbench.trajectory-config.v1`. Wrap `ConfigPanel` with the same primitive. Do not key or conditionally re-create `TrajectoryView` while panel state changes.
 
-- [ ] **Step 5: Add focus control to `TrajectoryView.jsx`**
+- [x] **Step 5: Add focus control to `TrajectoryView.jsx`**
 
-Use Lucide `Focus` / `PanelLeftOpen` to add an icon-only action in the existing trajectory toolbar. Pass a callback back to `TrajectoryPage` that changes both panel states with `enterWorkbenchFocus`, stores a focus snapshot, and restores it using `restoreWorkbenchFocus`. If either panel is manually changed while focused, discard the snapshot and exit focus mode.
+Use Lucide `Focus` / `PanelLeftOpen` to add an icon-only action in the existing trajectory toolbar. `TrajectoryPage` reads Explorer controls from `WorkbenchLayoutContext`, changes both panel states with `enterWorkbenchFocus`, stores a focus snapshot, and restores both through their owning callbacks using `restoreWorkbenchFocus`. If either panel is manually changed while focused, discard the snapshot and exit focus mode.
 
-- [ ] **Step 6: Run integration checks**
+- [x] **Step 6: Run integration checks**
 
 Run: `node --test src/lib/workbenchPanelState.test.js && npm run build && git diff --check`
 
 Expected: tests pass, Vite builds, and there is no whitespace error.
 
-- [ ] **Step 7: Commit integration**
+- [x] **Step 7: Commit integration**
 
 ```bash
-git add src/App.jsx src/pages/TrajectoryPage.jsx src/components/TrajectoryView.jsx src/App.css src/lib/workbenchPanelState.test.js
+git add src/App.jsx src/pages/TrajectoryPage.jsx src/components/TrajectoryView.jsx src/components/WorkbenchLayoutContext.jsx src/App.css src/lib/workbenchPanelState.test.js
 git commit -m "feat: add resizable trajectory workbench panels"
 ```
 
@@ -217,7 +218,7 @@ git commit -m "feat: add resizable trajectory workbench panels"
 **Interfaces:**
 - No production interface changes.
 
-- [ ] **Step 1: Mark implemented requirements and manual verification status**
+- [x] **Step 1: Mark implemented requirements and manual verification status**
 
 Add an implementation status note to the design and check off automated work in this plan. Keep the manual visual acceptance item explicitly pending if browser automation remains blocked by host policy.
 
@@ -227,7 +228,11 @@ Run: `npm test && npm run build && git diff --check`
 
 Expected: all tests pass, the production build completes, and the diff check is clean.
 
+Observed: the test suite reported 562 passing tests and one unrelated failure in `server/agent/taskOrchestrationHarnesses.test.js` (`02-bash.json: raw enabled`), so the chained command stopped before its later stages. `npm run build` and `git diff --check` were then run individually and passed.
+
 - [ ] **Step 3: Perform manual desktop acceptance**
+
+Pending: host-local browser automation is unavailable in the verification environment. Run the desktop acceptance checklist below in a browser before final release acceptance.
 
 Verify at desktop width:
 
@@ -237,7 +242,7 @@ Verify at desktop width:
 4. Use focus mode, then restore; verify a panel already collapsed before focus remains collapsed afterward.
 5. Start an agent run, resize/collapse panels during streamed output, and confirm no message or input state resets.
 
-- [ ] **Step 4: Commit closeout documentation**
+- [x] **Step 4: Commit closeout documentation**
 
 ```bash
 git add docs/superpowers/specs/2026-07-12-resizable-workbench-panels-design.md docs/superpowers/plans/2026-07-12-resizable-workbench-panels.md

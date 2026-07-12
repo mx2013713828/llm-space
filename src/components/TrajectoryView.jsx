@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Focus, PanelLeftOpen } from 'lucide-react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage } from './MessageBubbles';
 import { TodoList } from './TodoList';
 import { ScheduledTasksPanel } from './ScheduledTasksPanel';
@@ -34,7 +35,9 @@ export function TrajectoryView({
   handleRetryTurn,
   loopCount,
   pendingPermission,
-  handlePermissionDecision
+  handlePermissionDecision,
+  isFocusMode,
+  onToggleFocusMode,
 }) {
   const contextWindow = getModelContextWindow(selectedModel);
   const maxTokens = contextWindow.value;
@@ -88,6 +91,16 @@ export function TrajectoryView({
           >{tab.label}</button>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            aria-label={isFocusMode ? 'Restore workspace' : 'Focus trajectory'}
+            aria-pressed={isFocusMode}
+            className="trajectory-focus-toggle"
+            title={isFocusMode ? 'Restore workspace' : 'Focus trajectory'}
+            type="button"
+            onClick={onToggleFocusMode}
+          >
+            {isFocusMode ? <PanelLeftOpen size={17} /> : <Focus size={17} />}
+          </button>
           {totalCacheTokens > 0 && (
             <span
               onClick={() => setShowCacheDetail(v => !v)}

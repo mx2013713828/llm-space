@@ -1,5 +1,9 @@
 # Resizable Workbench Panels Design
 
+## Implementation Status
+
+Automated implementation for the resizable workbench panels is complete. The production build and whitespace check pass; the full test suite has one unrelated failure in `server/agent/taskOrchestrationHarnesses.test.js` (`02-bash.json: raw enabled`). The manual desktop acceptance checklist remains pending because host-local browser automation is unavailable in the verification environment. No production interface changes are required for this documentation closeout.
+
 ## Goal
 
 Give the Trajectory workspace more room by making its two left-side panels independently resizable and collapsible:
@@ -36,7 +40,7 @@ The two panels remain separate ownership boundaries:
 
 The remaining width belongs to the trajectory. While dragging, the page disables text selection and uses the appropriate resize cursor. Width writes are applied live with CSS custom properties or inline style, and are persisted only after the pointer is released to avoid storage churn.
 
-At viewport widths below the existing narrow-screen breakpoint, the current responsive behavior remains authoritative: the desktop panels are hidden rather than exposing the new rails.
+At viewport widths below the existing narrow-screen breakpoint, the current responsive behavior remains authoritative: Harness Explorer stays hidden, while runtime configuration remains visible and usable. The configuration panel temporarily presents as expanded; its desktop rail, collapse action, resize handle, and focus control are hidden without changing the persisted desktop preference.
 
 ## Interaction
 
@@ -89,6 +93,8 @@ src/components/ResizableWorkbenchPanel.jsx
 ```
 
 `App.jsx` owns the Harness Explorer panel state. `TrajectoryPage.jsx` owns its configuration panel state and passes focus actions into `TrajectoryView`. The shared component receives fixed identity, bounds, a state object, and update callbacks; it never knows about Harnesses or agent configuration.
+
+`WorkbenchLayoutContext` is the narrow coordination bridge for focus mode. `App.jsx` provides only the Explorer panel state, its setter, and focus snapshot operations. `TrajectoryPage.jsx` continues to own configuration state, reads the Explorer controls through the context, and performs the two-panel focus/restore transition. This avoids global browser events and keeps the two layout records independent.
 
 ## Error Handling And Performance
 

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { FolderTree } from 'lucide-react';
 import './index.css';
 import './App.css';
 import { TrajectoryPage } from './pages/TrajectoryPage';
@@ -7,7 +8,22 @@ import { PromptLabPage } from './pages/PromptLabPage';
 import { KnowledgePage } from './pages/KnowledgePage';
 import { McpPage } from './pages/McpPage';
 import { HarnessExplorer } from './components/HarnessExplorer';
+import { ResizableWorkbenchPanel } from './components/ResizableWorkbenchPanel';
+import { WorkbenchLayoutContext } from './components/WorkbenchLayoutContext';
 import { apiFetch } from './lib/apiClient';
+import {
+  getWorkbenchStorage,
+  loadWorkbenchPanelState,
+  saveWorkbenchPanelState,
+} from './lib/workbenchPanelState';
+
+const EXPLORER_STORAGE_KEY = 'llm-space.workbench.harness-explorer.v1';
+const EXPLORER_DEFAULTS = {
+  width: 272,
+  minWidth: 216,
+  maxWidth: 420,
+  collapsed: false,
+};
 
 /* ===== 导航配置 ===== */
 const TABS = [
@@ -69,6 +85,24 @@ function AppContent() {
   const [harnessFiles, setHarnessFiles] = useState([]);
   const [harness, setHarness] = useState(null);
   const [sessions, setSessions] = useState({});
+  const [explorerPanel, updateExplorerPanel] = useState(() => (
+    loadWorkbenchPanelState(getWorkbenchStorage(), EXPLORER_STORAGE_KEY, EXPLORER_DEFAULTS)
+  ));
+
+  const commitExplorerPanel = useCallback((nextPanel) => {
+    const persistedPanel = saveWorkbenchPanelState(
+      getWorkbenchStorage(),
+      EXPLORER_STORAGE_KEY,
+      nextPanel,
+      EXPLORER_DEFAULTS,
+    );
+    updateExplorerPanel(persistedPanel);
+  }, []);
+  const workbenchLayout = useMemo(() => ({
+    explorerPanel,
+    updateExplorerPanel,
+    commitExplorerPanel,
+  }), [explorerPanel, commitExplorerPanel]);
 
   const syncTimeoutRef = useRef(null);
 
@@ -304,60 +338,73 @@ function AppContent() {
       </header>
 
       {/* ===== 主体 ===== */}
-      <div className="app-body">
-        <HarnessExplorer
-          harnesses={harnessFiles}
-          activeHarnessId={activeHarnessId}
-          onSelect={(id) => navigate(`/${id}/${activeTab}`)}
-          onRefresh={loadHarnessList}
-          onCreate={handleCreateHarness}
-          onEdit={handleEditHarness}
-          onDuplicate={handleDuplicateHarness}
-          onDelete={handleDeleteHarness}
-        />
+      <WorkbenchLayoutContext.Provider value={workbenchLayout}>
+        <div className="app-body">
+          <ResizableWorkbenchPanel
+            id="harness-explorer-panel"
+            label="Harness Explorer"
+            icon={<FolderTree size={16} />}
+            panel={explorerPanel}
+            minWidth={EXPLORER_DEFAULTS.minWidth}
+            maxWidth={EXPLORER_DEFAULTS.maxWidth}
+            onPanelChange={updateExplorerPanel}
+            onPanelCommit={commitExplorerPanel}
+          >
+            <HarnessExplorer
+              harnesses={harnessFiles}
+              activeHarnessId={activeHarnessId}
+              onSelect={(id) => navigate(`/${id}/${activeTab}`)}
+              onRefresh={loadHarnessList}
+              onCreate={handleCreateHarness}
+              onEdit={handleEditHarness}
+              onDuplicate={handleDuplicateHarness}
+              onDelete={handleDeleteHarness}
+            />
+          </ResizableWorkbenchPanel>
 
-        {/* 主内容区 */}
-        <main className="main-content">
-          {activeTab === 'trajectory' && harness && (
-            <TrajectoryPage 
-              key={activeHarnessId} 
-              harness={harness} 
-              savedSession={currentSession}
-              onSessionUpdate={handleSessionUpdate}
-              onSessionReset={handleSessionReset}
-              onHarnessUpdate={handleHarnessUpdate}
-            />
-          )}
-          {activeTab === 'prompt-lab' && harness && (
-            <PromptLabPage 
-              key={activeHarnessId} 
-              harness={harness} 
-              onSave={(updatedHarness) => {
-                return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(updatedHarness)
-                }).then(() => setHarness(updatedHarness));
-              }}
-            />
-          )}
-          {activeTab === 'knowledge' && (
-            <KnowledgePage
-              harness={harness}
-              onSave={(updatedHarness) => {
-                return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(updatedHarness)
-                }).then(() => setHarness(updatedHarness));
-              }}
-            />
-          )}
-          {activeTab === 'mcp' && (
-            <McpPage harness={harness} />
-          )}
-        </main>
-      </div>
+          {/* 主内容区 */}
+          <main className="main-content">
+            {activeTab === 'trajectory' && harness && (
+              <TrajectoryPage
+                key={activeHarnessId}
+                harness={harness}
+                savedSession={currentSession}
+                onSessionUpdate={handleSessionUpdate}
+                onSessionReset={handleSessionReset}
+                onHarnessUpdate={handleHarnessUpdate}
+              />
+            )}
+            {activeTab === 'prompt-lab' && harness && (
+              <PromptLabPage
+                key={activeHarnessId}
+                harness={harness}
+                onSave={(updatedHarness) => {
+                  return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedHarness)
+                  }).then(() => setHarness(updatedHarness));
+                }}
+              />
+            )}
+            {activeTab === 'knowledge' && (
+              <KnowledgePage
+                harness={harness}
+                onSave={(updatedHarness) => {
+                  return apiFetch(`/api/harnesses/${updatedHarness.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedHarness)
+                  }).then(() => setHarness(updatedHarness));
+                }}
+              />
+            )}
+            {activeTab === 'mcp' && (
+              <McpPage harness={harness} />
+            )}
+          </main>
+        </div>
+      </WorkbenchLayoutContext.Provider>
     </div>
   );
 }

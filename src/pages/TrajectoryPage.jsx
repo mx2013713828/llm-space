@@ -1,14 +1,123 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { useModels } from '../hooks/useModels';
 import { useAgentLoop } from '../hooks/useAgentLoop';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 
 import { ConfigPanel } from '../components/ConfigPanel';
+import { ResizableWorkbenchPanel } from '../components/ResizableWorkbenchPanel';
 import { TrajectoryView } from '../components/TrajectoryView';
 import { ContextInspector } from '../components/ContextInspector';
+import { useWorkbenchLayout } from '../components/WorkbenchLayoutContext';
 import { apiFetch } from '../lib/apiClient';
+import {
+  enterWorkbenchFocus,
+  getWorkbenchPanelPresentation,
+  getWorkbenchStorage,
+  loadWorkbenchPanelState,
+  restoreWorkbenchFocus,
+  saveWorkbenchPanelState,
+} from '../lib/workbenchPanelState';
+
+const CONFIG_STORAGE_KEY = 'llm-space.workbench.trajectory-config.v1';
+const NARROW_WORKBENCH_QUERY = '(max-width: 900px)';
+const CONFIG_DEFAULTS = {
+  width: 340,
+  minWidth: 280,
+  maxWidth: 480,
+  collapsed: false,
+};
+
+function panelsMatch(left, right) {
+  return left?.width === right?.width && left?.collapsed === right?.collapsed;
+}
+
+function isNarrowWorkbenchViewport() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(NARROW_WORKBENCH_QUERY).matches;
+}
 
 export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessionReset, onHarnessUpdate }) {
+  const {
+    explorerPanel,
+    updateExplorerPanel,
+  } = useWorkbenchLayout();
+  const [configPanel, setConfigPanel] = useState(() => (
+    loadWorkbenchPanelState(getWorkbenchStorage(), CONFIG_STORAGE_KEY, CONFIG_DEFAULTS)
+  ));
+  const [isNarrowViewport, setIsNarrowViewport] = useState(isNarrowWorkbenchViewport);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const focusSnapshotRef = useRef(null);
+  const expectedExplorerPanelRef = useRef(null);
+
+  const cancelFocusMode = useCallback(() => {
+    focusSnapshotRef.current = null;
+    expectedExplorerPanelRef.current = null;
+    setIsFocusMode(false);
+  }, []);
+
+  const updateConfigPanel = useCallback((nextPanel) => {
+    cancelFocusMode();
+    setConfigPanel(nextPanel);
+  }, [cancelFocusMode]);
+
+  const commitConfigPanel = useCallback((nextPanel) => {
+    cancelFocusMode();
+    const persistedPanel = saveWorkbenchPanelState(
+      getWorkbenchStorage(),
+      CONFIG_STORAGE_KEY,
+      nextPanel,
+      CONFIG_DEFAULTS,
+    );
+    setConfigPanel(persistedPanel);
+  }, [cancelFocusMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+
+    const mediaQuery = window.matchMedia(NARROW_WORKBENCH_QUERY);
+    const updateViewport = (event) => setIsNarrowViewport(event.matches);
+    mediaQuery.addEventListener('change', updateViewport);
+    return () => mediaQuery.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!focusSnapshotRef.current) return;
+
+    if (panelsMatch(explorerPanel, expectedExplorerPanelRef.current)) {
+      expectedExplorerPanelRef.current = null;
+      return;
+    }
+
+    cancelFocusMode();
+  }, [cancelFocusMode, explorerPanel]);
+
+  const toggleFocusMode = useCallback(() => {
+    if (focusSnapshotRef.current) {
+      const restoredPanels = restoreWorkbenchFocus(
+        { explorer: explorerPanel, config: configPanel },
+        focusSnapshotRef.current,
+      );
+      focusSnapshotRef.current = null;
+      expectedExplorerPanelRef.current = null;
+      setIsFocusMode(false);
+      updateExplorerPanel(restoredPanels.explorer);
+      setConfigPanel(restoredPanels.config);
+      return;
+    }
+
+    const focused = enterWorkbenchFocus({
+      explorer: explorerPanel,
+      config: configPanel,
+    });
+    focusSnapshotRef.current = focused.snapshot;
+    expectedExplorerPanelRef.current = focused.panels.explorer;
+    setIsFocusMode(true);
+    updateExplorerPanel(focused.panels.explorer);
+    setConfigPanel(focused.panels.config);
+  }, [configPanel, explorerPanel, updateExplorerPanel]);
+
   // 1. 模型管理 Hook
   const {
     models,
@@ -210,39 +319,51 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
 
   // 5. 自动滚动 Hook
   const { chatEndRef, scrollContainerRef } = useAutoScroll(agentState.messages, activeRightTab);
+  const presentedConfigPanel = getWorkbenchPanelPresentation(configPanel, isNarrowViewport);
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
       {/* 左侧配置面板 */}
-      <ConfigPanel
-        harness={harness}
-        models={models}
-        selectedModel={selectedModel}
-        setSelectedModel={setSelectedModel}
-        showAddModel={showAddModel}
-        setShowAddModel={setShowAddModel}
-        showEditModel={showEditModel}
-        setShowEditModel={setShowEditModel}
-        newModelConfig={newModelConfig}
-        setNewModelConfig={setNewModelConfig}
-        editModelConfig={editModelConfig}
-        setEditModelConfig={setEditModelConfig}
-        handleAddModel={handleAddModel}
-        handleUpdateModel={handleUpdateModel}
-        
-        temperature={temperature}
-        setTemperature={setTemperature}
-        maxTokens={maxTokens}
-        setMaxTokens={setMaxTokens}
-        thinkingEnabled={thinkingEnabled}
-        setThinkingEnabled={setThinkingEnabled}
-        
-        systemPrompt={systemPrompt}
-        guidanceFile={guidanceFile}
-        isPromptDirty={isPromptDirty}
-        onPromptChange={handlePromptChange}
-        onSavePrompt={handleSavePrompt}
-      />
+      <ResizableWorkbenchPanel
+        id="trajectory-config-panel"
+        label="Runtime Configuration"
+        icon={<SlidersHorizontal size={16} />}
+        panel={presentedConfigPanel}
+        minWidth={CONFIG_DEFAULTS.minWidth}
+        maxWidth={CONFIG_DEFAULTS.maxWidth}
+        onPanelChange={updateConfigPanel}
+        onPanelCommit={commitConfigPanel}
+      >
+        <ConfigPanel
+          harness={harness}
+          models={models}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          showAddModel={showAddModel}
+          setShowAddModel={setShowAddModel}
+          showEditModel={showEditModel}
+          setShowEditModel={setShowEditModel}
+          newModelConfig={newModelConfig}
+          setNewModelConfig={setNewModelConfig}
+          editModelConfig={editModelConfig}
+          setEditModelConfig={setEditModelConfig}
+          handleAddModel={handleAddModel}
+          handleUpdateModel={handleUpdateModel}
+
+          temperature={temperature}
+          setTemperature={setTemperature}
+          maxTokens={maxTokens}
+          setMaxTokens={setMaxTokens}
+          thinkingEnabled={thinkingEnabled}
+          setThinkingEnabled={setThinkingEnabled}
+
+          systemPrompt={systemPrompt}
+          guidanceFile={guidanceFile}
+          isPromptDirty={isPromptDirty}
+          onPromptChange={handlePromptChange}
+          onSavePrompt={handleSavePrompt}
+        />
+      </ResizableWorkbenchPanel>
 
       {/* 右侧轨迹视图 */}
       <TrajectoryView
@@ -272,6 +393,8 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         loopCount={agentState.loopCount}
         pendingPermission={agentState.pendingPermission}
         handlePermissionDecision={agentState.handlePermissionDecision}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={toggleFocusMode}
       />
 
       {/* 上下文检查器模态框 */}
