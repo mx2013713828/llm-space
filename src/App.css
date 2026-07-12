@@ -674,13 +674,23 @@
 
 .workbench-panel-rail {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: space-between;
   width: 42px;
   min-width: 42px;
   height: 100%;
-  padding-top: 7px;
+  padding: 7px;
   border-right: 1px solid var(--border);
+}
+
+.workbench-panel-rail-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue);
 }
 
 .workbench-resize-handle {

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
+import { startWorkbenchPanelDrag } from '../lib/workbenchPanelDrag.js';
 import { normalizeWorkbenchPanelState, toggleWorkbenchPanel } from '../lib/workbenchPanelState.js';
 
 const COLLAPSED_PANEL_WIDTH = 42;
@@ -25,24 +26,10 @@ export function ResizableWorkbenchPanel({
     onPanelCommitRef.current = onPanelCommit;
   }, [onPanelChange, onPanelCommit]);
 
-  const cleanUpDrag = useCallback((commit) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-
-    document.removeEventListener('pointermove', drag.onPointerMove);
-    document.removeEventListener('pointerup', drag.onPointerEnd);
-    document.removeEventListener('pointercancel', drag.onPointerEnd);
-    document.body.classList.remove('workbench-is-resizing');
-
-    if (drag.handle.hasPointerCapture?.(drag.pointerId)) {
-      drag.handle.releasePointerCapture(drag.pointerId);
-    }
-
+  useEffect(() => () => {
+    dragRef.current?.cleanup(false);
     dragRef.current = null;
-    if (commit) onPanelCommitRef.current?.(drag.panel);
   }, []);
-
-  useEffect(() => () => cleanUpDrag(false), [cleanUpDrag]);
 
   const updateCollapsed = () => {
     const nextPanel = toggleWorkbenchPanel(panel);
@@ -64,35 +51,26 @@ export function ResizableWorkbenchPanel({
       maxWidth,
       collapsed: panel.collapsed,
     });
-    const drag = {
-      handle,
-      panel: normalizePanel(panel),
+    const startLeft = panelElement.getBoundingClientRect().left;
+    const drag = startWorkbenchPanelDrag({
       pointerId: event.pointerId,
-      startLeft: panelElement.getBoundingClientRect().left,
-      onPointerMove: null,
-      onPointerEnd: null,
-    };
-
-    drag.onPointerMove = (moveEvent) => {
-      if (moveEvent.pointerId !== drag.pointerId) return;
-      const nextPanel = normalizePanel({
-        ...drag.panel,
-        width: moveEvent.clientX - drag.startLeft,
+      handle,
+      eventTarget: document,
+      bodyClassList: document.body.classList,
+      initialPanel: normalizePanel(panel),
+      getNextPanel: (currentPanel, clientX) => normalizePanel({
+        ...currentPanel,
+        width: clientX - startLeft,
         collapsed: false,
-      });
-      drag.panel = nextPanel;
-      onPanelChangeRef.current?.(nextPanel);
-    };
-    drag.onPointerEnd = (endEvent) => {
-      if (endEvent.pointerId === drag.pointerId) cleanUpDrag(true);
-    };
+      }),
+      onChange: (nextPanel) => onPanelChangeRef.current?.(nextPanel),
+      onCommit: (nextPanel) => onPanelCommitRef.current?.(nextPanel),
+      onCleanup: () => {
+        dragRef.current = null;
+      },
+    });
 
     dragRef.current = drag;
-    handle.setPointerCapture(event.pointerId);
-    document.body.classList.add('workbench-is-resizing');
-    document.addEventListener('pointermove', drag.onPointerMove);
-    document.addEventListener('pointerup', drag.onPointerEnd);
-    document.addEventListener('pointercancel', drag.onPointerEnd);
   };
 
   const panelTitle = `${label} panel`;
@@ -106,6 +84,7 @@ export function ResizableWorkbenchPanel({
     >
       {panel.collapsed ? (
         <div className="workbench-panel-rail">
+          <span aria-hidden="true" className="workbench-panel-rail-icon" title={label}>{icon}</span>
           <button
             aria-label={`Expand ${label}`}
             className="workbench-panel-toggle"
