@@ -40,7 +40,7 @@ The two panels remain separate ownership boundaries:
 
 The remaining width belongs to the trajectory. While dragging, the page disables text selection and uses the appropriate resize cursor. Width writes are applied live with CSS custom properties or inline style, and are persisted only after the pointer is released to avoid storage churn.
 
-At viewport widths below the existing narrow-screen breakpoint, the current responsive behavior remains authoritative: the desktop panels are hidden rather than exposing the new rails.
+At viewport widths below the existing narrow-screen breakpoint, the current responsive behavior remains authoritative: Harness Explorer stays hidden, while runtime configuration remains visible and usable. The configuration panel temporarily presents as expanded; its desktop rail, collapse action, resize handle, and focus control are hidden without changing the persisted desktop preference.
 
 ## Interaction
 

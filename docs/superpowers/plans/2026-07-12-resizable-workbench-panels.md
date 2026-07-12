@@ -16,7 +16,7 @@
 - Persist only `{ width, collapsed }` in versioned browser-local keys; do not modify Harness JSON or server APIs.
 - Persist width on pointer release, never on every pointer move.
 - Do not re-mount `TrajectoryView`, `ConfigPanel`, or the agent loop while the user resizes.
-- Keep current narrow-screen behavior; desktop panel rails do not appear below the existing responsive breakpoint.
+- Keep current narrow-screen behavior: Harness Explorer remains hidden, runtime configuration remains usable as an expanded panel, and desktop rails/resize/focus controls do not appear below the existing responsive breakpoint.
 
 ---
 
