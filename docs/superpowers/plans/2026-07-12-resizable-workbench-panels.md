@@ -163,7 +163,7 @@ git commit -m "feat: add resizable workbench panel primitive"
 - `TrajectoryPage.jsx` owns `llm-space.workbench.trajectory-config.v1` and reads the Explorer controls through `WorkbenchLayoutContext`.
 - `TrajectoryView` consumes `isFocusMode` and `onToggleFocusMode` for a toolbar control only.
 
-- [x] **Step 1: Add failing focus semantics tests**
+- [x] **Step 1: Add focus semantics regression test (already green from Task 1 behavior)**
 
 ```js
 test('focus mode preserves an already collapsed explorer after restore', () => {
@@ -178,11 +178,11 @@ test('focus mode preserves an already collapsed explorer after restore', () => {
 });
 ```
 
-- [x] **Step 2: Run the state test file and verify the focus test fails**
+- [x] **Step 2: Run the state test file and confirm the focus test is already green**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
-Expected: the restore behavior fails until the helper distinguishes already-collapsed panels.
+Expected: the restore behavior passes because Task 1 already snapshots every panel's prior `collapsed` flag and restores it correctly; no helper change is needed.
 
 - [x] **Step 3: Create `WorkbenchLayoutContext` and wrap Harness Explorer in `App.jsx`**
 

@@ -627,6 +627,23 @@
   border-bottom: 1px solid var(--border);
 }
 
+.workbench-panel-expanded {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workbench-panel[data-collapsed='true'] .workbench-panel-expanded {
+  display: none;
+  pointer-events: none;
+}
+
+.workbench-panel:not([data-collapsed='true']) .workbench-panel-rail {
+  display: none;
+}
+
 .workbench-panel-label {
   display: inline-flex;
   align-items: center;
@@ -2602,7 +2619,6 @@
   .trajectory-layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   #harness-explorer-panel,
-  #trajectory-config-panel,
   .trajectory-focus-toggle { display: none; }
 }
 

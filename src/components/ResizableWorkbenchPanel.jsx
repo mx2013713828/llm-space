@@ -79,24 +79,27 @@ export function ResizableWorkbenchPanel({
     <aside
       aria-label={panelTitle}
       className="workbench-panel"
+      data-collapsed={panel.collapsed}
       id={id}
       style={{ width: panel.collapsed ? COLLAPSED_PANEL_WIDTH : panel.width }}
     >
-      {panel.collapsed ? (
-        <div className="workbench-panel-rail">
-          <span aria-hidden="true" className="workbench-panel-rail-icon" title={label}>{icon}</span>
-          <button
-            aria-label={`Expand ${label}`}
-            className="workbench-panel-toggle"
-            title={`Expand ${label}`}
-            type="button"
-            onClick={updateCollapsed}
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-        </div>
-      ) : (
-        <>
+      <div className="workbench-panel-rail">
+        <span aria-hidden="true" className="workbench-panel-rail-icon" title={label}>{icon}</span>
+        <button
+          aria-label={`Expand ${label}`}
+          className="workbench-panel-toggle"
+          title={`Expand ${label}`}
+          type="button"
+          onClick={updateCollapsed}
+        >
+          <PanelLeftOpen size={17} />
+        </button>
+      </div>
+      <div
+        aria-hidden={panel.collapsed || undefined}
+        className="workbench-panel-expanded"
+        inert={panel.collapsed || undefined}
+      >
           <div className="workbench-panel-header">
             <span className="workbench-panel-label">{icon}{label}</span>
             <button
@@ -117,8 +120,7 @@ export function ResizableWorkbenchPanel({
             aria-orientation="vertical"
             onPointerDown={beginResize}
           />
-        </>
-      )}
+      </div>
     </aside>
   );
 }
