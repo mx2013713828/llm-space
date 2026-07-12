@@ -31,6 +31,11 @@ test('normalizes missing and non-numeric widths to the default width', () => {
   });
 });
 
+test('normalizes a pointer-derived width at both resize bounds', () => {
+  assert.equal(normalizeWorkbenchPanelState({ width: 100 }, defaults).width, defaults.minWidth);
+  assert.equal(normalizeWorkbenchPanelState({ width: 999 }, defaults).width, defaults.maxWidth);
+});
+
 test('loads malformed browser storage as defaults', () => {
   const storage = {
     getItem() {

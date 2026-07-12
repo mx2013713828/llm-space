@@ -598,10 +598,121 @@
 /* ===== 主内容 ===== */
 .main-content {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* ===== Resizable workbench panels ===== */
+.workbench-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.workbench-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 38px;
+  min-width: 0;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workbench-panel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workbench-panel-label svg { color: var(--blue); }
+
+.workbench-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.workbench-panel-toggle:hover,
+.workbench-panel-toggle:focus-visible {
+  border-color: rgba(79, 142, 247, 0.35);
+  background: var(--blue-dim);
+  color: var(--blue);
+  outline: none;
+}
+
+.workbench-panel-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workbench-panel-rail {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 42px;
+  min-width: 42px;
+  height: 100%;
+  padding-top: 7px;
+  border-right: 1px solid var(--border);
+}
+
+.workbench-resize-handle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.workbench-resize-handle::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--border);
+  content: '';
+}
+
+.workbench-resize-handle:hover::before,
+.workbench-is-resizing .workbench-resize-handle::before {
+  background: var(--blue);
+}
+
+.workbench-is-resizing,
+.workbench-is-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 /* ===== Knowledge 页面 ===== */

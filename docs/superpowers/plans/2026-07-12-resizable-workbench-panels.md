@@ -106,7 +106,7 @@ git commit -m "feat: add persistent workbench panel state"
 - Consumes: `{ id, label, icon, panel, minWidth, maxWidth, onPanelChange, onPanelCommit, children }`.
 - Produces: a stable expanded panel wrapper, 42px collapsed rail, and pointer-driven divider.
 
-- [ ] **Step 1: Extend the failing test with width clamping used by dragging**
+- [x] **Step 1: Extend the failing test with width clamping used by dragging**
 
 ```js
 test('normalizes a pointer-derived width at both resize bounds', () => {
@@ -115,13 +115,13 @@ test('normalizes a pointer-derived width at both resize bounds', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests**
+- [x] **Step 2: Run the focused tests**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
 Expected: the new boundary assertion fails until the state helper is complete.
 
-- [ ] **Step 3: Implement `ResizableWorkbenchPanel`**
+- [x] **Step 3: Implement `ResizableWorkbenchPanel`**
 
 ```jsx
 <aside className="workbench-panel" style={{ width: panel.collapsed ? 42 : panel.width }}>
@@ -132,17 +132,17 @@ Expected: the new boundary assertion fails until the state helper is complete.
 
 `beginResize` captures the pointer, temporarily adds `workbench-is-resizing` to `document.body`, updates local width on pointer move through `onPanelChange`, and calls `onPanelCommit` once on pointer up or pointer cancel. Cleanup releases pointer capture and removes listeners/classes on unmount. Header and rail controls use Lucide `PanelLeftClose` / `PanelLeftOpen` with labels and tooltips.
 
-- [ ] **Step 4: Add CSS for the desktop workbench interaction**
+- [x] **Step 4: Add CSS for the desktop workbench interaction**
 
 Add `.workbench-panel`, `.workbench-panel-rail`, `.workbench-resize-handle`, and `.workbench-is-resizing` styles. The handle has a 7px hit target with a 1px visual divider, becomes blue while active, and never changes the page's vertical geometry. Keep collapsed rails at 42px and use `min-width: 0` on sibling content so the trajectory receives recovered width.
 
-- [ ] **Step 5: Run focused state tests and production build**
+- [x] **Step 5: Run focused state tests and production build**
 
 Run: `node --test src/lib/workbenchPanelState.test.js && npm run build`
 
 Expected: tests pass and Vite completes successfully.
 
-- [ ] **Step 6: Commit the reusable panel primitive**
+- [x] **Step 6: Commit the reusable panel primitive**
 
 ```bash
 git add src/components/ResizableWorkbenchPanel.jsx src/App.css src/lib/workbenchPanelState.test.js
