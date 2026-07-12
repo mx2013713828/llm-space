@@ -163,7 +163,7 @@ git commit -m "feat: add resizable workbench panel primitive"
 - `TrajectoryPage.jsx` owns `llm-space.workbench.trajectory-config.v1` and reads the Explorer controls through `WorkbenchLayoutContext`.
 - `TrajectoryView` consumes `isFocusMode` and `onToggleFocusMode` for a toolbar control only.
 
-- [ ] **Step 1: Add failing focus semantics tests**
+- [x] **Step 1: Add failing focus semantics tests**
 
 ```js
 test('focus mode preserves an already collapsed explorer after restore', () => {
@@ -178,31 +178,31 @@ test('focus mode preserves an already collapsed explorer after restore', () => {
 });
 ```
 
-- [ ] **Step 2: Run the state test file and verify the focus test fails**
+- [x] **Step 2: Run the state test file and verify the focus test fails**
 
 Run: `node --test src/lib/workbenchPanelState.test.js`
 
 Expected: the restore behavior fails until the helper distinguishes already-collapsed panels.
 
-- [ ] **Step 3: Create `WorkbenchLayoutContext` and wrap Harness Explorer in `App.jsx`**
+- [x] **Step 3: Create `WorkbenchLayoutContext` and wrap Harness Explorer in `App.jsx`**
 
 Create `WorkbenchLayoutContext` with `{ explorerPanel, updateExplorerPanel, commitExplorerPanel }`. Initialize Explorer state via `loadWorkbenchPanelState(window.localStorage, 'llm-space.workbench.harness-explorer.v1', explorerDefaults)`. Render `HarnessExplorer` as the child of `ResizableWorkbenchPanel`; call `saveWorkbenchPanelState` on commit. Keep `main-content` as a `min-width: 0` flex sibling so route content grows into reclaimed space.
 
-- [ ] **Step 4: Wrap ConfigPanel in `TrajectoryPage.jsx`**
+- [x] **Step 4: Wrap ConfigPanel in `TrajectoryPage.jsx`**
 
 Initialize independent config state under `llm-space.workbench.trajectory-config.v1`. Wrap `ConfigPanel` with the same primitive. Do not key or conditionally re-create `TrajectoryView` while panel state changes.
 
-- [ ] **Step 5: Add focus control to `TrajectoryView.jsx`**
+- [x] **Step 5: Add focus control to `TrajectoryView.jsx`**
 
 Use Lucide `Focus` / `PanelLeftOpen` to add an icon-only action in the existing trajectory toolbar. `TrajectoryPage` reads Explorer controls from `WorkbenchLayoutContext`, changes both panel states with `enterWorkbenchFocus`, stores a focus snapshot, and restores both through their owning callbacks using `restoreWorkbenchFocus`. If either panel is manually changed while focused, discard the snapshot and exit focus mode.
 
-- [ ] **Step 6: Run integration checks**
+- [x] **Step 6: Run integration checks**
 
 Run: `node --test src/lib/workbenchPanelState.test.js && npm run build && git diff --check`
 
 Expected: tests pass, Vite builds, and there is no whitespace error.
 
-- [ ] **Step 7: Commit integration**
+- [x] **Step 7: Commit integration**
 
 ```bash
 git add src/App.jsx src/pages/TrajectoryPage.jsx src/components/TrajectoryView.jsx src/components/WorkbenchLayoutContext.jsx src/App.css src/lib/workbenchPanelState.test.js

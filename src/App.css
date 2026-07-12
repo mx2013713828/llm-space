@@ -672,6 +672,14 @@
   overflow: hidden;
 }
 
+.workbench-panel-content > .harness-explorer,
+.workbench-panel-content > .config-panel {
+  width: 100% !important;
+  min-width: 0;
+  flex: 1 1 auto !important;
+  border-right: 0;
+}
+
 .workbench-panel-rail {
   display: flex;
   flex-direction: column;
@@ -723,6 +731,30 @@
 .workbench-is-resizing * {
   cursor: col-resize !important;
   user-select: none;
+}
+
+.trajectory-focus-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.trajectory-focus-toggle:hover,
+.trajectory-focus-toggle:focus-visible,
+.trajectory-focus-toggle[aria-pressed='true'] {
+  border-color: rgba(79, 142, 247, 0.42);
+  background: var(--blue-dim);
+  color: var(--blue);
+  outline: none;
 }
 
 /* ===== Knowledge 页面 ===== */
@@ -2569,6 +2601,9 @@
 @media (max-width: 900px) {
   .trajectory-layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
+  #harness-explorer-panel,
+  #trajectory-config-panel,
+  .trajectory-focus-toggle { display: none; }
 }
 
 /* ===== 模型选择器 ===== */

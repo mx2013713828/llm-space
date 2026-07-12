@@ -105,3 +105,15 @@ test('focus mode preserves panel values while changing collapse state', () => {
   assert.deepEqual(focused.snapshot, { explorer: false });
   assert.deepEqual(panels, { explorer: { width: 272, collapsed: false } });
 });
+
+test('focus mode preserves an already collapsed explorer after restore', () => {
+  const focused = enterWorkbenchFocus({
+    explorer: { width: 272, collapsed: true },
+    config: { width: 340, collapsed: false },
+  });
+
+  assert.deepEqual(restoreWorkbenchFocus(focused.panels, focused.snapshot), {
+    explorer: { width: 272, collapsed: true },
+    config: { width: 340, collapsed: false },
+  });
+});
