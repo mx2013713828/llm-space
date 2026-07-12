@@ -84,7 +84,6 @@ export function ResizableWorkbenchPanel({
       style={{ width: panel.collapsed ? COLLAPSED_PANEL_WIDTH : panel.width }}
     >
       <div className="workbench-panel-rail">
-        <span aria-hidden="true" className="workbench-panel-rail-icon" title={label}>{icon}</span>
         <button
           aria-label={`Expand ${label}`}
           className="workbench-panel-toggle"
@@ -94,6 +93,7 @@ export function ResizableWorkbenchPanel({
         >
           <PanelLeftOpen size={17} />
         </button>
+        <span aria-hidden="true" className="workbench-panel-rail-icon" title={label}>{icon}</span>
       </div>
       <div
         aria-hidden={panel.collapsed || undefined}

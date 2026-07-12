@@ -701,7 +701,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   width: 42px;
   min-width: 42px;
   height: 100%;

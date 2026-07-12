@@ -794,9 +794,6 @@ body {
 .animate-slide-in { animation: slideIn var(--duration-normal) var(--ease-smooth) both; }
 .animate-bounce-in { animation: bounce-in 0.4s var(--ease-smooth) both; }
 
-/* ===== 工具提示 ===== */
-[title] { cursor: help; }
-
 /* ===== 渐变文字 ===== */
 .gradient-text {
   background: linear-gradient(135deg, var(--blue), var(--purple));
