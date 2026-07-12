@@ -27,9 +27,9 @@ const trackedHarnessExpectations = {
     enable_cron_scheduler: false,
   },
   '02-bash.json': {
-    enabled: true,
+    enabled: false,
     mode: 'todo',
-    enable_background_tasks: true,
+    enable_background_tasks: false,
     enable_sub_agents: false,
     enable_agent_teams: false,
     enable_cron_scheduler: false,
@@ -53,8 +53,8 @@ const trackedHarnessExpectations = {
   '05-task-system.json': {
     enabled: true,
     mode: 'task_system',
-    enable_background_tasks: true,
-    enable_sub_agents: false,
+    enable_background_tasks: false,
+    enable_sub_agents: true,
     enable_agent_teams: false,
     enable_cron_scheduler: false,
   },
