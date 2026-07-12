@@ -90,6 +90,8 @@ src/components/ResizableWorkbenchPanel.jsx
 
 `App.jsx` owns the Harness Explorer panel state. `TrajectoryPage.jsx` owns its configuration panel state and passes focus actions into `TrajectoryView`. The shared component receives fixed identity, bounds, a state object, and update callbacks; it never knows about Harnesses or agent configuration.
 
+`WorkbenchLayoutContext` is the narrow coordination bridge for focus mode. `App.jsx` provides only the Explorer panel state, its setter, and focus snapshot operations. `TrajectoryPage.jsx` continues to own configuration state, reads the Explorer controls through the context, and performs the two-panel focus/restore transition. This avoids global browser events and keeps the two layout records independent.
+
 ## Error Handling And Performance
 
 - Local storage read/write failures do not block rendering.
