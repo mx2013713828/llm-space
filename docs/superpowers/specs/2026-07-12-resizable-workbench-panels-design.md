@@ -1,5 +1,9 @@
 # Resizable Workbench Panels Design
 
+## Implementation Status
+
+Automated implementation for the resizable workbench panels is complete. The production build and whitespace check pass; the full test suite has one unrelated failure in `server/agent/taskOrchestrationHarnesses.test.js` (`02-bash.json: raw enabled`). The manual desktop acceptance checklist remains pending because host-local browser automation is unavailable in the verification environment. No production interface changes are required for this documentation closeout.
+
 ## Goal
 
 Give the Trajectory workspace more room by making its two left-side panels independently resizable and collapsible:

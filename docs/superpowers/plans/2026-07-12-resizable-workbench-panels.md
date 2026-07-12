@@ -218,7 +218,7 @@ git commit -m "feat: add resizable trajectory workbench panels"
 **Interfaces:**
 - No production interface changes.
 
-- [ ] **Step 1: Mark implemented requirements and manual verification status**
+- [x] **Step 1: Mark implemented requirements and manual verification status**
 
 Add an implementation status note to the design and check off automated work in this plan. Keep the manual visual acceptance item explicitly pending if browser automation remains blocked by host policy.
 
@@ -228,7 +228,11 @@ Run: `npm test && npm run build && git diff --check`
 
 Expected: all tests pass, the production build completes, and the diff check is clean.
 
+Observed: the test suite reported 562 passing tests and one unrelated failure in `server/agent/taskOrchestrationHarnesses.test.js` (`02-bash.json: raw enabled`), so the chained command stopped before its later stages. `npm run build` and `git diff --check` were then run individually and passed.
+
 - [ ] **Step 3: Perform manual desktop acceptance**
+
+Pending: host-local browser automation is unavailable in the verification environment. Run the desktop acceptance checklist below in a browser before final release acceptance.
 
 Verify at desktop width:
 
@@ -238,7 +242,7 @@ Verify at desktop width:
 4. Use focus mode, then restore; verify a panel already collapsed before focus remains collapsed afterward.
 5. Start an agent run, resize/collapse panels during streamed output, and confirm no message or input state resets.
 
-- [ ] **Step 4: Commit closeout documentation**
+- [x] **Step 4: Commit closeout documentation**
 
 ```bash
 git add docs/superpowers/specs/2026-07-12-resizable-workbench-panels-design.md docs/superpowers/plans/2026-07-12-resizable-workbench-panels.md
