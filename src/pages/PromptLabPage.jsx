@@ -9,6 +9,7 @@ import {
 } from '../lib/taskOrchestration.js';
 import { applyKnowledgeRuntimeStrategy } from '../lib/knowledgeRuntime.js';
 import { apiFetch } from '../lib/apiClient.js';
+import HarnessVisualizer from '../components/HarnessVisualizer.jsx';
 
 const STRATEGY_PROMPT_VISIBILITY = {
   inline_strategy_prompt: 'inline',
@@ -297,6 +298,7 @@ export function PromptLabPage({ harness, onSave }) {
           { key: 'tools-edit', label: '🔧 Tools Mounting' },
           { key: 'features', label: '🔬 Experimental Features' },
           { key: 'templates', label: '📄 Templates' },
+          { key: 'visualizer', label: '👁️ Architecture View' },
         ].filter(Boolean).map(tab => (
           <button
             key={tab.key}
@@ -879,6 +881,18 @@ export function PromptLabPage({ harness, onSave }) {
             ))}
           </div>
         )}
+        {/* 架构可视化 */}
+        {activeTab === 'visualizer' && (
+          <div style={{ padding: '20px 0', overflowY: 'auto', flex: 1 }}>
+            <HarnessVisualizer
+              harness={harness}
+              features={features}
+              skills={selectedSkills}
+              tools={selectedTools}
+            />
+          </div>
+        )}
+
       </div>
     </div>
   );
