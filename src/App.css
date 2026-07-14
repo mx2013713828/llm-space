@@ -612,7 +612,7 @@
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-surface);
+  background: var(--bg-sidebar);
 }
 
 .workbench-panel-header {
