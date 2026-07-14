@@ -1,11 +1,8 @@
-/* ===== Google Fonts ===== */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
 /* ===== CSS 变量设计系统 ===== */
 :root {
   /* Default/fallback variables if no theme is set */
-  --font-sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 150ms;
@@ -111,6 +108,45 @@
 
   /* 侧边栏 */
   --bg-sidebar: #0d1017;
+
+  /* =========================================
+     Tier 2: 语义化 UI Tokens
+     ========================================= */
+  --ui-code-bg: var(--bg-base);
+  --ui-code-text: var(--text-code);
+  --ui-code-border: var(--border);
+  --ui-inline-code-bg: rgba(148, 163, 184, 0.12);
+  --ui-slider-track: var(--bg-elevated);
+  --ui-slider-thumb: var(--blue);
+  --ui-slider-value: var(--blue);
+  --ui-badge-neutral-bg: var(--bg-elevated);
+  --ui-badge-neutral-text: var(--text-secondary);
+  --ui-tab-active-color: var(--blue);
+  --ui-tab-active-shadow: none;
+  --ui-tab-active-bg: var(--blue-dim);
+  --ui-section-icon: var(--blue);
+  --ui-token-count: var(--blue-laser);
+  --ui-kb-monogram-bg: var(--bg-teal-faded);
+  --ui-kb-monogram-color: var(--cyan);
+  --ui-strategy-active-bg: linear-gradient(145deg, var(--bg-teal-faded), var(--bg-blue-faded));
+  --ui-btn-ghost-bg: rgba(255, 255, 255, 0.02);
+  --ui-btn-ghost-text: #a5b7d6;
+  --ui-btn-ghost-border: var(--border-light);
+  --ui-btn-ghost-hover-bg: var(--bg-elevated);
+  --ui-btn-ghost-hover-text: var(--text-primary);
+  --ui-btn-ghost-hover-border: var(--blue);
+  --ui-btn-ghost-hover-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+  --ui-accent: var(--blue);
+  --ui-accent-dim: var(--blue-dim);
+
+  /* Message Bubbles */
+  --ui-msg-thinking-bg: var(--purple-dim);
+  --ui-msg-thinking-border: rgba(168,85,247,0.2);
+  --ui-msg-thinking-accent: var(--purple);
+  --ui-msg-thinking-text: #c4b5fd;
+  --ui-msg-thinking-meta: #9f7aea;
+  --ui-msg-tool-accent: var(--cyan);
+  --ui-msg-text-accent: var(--green);
 }
 
 [data-theme="light"] {
@@ -137,12 +173,12 @@
   --red-dim: rgba(224, 46, 42, 0.12);
   --cyan: #0284c7;
   --orange: #ea580c;
-  --blue-laser: #0169cc;
+  --blue-laser: #374151;
 
   /* 文字色 (Ink) */
   --text-primary: #0d0d0d;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-secondary: #525252;
+  --text-muted: #737373;
   --text-code: #0369a1;
   --text-error: #b91c1c;
   --text-danger: #dc2626;
@@ -206,6 +242,45 @@
 
   /* 侧边栏 */
   --bg-sidebar: #f0ede8;
+
+  /* =========================================
+     Tier 2: 语义化 UI Tokens
+     ========================================= */
+  --ui-code-bg: #f4f4f4;
+  --ui-code-text: #374151;
+  --ui-code-border: #e4e4e4;
+  --ui-inline-code-bg: #f0f0f0;
+  --ui-slider-track: #e2e8f0;
+  --ui-slider-thumb: #374151;
+  --ui-slider-value: var(--text-secondary);
+  --ui-badge-neutral-bg: #f0f0f0;
+  --ui-badge-neutral-text: #374151;
+  --ui-tab-active-color: #0d0d0d;
+  --ui-tab-active-shadow: inset 0 -2px 0 #0d0d0d;
+  --ui-tab-active-bg: transparent;
+  --ui-section-icon: var(--text-muted);
+  --ui-token-count: var(--text-secondary);
+  --ui-kb-monogram-bg: #f4f4f4;
+  --ui-kb-monogram-color: #4b5563;
+  --ui-strategy-active-bg: var(--bg-card-hover);
+  --ui-btn-ghost-bg: transparent;
+  --ui-btn-ghost-text: var(--text-secondary);
+  --ui-btn-ghost-border: var(--border);
+  --ui-btn-ghost-hover-bg: #f4f4f4;
+  --ui-btn-ghost-hover-text: var(--text-primary);
+  --ui-btn-ghost-hover-border: #9ca3af;
+  --ui-btn-ghost-hover-shadow: none;
+  --ui-accent: var(--text-primary);
+  --ui-accent-dim: #e5e5e5;
+
+  /* Message Bubbles - Minimalist */
+  --ui-msg-thinking-bg: #f8fafc;
+  --ui-msg-thinking-border: #e2e8f0;
+  --ui-msg-thinking-accent: #64748b;
+  --ui-msg-thinking-text: #475569;
+  --ui-msg-thinking-meta: #94a3b8;
+  --ui-msg-tool-accent: #475569;
+  --ui-msg-text-accent: #0d0d0d;
 }
 
 
@@ -257,15 +332,15 @@ body {
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.02);
-  color: #a5b7d6;
-  border: 1px solid var(--border-light);
+  background: var(--ui-btn-ghost-bg);
+  color: var(--ui-btn-ghost-text);
+  border: 1px solid var(--ui-btn-ghost-border);
 }
 .btn-ghost:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border-color: var(--blue);
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+  background: var(--ui-btn-ghost-hover-bg);
+  color: var(--ui-btn-ghost-hover-text);
+  border-color: var(--ui-btn-ghost-hover-border);
+  box-shadow: var(--ui-btn-ghost-hover-shadow);
 }
 
 .btn-danger {
@@ -315,12 +390,12 @@ body {
 .code-block {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: var(--bg-base);
-  border: 1px solid var(--border);
+  background: var(--ui-code-bg);
+  border: 1px solid var(--ui-code-border);
   border-radius: var(--radius-sm);
   padding: 12px;
   overflow-x: auto;
-  color: var(--text-code);
+  color: var(--ui-code-text);
   line-height: 1.6;
 }
 
@@ -392,7 +467,7 @@ body {
 }
 
 .mcp-eyebrow {
-  color: var(--cyan);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -424,7 +499,7 @@ body {
 .mcp-alert {
   border: 1px solid rgba(34, 197, 94, 0.25);
   background: var(--green-dim);
-  color: #8ef0b4;
+  color: var(--green);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 13px;
@@ -433,7 +508,7 @@ body {
 .mcp-alert.error {
   border-color: rgba(239, 68, 68, 0.32);
   background: var(--red-dim);
-  color: #fca5a5;
+  color: var(--red);
 }
 
 .mcp-layout {
@@ -546,18 +621,18 @@ body {
   height: 20px;
   padding: 0 8px;
   border-radius: 99px;
-  background: var(--bg-subtle);
-  color: var(--text-secondary);
+  background: var(--ui-badge-neutral-bg, var(--bg-subtle));
+  color: var(--ui-badge-neutral-text, var(--text-secondary));
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.mcp-pill.connected { color: var(--green); background: var(--green-dim); }
-.mcp-pill.starting { color: var(--yellow); background: var(--yellow-dim); }
-.mcp-pill.error { color: var(--red); background: var(--red-dim); }
-.mcp-pill.blue { color: var(--blue); background: var(--blue-dim); }
+.mcp-pill.connected { color: var(--green); background: rgba(0, 162, 64, 0.12); }
+.mcp-pill.starting { color: var(--yellow); background: rgba(202, 138, 4, 0.12); }
+.mcp-pill.error { color: var(--red); background: rgba(224, 46, 42, 0.12); }
+.mcp-pill.blue { color: var(--ui-badge-neutral-text, var(--blue)); background: var(--ui-badge-neutral-bg, var(--blue-dim)); }
 
 .mcp-presets {
   border-top: 1px solid var(--border);
@@ -1003,4 +1078,16 @@ body {
 .animate-spin {
   display: inline-block;
   animation: spin 1.5s linear infinite;
+}
+
+/* blockquote 引用块颜色 */
+[data-theme="light"] .markdown-content blockquote {
+  border-left-color: #d1d5db;
+  color: var(--text-secondary);
+}
+
+/* blockquote 引用块颜色 */
+[data-theme="light"] .markdown-content blockquote {
+  border-left-color: #d1d5db;
+  color: var(--text-secondary);
 }
