@@ -47,6 +47,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           tokens: { input: lastInputTokens, output: 0 },
           signature: event.signature,
           streaming: true,
+          createdAt: event.created_at || event.createdAt,
         },
       ],
     };
@@ -92,6 +93,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           content: '',
           tokens: { input: lastInputTokens, output: 0 },
           streaming: true,
+          createdAt: event.created_at || event.createdAt,
         },
       ],
     };
@@ -147,6 +149,7 @@ export function applyStreamMessageEvent(messages, state, event, options = {}) {
           toolInputRaw: '',
           toolInput: {},
           toolStatus: 'pending',
+          createdAt: event.created_at || event.createdAt,
         },
       ],
     };

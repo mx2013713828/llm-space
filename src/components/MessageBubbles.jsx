@@ -1,4 +1,5 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
+import { Copy, Check } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
 import {
   getChildDisplayName,
@@ -13,19 +14,60 @@ import {
 } from '../lib/runtimeStatusPresentation.js';
 
 /**
+ * 消息底部区域 (时间戳 + 复制等操作)
+ */
+export function MessageFooter({ createdAt, copyText, streaming, showActions = true }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copied]);
+
+  if ((!createdAt && !copyText) || streaming) return null;
+
+  const handleCopy = () => {
+    if (copyText) {
+      navigator.clipboard.writeText(copyText).catch(() => {});
+      setCopied(true);
+    }
+  };
+
+  const formattedTime = createdAt ? new Date(createdAt).toLocaleString([], {
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }) : '';
+
+  return (
+    <div className="msg-footer">
+      <div className="msg-time">{formattedTime}</div>
+      {showActions && copyText && (
+        <div className="msg-actions">
+          <button type="button" className="msg-action-btn" aria-label="Copy to clipboard" title="Copy" onClick={handleCopy}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Thinking 气泡组件
  * 展示 agent 的内部思考过程，支持折叠/展开
  */
-export function ThinkingBubble({ content, tokens, duration, folded = false, isCollapsed: defaultCollapsed = true }) {
+export function ThinkingBubble({ content, tokens, duration, folded = false, isCollapsed: defaultCollapsed = true, createdAt }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   return (
-    <div className="message-bubble msg-thinking animate-fade-in">
+    <div className="message-bubble msg-thinking animate-fade-in group">
       <div className="msg-thinking-header" onClick={() => setCollapsed(!collapsed)}>
         <span>🧠</span>
         <span>Thinking Trajectory</span>
         {tokens && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9f7aea', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ui-token-count)', fontFamily: 'var(--font-mono)' }}>
             {tokens.input}↑ {tokens.output}↓
           </span>
         )}
@@ -64,6 +106,7 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
               )}
             </div>
           )}
+          <MessageFooter createdAt={createdAt} copyText={content} showActions={true} />
         </div>
       )}
     </div>
@@ -74,7 +117,7 @@ export function ThinkingBubble({ content, tokens, duration, folded = false, isCo
  * 工具调用卡片
  * 展示工具名称、输入参数、输出结果，支持折叠
  */
-export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subMessages, subAgentStatus, subAgentTrace, teamStatus }) {
+export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subMessages, subAgentStatus, subAgentTrace, teamStatus, createdAt }) {
   const [expanded, setExpanded] = useState(false);
   const [traceExpanded, setTraceExpanded] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
@@ -288,7 +331,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
   };
 
   return (
-    <div className="message-bubble msg-tool animate-fade-in" style={{ padding: 0 }}>
+    <div className="message-bubble msg-tool animate-fade-in group" style={{ padding: 0 }}>
       <div className="tool-call-header" onClick={() => setExpanded(!expanded)}>
         <span style={{ fontSize: 15 }}>{icon}</span>
         <span className="tool-call-name">{toolName}</span>
@@ -349,6 +392,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
           )}
           {renderChildTracePanel(subAgentTraceRequest)}
           {renderChildTracePanel(teammateTraceRequest)}
+          <MessageFooter createdAt={createdAt} showActions={false} />
         </div>
       )}
     </div>
@@ -358,7 +402,7 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
 /**
  * 用户消息气泡
  */
-export function UserMessage({ content, onRetry, variant = 'user' }) {
+export function UserMessage({ content, onRetry, variant = 'user', createdAt }) {
   const isScheduled = variant === 'scheduled';
   return (
     <div className="msg-user-container">
@@ -374,7 +418,7 @@ export function UserMessage({ content, onRetry, variant = 'user' }) {
           REWIND
         </button>
       )}
-      <div className={`message-bubble msg-user ${isScheduled ? 'msg-scheduled' : ''} animate-fade-in`}>
+      <div className={`message-bubble msg-user ${isScheduled ? 'msg-scheduled' : ''} animate-fade-in group`}>
         <div className="msg-user-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{isScheduled ? '⏰' : '👤'}</span>
@@ -383,6 +427,7 @@ export function UserMessage({ content, onRetry, variant = 'user' }) {
           </div>
         </div>
         <div style={{ color: 'var(--text-primary)', lineHeight: 1.65 }}>{content}</div>
+        <MessageFooter createdAt={createdAt} copyText={content} showActions={true} />
       </div>
     </div>
   );
@@ -391,9 +436,9 @@ export function UserMessage({ content, onRetry, variant = 'user' }) {
 /**
  * 助手文本回复
  */
-export const AssistantMessage = memo(function AssistantMessage({ content, isFinalAnswer = true, streaming = false }) {
+export const AssistantMessage = memo(function AssistantMessage({ content, isFinalAnswer = true, streaming = false, createdAt }) {
   return (
-    <div className="message-bubble msg-text animate-fade-in">
+    <div className="message-bubble msg-text animate-fade-in group">
       <div className="msg-text-header">
         <span>🤖</span>
         <span>Assistant</span>
@@ -408,6 +453,7 @@ export const AssistantMessage = memo(function AssistantMessage({ content, isFina
       ) : (
         <MarkdownRenderer content={content} />
       )}
+      <MessageFooter createdAt={createdAt} copyText={content} streaming={streaming} showActions={true} />
     </div>
   );
 });

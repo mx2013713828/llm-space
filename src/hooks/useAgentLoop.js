@@ -735,7 +735,7 @@ export function useAgentLoop({
     setIsRunning(true);
 
     const nextTurn = loopCount + 1;
-    const userMsg = { role: 'user', content: text, turn: nextTurn };
+    const userMsg = { role: 'user', content: text, turn: nextTurn, createdAt: new Date().toISOString() };
     const currentMessages = [...messages, userMsg];
 
     setMessages(currentMessages);

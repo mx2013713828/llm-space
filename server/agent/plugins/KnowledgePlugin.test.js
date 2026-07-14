@@ -198,6 +198,27 @@ test('KnowledgePlugin does not inject empty retrieved knowledge blocks', async (
 	assert.equal(context.promptAssemblySections.some(section => section.id === 'retrieved_knowledge'), false);
 });
 
+test('KnowledgePlugin degrades gracefully when automatic retrieval is unavailable', async () => {
+	const context = createKnowledgeContext({
+		retrievalError: new Error('fetch failed'),
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'auto_rag',
+				auto_retrieve: true,
+				knowledge_tools: false,
+			},
+		},
+	});
+
+	await KnowledgePlugin.preLLM(context);
+
+	assert.equal(context.apiMessages[0].content[0].text, 'What is RAG?');
+	const skipped = context.promptAssemblySections.find(section => section.id === 'retrieved_knowledge_unavailable');
+	assert.equal(skipped?.sentToModel, false);
+	assert.match(skipped?.content || '', /fetch failed/);
+});
+
 test('KnowledgePlugin leaves payload unchanged in manual_lab strategy', async () => {
 	const context = createKnowledgeContext({
 		features: {
@@ -269,6 +290,7 @@ test('KnowledgePlugin rejects knowledge tools when current strategy disables the
 function createKnowledgeContext({
 	features = {},
 	retrieval,
+	retrievalError,
 	retrievalChunks = [{
 		id: 'chk_1',
 		score: 3,
@@ -295,10 +317,11 @@ function createKnowledgeContext({
 						chunkCount: retrievalChunks.length,
 					};
 				},
-				async retrieveKnowledge({ knowledgeBaseIds, query }) {
-					assert.deepEqual(knowledgeBaseIds, ['kb_docs']);
-					if (!retrieval) assert.equal(query, 'What is RAG?');
-					return retrieval || {
+			async retrieveKnowledge({ knowledgeBaseIds, query }) {
+				assert.deepEqual(knowledgeBaseIds, ['kb_docs']);
+				if (!retrieval) assert.equal(query, 'What is RAG?');
+				if (retrievalError) throw retrievalError;
+				return retrieval || {
 						query,
 						chunks: retrievalChunks,
 					};

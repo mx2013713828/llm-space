@@ -2882,9 +2882,9 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   cursor: pointer;
-  background: rgba(168, 85, 247, 0.06);
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  color: #d8b4fe;
+  background: var(--ui-btn-rewind-bg);
+  border: 1px solid var(--ui-btn-rewind-border);
+  color: var(--ui-btn-rewind-text);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2897,9 +2897,10 @@
 
 .btn-rewind:hover {
   opacity: 1 !important;
-  color: #f3e8ff;
-  border-color: rgba(168, 85, 247, 0.6);
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.45), inset 0 0 4px rgba(168, 85, 247, 0.2);
+  color: var(--ui-btn-rewind-hover-text);
+  background: var(--ui-btn-rewind-hover-bg);
+  border-color: var(--ui-btn-rewind-hover-border);
+  box-shadow: var(--ui-btn-rewind-hover-shadow);
 }
 
 .btn-rewind svg {
@@ -2927,4 +2928,61 @@
 
 .animate-spin-fast {
   animation: spin 0.8s linear infinite;
+}
+
+/* =========================================
+   Message Footer (Time & Actions)
+   ========================================= */
+.msg-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  opacity: 0.6;
+  transition: opacity var(--duration-fast);
+}
+.group:hover .msg-footer,
+.msg-footer:focus-within {
+  opacity: 1;
+}
+
+.msg-time {
+  user-select: none;
+}
+
+.msg-actions {
+  display: flex;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity var(--duration-fast), transform var(--duration-fast);
+  transform: translateY(2px);
+}
+.group:hover .msg-actions,
+.msg-actions:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.msg-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast);
+}
+.msg-action-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+.msg-action-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }

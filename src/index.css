@@ -138,6 +138,13 @@
   --ui-btn-ghost-hover-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
   --ui-accent: var(--blue);
   --ui-accent-dim: var(--blue-dim);
+  --ui-btn-rewind-bg: rgba(168, 85, 247, 0.06);
+  --ui-btn-rewind-border: rgba(168, 85, 247, 0.25);
+  --ui-btn-rewind-text: #d8b4fe;
+  --ui-btn-rewind-hover-bg: rgba(168, 85, 247, 0.15);
+  --ui-btn-rewind-hover-border: rgba(168, 85, 247, 0.4);
+  --ui-btn-rewind-hover-shadow: 0 0 12px rgba(168, 85, 247, 0.2);
+  --ui-btn-rewind-hover-text: #f3e8ff;
 
   /* Message Bubbles */
   --ui-msg-thinking-bg: var(--purple-dim);
@@ -271,7 +278,14 @@
   --ui-btn-ghost-hover-border: #9ca3af;
   --ui-btn-ghost-hover-shadow: none;
   --ui-accent: var(--text-primary);
-  --ui-accent-dim: #e5e5e5;
+  --ui-accent-dim: #f4f4f5;
+  --ui-btn-rewind-bg: #ffffff;
+  --ui-btn-rewind-border: #e2e8f0;
+  --ui-btn-rewind-text: #64748b;
+  --ui-btn-rewind-hover-bg: #f8fafc;
+  --ui-btn-rewind-hover-border: #cbd5e1;
+  --ui-btn-rewind-hover-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  --ui-btn-rewind-hover-text: #0f172a;
 
   /* Message Bubbles - Minimalist */
   --ui-msg-thinking-bg: #f8fafc;

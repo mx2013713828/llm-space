@@ -1035,6 +1035,7 @@ export class AgentExecutor {
       content: '',
       tokens: { input: this._lastInputTokens || 0, output: 0 },
       signature: event.signature || '',
+      createdAt: new Date().toISOString(),
     };
     streamState.blockMessagesByIndex.set(event.index, msg);
     this.messages.push(msg);
@@ -1043,6 +1044,7 @@ export class AgentExecutor {
       index: event.index,
       signature: event.signature || '',
       turn: streamState.turnIndex,
+      createdAt: msg.createdAt,
     });
   }
 
@@ -1080,6 +1082,7 @@ export class AgentExecutor {
           turn: streamState.turnIndex,
           content: '',
           tokens: { input: this._lastInputTokens || 0, output: 0 },
+          createdAt: new Date().toISOString(),
         };
         this.messages.push(msg);
       }
@@ -1091,6 +1094,7 @@ export class AgentExecutor {
       index: event.index,
       turn: streamState.turnIndex,
       isContinuation: streamState.isContinuation,
+      createdAt: msg?.createdAt,
     });
   }
 
@@ -1126,6 +1130,7 @@ export class AgentExecutor {
       toolInputRaw: '',
       toolInput: {},
       toolStatus: 'pending',
+      createdAt: new Date().toISOString(),
     };
     streamState.blockMessagesByIndex.set(event.index, msg);
     this.messages.push(msg);
@@ -1134,6 +1139,7 @@ export class AgentExecutor {
       name: event.name,
       id: event.id,
       turn: streamState.turnIndex,
+      createdAt: msg.createdAt,
     });
   }
 

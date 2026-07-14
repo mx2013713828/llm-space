@@ -122,13 +122,30 @@ export const KnowledgePlugin = {
 		const query = String(textBlock.text || '').replace(RETRIEVED_KNOWLEDGE_PATTERN, '').trim();
 		if (!query) return;
 
-		const retrieval = await deps.retrieveKnowledge({
-			knowledgeBaseIds: mountedIds,
-			query,
-			topK: runtime.topK,
-			maxChars: runtime.maxChars,
-			scoreThreshold: runtime.scoreThreshold,
-		});
+		let retrieval;
+		try {
+			retrieval = await deps.retrieveKnowledge({
+				knowledgeBaseIds: mountedIds,
+				query,
+				topK: runtime.topK,
+				maxChars: runtime.maxChars,
+				scoreThreshold: runtime.scoreThreshold,
+			});
+		} catch (error) {
+			context.knowledgeRetrieval = {
+				query,
+				knowledgeBaseIds: mountedIds,
+				chunks: [],
+				error: String(error?.message || error),
+			};
+			context.promptAssemblySections = Array.isArray(context.promptAssemblySections) ? context.promptAssemblySections : [];
+			context.promptAssemblySections.push(buildUnavailableRetrievalSection({
+				mountedIds,
+				query,
+				error,
+			}));
+			return;
+		}
 		const gate = evaluateAutoRagInjectionGate({
 			retrieval,
 			runtime,
@@ -322,6 +339,34 @@ function buildSkippedRetrievalSection({ mountedIds, query, retrieval, gate }) {
 			reason: gate.reason,
 			topScore: gate.topScore,
 			threshold: gate.threshold,
+		},
+	};
+}
+
+function buildUnavailableRetrievalSection({ mountedIds, query, error }) {
+	const message = String(error?.message || error || 'Unknown retrieval error');
+	const content = [
+		'<retrieved_knowledge_unavailable>',
+		`Query: ${escapeXmlText(query)}`,
+		`Reason: ${escapeXmlText(message)}`,
+		'</retrieved_knowledge_unavailable>',
+		'',
+	].join('\n');
+	return {
+		id: 'retrieved_knowledge_unavailable',
+		label: 'Retrieved Knowledge Unavailable',
+		target: 'user',
+		lifecycle: 'dynamic',
+		source: 'knowledge/retrieval',
+		content,
+		order: 90,
+		sentToModel: false,
+		cacheImpact: 'not_sent',
+		chars: content.length,
+		metadata: {
+			knowledgeBaseIds: mountedIds,
+			query,
+			reason: message,
 		},
 	};
 }

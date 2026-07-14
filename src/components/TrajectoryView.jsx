@@ -215,6 +215,7 @@ export function TrajectoryView({
                           key={messageKey}
                           content={presentation.content}
                           variant={presentation.variant}
+                          createdAt={msg.created_at || msg.createdAt}
                           onRetry={isRunning || presentation.variant === 'scheduled'
                             ? null
                             : () => handleRetryTurn(parseInt(turn, 10), msg.content)}
@@ -239,14 +240,15 @@ export function TrajectoryView({
                         <div style={{ lineHeight: 1.4 }}>{msg.content}</div>
                       </div>
                     );
-                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} />;
-                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} />;
+                    if (msg.type === 'thinking') return <ThinkingBubble key={messageKey} content={msg.content} folded={msg.folded} tokens={msg.tokens} duration={msg.duration} createdAt={msg.created_at || msg.createdAt} />;
+                    if (msg.type === 'tool_call') return <ToolCallCard key={messageKey} toolName={msg.toolName} toolInput={msg.toolInput} toolOutput={msg.toolOutput} toolStatus={msg.toolStatus} subMessages={msg.subMessages} subAgentStatus={msg.subAgentStatus} subAgentTrace={msg.subAgentTrace} teamStatus={msg.teamStatus} createdAt={msg.created_at || msg.createdAt} />;
                     if (msg.type === 'text') return (
                       <AssistantMessage
                         key={messageKey}
                         content={msg.content}
                         isFinalAnswer={isAssistantTextFinalAnswer(msgs, idx)}
                         streaming={msg.streaming}
+                        createdAt={msg.created_at || msg.createdAt}
                       />
                     );
                     return null;
