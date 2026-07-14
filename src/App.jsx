@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { FolderTree } from 'lucide-react';
+import { FolderTree, Sun, Moon } from 'lucide-react';
 import './index.css';
 import './App.css';
 import { TrajectoryPage } from './pages/TrajectoryPage';
@@ -81,6 +81,20 @@ function AppContent() {
   const routeStartsWithTab = TOP_LEVEL_TAB_KEYS.has(harnessId || '');
   const activeTab = routeStartsWithTab ? harnessId : (tab || 'trajectory');
   const activeHarnessId = routeStartsWithTab ? '' : (harnessId || '');
+
+  // Theme State Management
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('llm-space.theme') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('llm-space.theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const [harnessFiles, setHarnessFiles] = useState([]);
   const [harness, setHarness] = useState(null);
@@ -326,14 +340,39 @@ function AppContent() {
         </div>
 
         {/* 右侧信息 */}
-        <div className="topbar-right">
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: 'var(--green)',
-            boxShadow: '0 0 6px var(--green)',
-            animation: 'pulse-glow 2s ease-in-out infinite',
-          }} />
-          <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>Running Locally</span>
+        <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* 状态指示器 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: 'var(--green)',
+              boxShadow: '0 0 6px var(--green)',
+              animation: 'pulse-glow 2s ease-in-out infinite',
+            }} />
+            <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>Running Locally</span>
+          </div>
+
+          {/* 主题切换按钮 */}
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '6px',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elevated)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
         </div>
       </header>
 

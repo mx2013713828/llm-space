@@ -284,7 +284,7 @@ export function ContextInspector({
           width: '92vw',
           maxWidth: 1120,
           height: '86vh',
-          background: 'var(--bg-primary)',
+          background: 'var(--bg-surface)',
           borderRadius: 10,
           border: '1px solid var(--border)',
           display: 'flex',
@@ -377,7 +377,7 @@ export function ContextInspector({
                           marginBottom: 6,
                           borderRadius: 6,
                           border: active ? '1px solid var(--blue)' : '1px solid var(--border)',
-                          background: active ? 'rgba(59, 130, 246, 0.10)' : 'var(--bg-primary)',
+                          background: active ? 'rgba(59, 130, 246, 0.10)' : 'var(--bg-surface)',
                           color: 'var(--text-primary)',
                           cursor: 'pointer',
                         }}
@@ -424,7 +424,7 @@ export function ContextInspector({
                           ref={node => setMessageNode(item.id, node)}
                           style={{
                             border: selected ? '1px solid var(--blue)' : '1px solid var(--border)',
-                            background: selected ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-primary)',
+                            background: selected ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-surface)',
                             borderRadius: 8,
                             overflow: 'hidden',
                           }}
