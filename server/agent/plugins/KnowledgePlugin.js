@@ -117,35 +117,56 @@ export const KnowledgePlugin = {
 		}
 
 		if (!runtime.autoRetrieve) return;
-		const textBlock = findLatestUserTextBlock(context.apiMessages);
-		if (!textBlock) return;
+		const latestUserText = findLatestUserTextBlock(context.apiMessages);
+		if (!latestUserText) return;
+		const { message: userMessage, textBlock } = latestUserText;
 		const query = String(textBlock.text || '').replace(RETRIEVED_KNOWLEDGE_PATTERN, '').trim();
 		if (!query) return;
+		const traceKey = buildRetrievalTraceKey({ userMessage, query, turnIndex: context.turnIndex });
+		const cache = getRetrievalCache(executor);
+		let cached = cache.get(traceKey);
 
-		let retrieval;
-		try {
-			retrieval = await deps.retrieveKnowledge({
-				knowledgeBaseIds: mountedIds,
-				query,
-				topK: runtime.topK,
-				maxChars: runtime.maxChars,
-				scoreThreshold: runtime.scoreThreshold,
-			});
-		} catch (error) {
+		if (!cached) {
+			try {
+				cached = {
+					retrieval: await deps.retrieveKnowledge({
+						knowledgeBaseIds: mountedIds,
+						query,
+						topK: runtime.topK,
+						maxChars: runtime.maxChars,
+						scoreThreshold: runtime.scoreThreshold,
+					}),
+				};
+			} catch (error) {
+				cached = { error: String(error?.message || error) };
+			}
+			cache.set(traceKey, cached);
+		}
+
+		if (cached.error) {
 			context.knowledgeRetrieval = {
 				query,
 				knowledgeBaseIds: mountedIds,
 				chunks: [],
-				error: String(error?.message || error),
+				error: cached.error,
 			};
 			context.promptAssemblySections = Array.isArray(context.promptAssemblySections) ? context.promptAssemblySections : [];
 			context.promptAssemblySections.push(buildUnavailableRetrievalSection({
 				mountedIds,
 				query,
-				error,
+				error: cached.error,
 			}));
+			emitKnowledgeRetrievalTrace({
+				executor,
+				traceKey,
+				turn: userMessage?.turn,
+				query,
+				status: 'unavailable',
+				reason: cached.error,
+			});
 			return;
 		}
+		const retrieval = cached.retrieval;
 		const gate = evaluateAutoRagInjectionGate({
 			retrieval,
 			runtime,
@@ -159,6 +180,15 @@ export const KnowledgePlugin = {
 				retrieval,
 				gate,
 			}));
+			emitKnowledgeRetrievalTrace({
+				executor,
+				traceKey,
+				turn: userMessage?.turn,
+				query,
+				retrieval,
+				status: 'skipped',
+				reason: gate.reason,
+			});
 			return;
 		}
 		const block = buildRetrievedKnowledgeBlock(retrieval);
@@ -183,6 +213,14 @@ export const KnowledgePlugin = {
 				chunkCount: retrieval.chunks?.length || 0,
 				query,
 			},
+		});
+		emitKnowledgeRetrievalTrace({
+			executor,
+			traceKey,
+			turn: userMessage?.turn,
+			query,
+			retrieval,
+			status: 'injected',
 		});
 	},
 
@@ -371,6 +409,56 @@ function buildUnavailableRetrievalSection({ mountedIds, query, error }) {
 	};
 }
 
+function getRetrievalCache(executor) {
+	if (!(executor.knowledgeRetrievalCache instanceof Map)) {
+		executor.knowledgeRetrievalCache = new Map();
+	}
+	return executor.knowledgeRetrievalCache;
+}
+
+function buildRetrievalTraceKey({ userMessage, query, turnIndex }) {
+	return `${userMessage?.turn ?? turnIndex ?? 'unknown'}:${query}`;
+}
+
+function emitKnowledgeRetrievalTrace({
+	executor,
+	traceKey,
+	turn,
+	query,
+	retrieval,
+	status,
+	reason = '',
+}) {
+	if (!executor || !traceKey) return;
+	if (!Array.isArray(executor.messages)) executor.messages = [];
+	const existing = Array.isArray(executor.messages)
+		&& executor.messages.some(message => message?.type === 'knowledge_retrieval' && message?.traceKey === traceKey);
+	if (existing) return;
+
+	const chunks = Array.isArray(retrieval?.chunks) ? retrieval.chunks : [];
+	const sources = chunks.slice(0, 10).map(chunk => ({
+		knowledgeBase: String(chunk?.knowledgeBase?.name || chunk?.knowledgeBase?.id || ''),
+		filename: String(chunk?.source?.filename || 'unknown'),
+		score: Number(chunk?.score || 0),
+	}));
+	const message = {
+		role: 'system',
+		type: 'knowledge_retrieval',
+		turn,
+		runtimeNotificationOnly: true,
+		traceKey,
+		status,
+		query,
+		strategy: String(retrieval?.effectiveSettings?.strategy || ''),
+		resultCount: chunks.length,
+		sources,
+		reason: String(reason || ''),
+		createdAt: new Date().toISOString(),
+	};
+	executor.messages.push(message);
+	executor.onEvent?.('messages_update', { messages: executor.messages });
+}
+
 function resolveAutoRagInjectionThreshold({ retrieval = {}, runtime = {} } = {}) {
 	const explicitRuntimeThreshold = Number(runtime.autoInjectThreshold ?? runtime.minInjectScore);
 	if (Number.isFinite(explicitRuntimeThreshold)) return explicitRuntimeThreshold;
@@ -399,7 +487,7 @@ function findLatestUserTextBlock(apiMessages = []) {
 		if (message.role !== 'user' || !Array.isArray(message.content)) continue;
 		if (message.content.some(block => block.type === 'tool_result')) continue;
 		const textBlock = message.content.find(block => block.type === 'text');
-		if (textBlock) return textBlock;
+		if (textBlock) return { message, textBlock };
 	}
 	return null;
 }

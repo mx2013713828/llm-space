@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { BookOpenText, Check, ChevronDown, CircleAlert, CircleCheck, Copy } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer.jsx';
 import {
   getChildDisplayName,
@@ -12,6 +12,7 @@ import {
   getBadgeClassForTone,
   getToolStatusPresentation,
 } from '../lib/runtimeStatusPresentation.js';
+import { getKnowledgeRetrievalPresentation } from '../lib/knowledgeRetrievalPresentation.js';
 
 /**
  * 消息底部区域 (时间戳 + 复制等操作)
@@ -396,6 +397,70 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
         </div>
       )}
     </div>
+  );
+}
+
+export function KnowledgeRetrievalCard({
+  query,
+  strategy,
+  status,
+  resultCount,
+  sources,
+  reason,
+  createdAt,
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const presentation = getKnowledgeRetrievalPresentation({ status, resultCount, strategy });
+  const Icon = presentation.tone === 'success' ? CircleCheck : CircleAlert;
+  const safeSources = Array.isArray(sources) ? sources : [];
+
+  return (
+    <section className={`message-bubble msg-knowledge-retrieval msg-knowledge-${presentation.tone} animate-fade-in group`}>
+      <button
+        type="button"
+        className="knowledge-retrieval-header"
+        onClick={() => setExpanded(value => !value)}
+        aria-expanded={expanded}
+      >
+        <BookOpenText size={16} aria-hidden="true" />
+        <span className="knowledge-retrieval-title">Knowledge Retrieval</span>
+        <span className={`badge ${presentation.tone === 'success' ? 'badge-green' : presentation.tone === 'warning' ? 'badge-amber' : 'badge-red'}`}>
+          {presentation.label}
+        </span>
+        <span className="knowledge-retrieval-summary">{presentation.summary}</span>
+        <ChevronDown className={expanded ? 'chevron open' : 'chevron'} size={15} aria-hidden="true" />
+      </button>
+
+      {expanded && (
+        <div className="knowledge-retrieval-body animate-fade-in">
+          <div className="knowledge-retrieval-query">
+            <span>Query</span>
+            <code>{query || '(empty query)'}</code>
+          </div>
+          {safeSources.length > 0 ? (
+            <div className="knowledge-retrieval-sources">
+              {safeSources.map((source, index) => (
+                <div className="knowledge-retrieval-source" key={`${source.knowledgeBase || 'base'}:${source.filename || 'source'}:${index}`}>
+                  <span className="knowledge-retrieval-source-index">{index + 1}</span>
+                  <span className="knowledge-retrieval-source-file">{source.filename || 'unknown file'}</span>
+                  {source.knowledgeBase && <span className="knowledge-retrieval-source-base">{source.knowledgeBase}</span>}
+                  <span className="knowledge-retrieval-source-score">{Number(source.score || 0).toFixed(4)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="knowledge-retrieval-empty">No sources were returned for this retrieval.</div>
+          )}
+          {reason && (
+            <div className="knowledge-retrieval-reason">
+              <Icon size={14} aria-hidden="true" />
+              <span>{reason}</span>
+            </div>
+          )}
+          <MessageFooter createdAt={createdAt} showActions={false} />
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -127,6 +127,70 @@ test('KnowledgePlugin injects retrieved knowledge only for auto_rag with matchin
 	assert.equal(context.promptAssemblySections.some(section => section.id === 'retrieved_knowledge'), true);
 });
 
+test('KnowledgePlugin emits a presentation-only trajectory trace for automatic retrieval', async () => {
+	const events = [];
+	const context = createKnowledgeContext({
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'auto_rag',
+				auto_retrieve: true,
+				knowledge_tools: false,
+			},
+		},
+	});
+	context.executor.messages = [];
+	context.executor.onEvent = (type, payload) => events.push({ type, payload });
+
+	await KnowledgePlugin.preLLM(context);
+
+	assert.equal(context.executor.messages.length, 1);
+	assert.equal(context.executor.messages[0].role, 'system');
+	assert.equal(context.executor.messages[0].type, 'knowledge_retrieval');
+	assert.equal(context.executor.messages[0].runtimeNotificationOnly, true);
+	assert.equal(context.executor.messages[0].status, 'injected');
+	assert.equal(context.executor.messages[0].query, 'What is RAG?');
+	assert.equal(context.executor.messages[0].resultCount, 1);
+	assert.deepEqual(context.executor.messages[0].sources, [{ knowledgeBase: 'Docs', filename: 'rag.md', score: 3 }]);
+	assert.match(context.executor.messages[0].createdAt, /^\d{4}-\d{2}-\d{2}T/);
+	assert.equal(events[0]?.type, 'messages_update');
+});
+
+test('KnowledgePlugin reuses one automatic retrieval within the same user turn', async () => {
+	let retrievalCalls = 0;
+	const features = {
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'auto_rag',
+			auto_retrieve: true,
+			knowledge_tools: false,
+		},
+	};
+	const first = createKnowledgeContext({ features });
+	first.executor.messages = [];
+	first.executor.knowledgeDependencies.retrieveKnowledge = async () => {
+		retrievalCalls += 1;
+		return {
+			query: 'What is RAG?',
+			chunks: [{
+				id: 'chk_1',
+				score: 3,
+				text: 'RAG retrieves external context.',
+				source: { filename: 'rag.md', chunkIndex: 0 },
+				knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+			}],
+		};
+	};
+	await KnowledgePlugin.preLLM(first);
+
+	const second = createKnowledgeContext({ features });
+	second.executor = first.executor;
+	await KnowledgePlugin.preLLM(second);
+
+	assert.equal(retrievalCalls, 1);
+	assert.equal(first.executor.messages.filter(message => message.type === 'knowledge_retrieval').length, 1);
+});
+
 test('KnowledgePlugin skips low-confidence vector retrieval without injecting prompt content', async () => {
 	const context = createKnowledgeContext({
 		retrieval: {
@@ -296,6 +360,7 @@ function createKnowledgeContext({
 		score: 3,
 		text: 'RAG retrieves external context.',
 		source: { filename: 'rag.md', chunkIndex: 0 },
+		knowledgeBase: { id: 'kb_docs', name: 'Docs' },
 	}],
 } = {}) {
 	return {
