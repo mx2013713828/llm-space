@@ -159,7 +159,7 @@ export const KnowledgePlugin = {
 			emitKnowledgeRetrievalTrace({
 				executor,
 				traceKey,
-				turn: userMessage?.turn,
+				turn: context.turnIndex,
 				query,
 				status: 'unavailable',
 				reason: cached.error,
@@ -183,7 +183,7 @@ export const KnowledgePlugin = {
 			emitKnowledgeRetrievalTrace({
 				executor,
 				traceKey,
-				turn: userMessage?.turn,
+				turn: context.turnIndex,
 				query,
 				retrieval,
 				status: 'skipped',
@@ -217,7 +217,7 @@ export const KnowledgePlugin = {
 		emitKnowledgeRetrievalTrace({
 			executor,
 			traceKey,
-			turn: userMessage?.turn,
+			turn: context.turnIndex,
 			query,
 			retrieval,
 			status: 'injected',

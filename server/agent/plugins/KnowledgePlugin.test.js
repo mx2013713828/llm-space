@@ -139,6 +139,7 @@ test('KnowledgePlugin emits a presentation-only trajectory trace for automatic r
 			},
 		},
 	});
+	context.turnIndex = 7;
 	context.executor.messages = [];
 	context.executor.onEvent = (type, payload) => events.push({ type, payload });
 
@@ -147,6 +148,7 @@ test('KnowledgePlugin emits a presentation-only trajectory trace for automatic r
 	assert.equal(context.executor.messages.length, 1);
 	assert.equal(context.executor.messages[0].role, 'system');
 	assert.equal(context.executor.messages[0].type, 'knowledge_retrieval');
+	assert.equal(context.executor.messages[0].turn, 7);
 	assert.equal(context.executor.messages[0].runtimeNotificationOnly, true);
 	assert.equal(context.executor.messages[0].status, 'injected');
 	assert.equal(context.executor.messages[0].query, 'What is RAG?');
