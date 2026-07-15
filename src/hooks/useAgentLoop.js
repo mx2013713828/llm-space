@@ -57,11 +57,42 @@ export function useAgentLoop({
   const [cacheStats, setCacheStats] = useState(() => createCacheStats());
   const [contextTokens, setContextTokens] = useState(0);
   const [pendingPermission, setPendingPermission] = useState(null);
+	const [runMode, setRunModeState] = useState('continuous');
+	const [runControl, setRunControl] = useState(null);
+	const [runControlCommandPending, setRunControlCommandPending] = useState(false);
+	const [runControlError, setRunControlError] = useState('');
 
   const textareaRef = useRef(null);
   const isComposingRef = useRef(false);
   const [inputText, setInputText] = useState('');
   const parsedFeatures = parseFeatures(harness?.features || {});
+
+	useEffect(() => {
+		const storageKey = harness?.id ? `llm-space.run-mode.${harness.id}.v1` : '';
+		let nextMode = 'continuous';
+		try {
+			nextMode = storageKey && window.localStorage.getItem(storageKey) === 'step_through'
+				? 'step_through'
+				: 'continuous';
+		} catch {
+			// Browser storage is optional UI preference only.
+		}
+		setRunModeState(nextMode);
+		setRunControl(null);
+		setRunControlCommandPending(false);
+		setRunControlError('');
+	}, [harness?.id]);
+
+	const setRunMode = (nextMode) => {
+		const normalized = nextMode === 'step_through' ? 'step_through' : 'continuous';
+		setRunModeState(normalized);
+		if (!harness?.id) return;
+		try {
+			window.localStorage.setItem(`llm-space.run-mode.${harness.id}.v1`, normalized);
+		} catch {
+			// Browser storage is optional UI preference only.
+		}
+	};
 
   // Track last reported content to avoid triggering onSessionUpdate unnecessarily
   const lastReportedRef = useRef({ messages: null, todos: null, backgroundTasks: null });
@@ -249,6 +280,9 @@ export function useAgentLoop({
       todos: currentTodos,
       backgroundTasks: liveStateRef.current.backgroundTasks,
     });
+		setRunControl(null);
+		setRunControlCommandPending(false);
+		setRunControlError('');
 
     // 追踪当前轮次号，用于错误/恢复消息的 turn 归属（避免使用魔法数字 999 产生幽灵 Step）
     let currentTurn = currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.turn || 1)) : 1;
@@ -286,6 +320,7 @@ export function useAgentLoop({
           temperature,
           maxTokens,
           thinkingEnabled,
+			runMode,
           // enable_skills 已升级为 group 类型，需读 .enabled；向后兼容旧 boolean 格式
           skills: (() => {
             const sf = harness.features?.enable_skills;
@@ -446,6 +481,18 @@ export function useAgentLoop({
             case 'background_tasks_update':
               setBackgroundTasks(evt.tasks || []);
               break;
+
+			case 'run_control_state':
+				flushStreamEvents();
+				setRunControl({
+					runId: evt.runId || '',
+					mode: evt.mode || 'continuous',
+					status: evt.status || 'running',
+					checkpoint: evt.checkpoint || null,
+				});
+				setRunControlCommandPending(false);
+				setRunControlError('');
+				break;
 
             case 'error_recovery_attempt':
             case 'error_recovery_fallback':
@@ -682,6 +729,9 @@ export function useAgentLoop({
       streamBatcherRef.current?.flushNow?.();
       streamBatcherRef.current?.dispose?.();
       streamBatcherRef.current = null;
+		setRunControl(null);
+		setRunControlCommandPending(false);
+		setRunControlError('');
       setIsRunning(false);
     }
   };
@@ -820,6 +870,30 @@ export function useAgentLoop({
     }
   };
 
+	const advanceRun = async (action = 'next') => {
+		if (!runControl?.runId || runControlCommandPending) return false;
+		setRunControlCommandPending(true);
+		setRunControlError('');
+		try {
+			const res = await apiFetch(`/api/agent/runs/${encodeURIComponent(runControl.runId)}/advance`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action }),
+			});
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				setRunControlError(data.error || 'The paused run is no longer available.');
+				return false;
+			}
+			return true;
+		} catch (err) {
+			setRunControlError(err.message || 'Unable to advance the paused run.');
+			return false;
+		} finally {
+			setRunControlCommandPending(false);
+		}
+	};
+
   return {
     // 消息和状态
     messages,
@@ -834,6 +908,11 @@ export function useAgentLoop({
     cacheStats,
     contextTokens,
     pendingPermission,
+		runMode,
+		setRunMode,
+		runControl,
+		runControlCommandPending,
+		runControlError,
 
     // 输入控制
     inputText,
@@ -849,6 +928,7 @@ export function useAgentLoop({
     handleResetSession,
     handleRetryTurn,
     handlePermissionDecision,
+		advanceRun,
   };
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Focus, PanelLeftOpen } from 'lucide-react';
+import { FastForward, Focus, PanelLeftOpen, Play, StepForward } from 'lucide-react';
 import { ThinkingBubble, ToolCallCard, UserMessage, AssistantMessage, KnowledgeRetrievalCard } from './MessageBubbles';
 import { TodoList } from './TodoList';
 import { ScheduledTasksPanel } from './ScheduledTasksPanel';
@@ -8,6 +8,7 @@ import { getUserMessagePresentation, isAssistantTextFinalAnswer } from '../lib/m
 import { parseFeatures } from '../lib/FeatureSchema.js';
 import { isOrchestrationEnabled } from '../lib/taskOrchestration.js';
 import { getPermissionSourcePresentation } from '../lib/permissionPresentation.js';
+import { getRunControlPresentation } from '../lib/runControlPresentation.js';
 
 export function TrajectoryView({
   activeRightTab,
@@ -36,6 +37,12 @@ export function TrajectoryView({
   loopCount,
   pendingPermission,
   handlePermissionDecision,
+	runMode,
+	setRunMode,
+	runControl,
+	runControlCommandPending,
+	runControlError,
+	advanceRun,
   isFocusMode,
   onToggleFocusMode,
 }) {
@@ -64,6 +71,7 @@ export function TrajectoryView({
   const orchestration = parseFeatures(harness?.features || {}).task_orchestration;
   const taskBoardLabel = orchestration?.mode === 'task_system' ? 'Task DAG' : 'TODO';
   const permissionSource = getPermissionSourcePresentation(pendingPermission || {});
+	const runControlPresentation = getRunControlPresentation(runControl);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, height: '100%', position: 'relative' }}>
@@ -90,6 +98,30 @@ export function TrajectoryView({
             onClick={() => setActiveRightTab(tab.key)}
           >{tab.label}</button>
         ))}
+		<div className="trajectory-run-mode" role="group" aria-label="Agent run mode">
+			<button
+				type="button"
+				className={runMode === 'continuous' ? 'active' : ''}
+				onClick={() => setRunMode('continuous')}
+				aria-pressed={runMode === 'continuous'}
+				disabled={isRunning}
+				title="Run continuously until completion"
+			>
+				<Play size={13} aria-hidden="true" />
+				Continuous
+			</button>
+			<button
+				type="button"
+				className={runMode === 'step_through' ? 'active' : ''}
+				onClick={() => setRunMode('step_through')}
+				aria-pressed={runMode === 'step_through'}
+				disabled={isRunning}
+				title="Pause at model and tool checkpoints"
+			>
+				<StepForward size={13} aria-hidden="true" />
+				Step Through
+			</button>
+		</div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
           <button
             aria-label={isFocusMode ? 'Restore workspace' : 'Focus trajectory'}
@@ -256,6 +288,41 @@ export function TrajectoryView({
                   })}
                 </div>
               ))}
+			  {runControlPresentation.visible && (
+				<section className="run-checkpoint-card animate-fade-in" aria-live="polite">
+					<div className="run-checkpoint-mark"><StepForward size={18} aria-hidden="true" /></div>
+					<div className="run-checkpoint-content">
+						<span className="run-checkpoint-eyebrow">{runControlPresentation.phaseLabel}</span>
+						<strong>{runControlPresentation.nextDescription}</strong>
+						{runControlPresentation.tools.length > 0 && (
+							<div className="run-checkpoint-tools" aria-label="Upcoming tools">
+								{runControlPresentation.tools.map(tool => <code key={tool}>{tool}</code>)}
+							</div>
+						)}
+						{runControlError && <span className="run-checkpoint-error">{runControlError}</span>}
+					</div>
+					<div className="run-checkpoint-actions">
+						<button
+							type="button"
+							className="btn btn-primary"
+							onClick={() => advanceRun('next')}
+							disabled={runControlCommandPending}
+						>
+							<StepForward size={15} aria-hidden="true" />
+							Next step
+						</button>
+						<button
+							type="button"
+							className="btn btn-ghost"
+							onClick={() => advanceRun('run_to_completion')}
+							disabled={runControlCommandPending}
+						>
+							<FastForward size={15} aria-hidden="true" />
+							Run to completion
+						</button>
+					</div>
+				</section>
+			  )}
               {isRunning && (
                 <div className="running-indicator animate-fade-in" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>
                   <div className="running-dots"><div className="loading-dot" /><div className="loading-dot" /><div className="loading-dot" /></div>

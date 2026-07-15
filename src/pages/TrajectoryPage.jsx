@@ -393,6 +393,12 @@ export function TrajectoryPage({ harness, savedSession, onSessionUpdate, onSessi
         loopCount={agentState.loopCount}
         pendingPermission={agentState.pendingPermission}
         handlePermissionDecision={agentState.handlePermissionDecision}
+		runMode={agentState.runMode}
+		setRunMode={agentState.setRunMode}
+		runControl={agentState.runControl}
+		runControlCommandPending={agentState.runControlCommandPending}
+		runControlError={agentState.runControlError}
+		advanceRun={agentState.advanceRun}
         isFocusMode={isFocusMode}
         onToggleFocusMode={toggleFocusMode}
       />

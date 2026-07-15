@@ -2070,10 +2070,85 @@
   font-size: 11px;
   line-height: 1.5;
 }
+.trajectory-run-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+}
+.trajectory-run-mode button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.trajectory-run-mode button:hover { color: var(--text-primary); }
+.trajectory-run-mode button:disabled { cursor: default; opacity: 0.55; }
+.trajectory-run-mode button.active {
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+  color: var(--blue);
+}
+.run-checkpoint-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--blue) 48%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--blue) 8%, var(--bg-surface));
+}
+.run-checkpoint-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--blue) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  color: var(--blue);
+}
+.run-checkpoint-content { display: grid; gap: 4px; min-width: 0; }
+.run-checkpoint-content strong { color: var(--text-primary); font-size: 13px; overflow-wrap: anywhere; }
+.run-checkpoint-eyebrow { color: var(--blue); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.run-checkpoint-tools { display: flex; flex-wrap: wrap; gap: 5px; }
+.run-checkpoint-tools code {
+  max-width: 190px;
+  overflow: hidden;
+  padding: 2px 6px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-checkpoint-actions { display: flex; gap: 7px; align-items: center; }
+.run-checkpoint-actions .btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.run-checkpoint-error { color: var(--red); font-size: 11px; line-height: 1.4; }
 @media (max-width: 680px) {
   .knowledge-retrieval-summary { display: none; }
   .knowledge-retrieval-source { grid-template-columns: 18px minmax(0, 1fr) auto; }
   .knowledge-retrieval-source-base { display: none; }
+  .trajectory-run-mode { margin-left: 0; }
+  .trajectory-run-mode button { padding: 0 6px; }
+  .run-checkpoint-card { grid-template-columns: auto minmax(0, 1fr); }
+  .run-checkpoint-actions { grid-column: 1 / -1; }
+  .run-checkpoint-actions .btn { flex: 1; justify-content: center; }
 }
 .tool-call-header {
   display: flex;
