@@ -53,6 +53,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
     temperature: 0.2,
     maxTokens: 1024,
     thinkingEnabled: false,
+    runController: { mode: 'step_through' },
     skills: ['skill-a'],
     onEvent(type, payload) {
       parentEvents.push({ type, payload });
@@ -77,6 +78,7 @@ test('sub-agent plugin spawns isolated one-off executor and returns the final as
   assert.equal(spawned.constructorArgs.features.enable_memory.enabled, false);
   assert.equal(spawned.constructorArgs.features.security_mode, 'strict');
   assert.deepEqual(spawned.constructorArgs.skills, ['skill-a']);
+  assert.equal(spawned.constructorArgs.runController, undefined);
   assert.match(spawned.constructorArgs.systemPrompt, /forbidden to delegate/i);
   assert.deepEqual(parentEvents, [
     {

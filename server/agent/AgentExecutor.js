@@ -101,6 +101,22 @@ function buildPermanentSecurityBlockFinalMessage(blockedTools = []) {
   ].join('\n') + suffix;
 }
 
+function buildToolCheckpoint({ turn, tools = [] } = {}) {
+  const summaries = tools.slice(0, 6).map(tool => ({
+    id: String(tool?.id || ''),
+    name: String(tool?.toolName || 'unknown_tool'),
+  }));
+  const description = summaries.length === 1
+    ? `Next: run ${summaries[0].name}`
+    : `Next: run ${summaries.length} tools`;
+  return {
+    phase: 'awaiting_tool_step',
+    turn,
+    nextAction: { kind: 'tools', description },
+    tools: summaries,
+  };
+}
+
 export function getCompactionTokenThresholds(model = {}) {
   const contextWindow = getModelContextWindow(model).value;
   return {
@@ -154,6 +170,7 @@ export class AgentExecutor {
     dryRunMode = '',
     memoryDependencies = null,
     knowledgeDependencies = null,
+    runController = null,
     onEvent = () => {}
   }) {
     this.harnessId = harnessId;
@@ -222,6 +239,7 @@ export class AgentExecutor {
     this.dryRunMode = dryRunMode;
     this.memoryDependencies = memoryDependencies;
     this.knowledgeDependencies = knowledgeDependencies;
+    this.runController = runController;
     this.onEvent = onEvent;
 
     this.roundsSinceTodo = 0;
@@ -629,6 +647,16 @@ export class AgentExecutor {
         if (shouldRunToolStage) {
           const toolsToRun = currentTurnMessages.filter(m => m.type === 'tool_call' && hasExecutableToolUse([m]));
 
+          if (toolsToRun.length > 0) {
+            const toolStep = await this.runController?.waitForCheckpoint(
+              buildToolCheckpoint({ turn: turnIndex, tools: toolsToRun }),
+            );
+            if (toolStep?.action === 'abort') {
+              exhaustedTurns = false;
+              break;
+            }
+          }
+
           const executeToolCall = async (tool) => {
             tool.toolStatus = 'running';
             this.onEvent('tool_exec_start', { id: tool.id, toolName: tool.toolName });
@@ -743,12 +771,25 @@ export class AgentExecutor {
             break;
           }
 
-          turnIndex++;
-          await new Promise(r => setTimeout(r, 500));
-          
           // 生命周期：onLoopEnd (清理垃圾，记录轮数)
           await this.hooks.dispatch('onLoopEnd', context);
           await this.saveSession();
+
+          if (toolsToRun.length > 0) {
+            const modelStep = await this.runController?.waitForCheckpoint({
+              phase: 'awaiting_model_step',
+              turn: turnIndex,
+              nextAction: { kind: 'model', description: 'Next: ask the model for its next decision' },
+              tools: [],
+            });
+            if (modelStep?.action === 'abort') {
+              exhaustedTurns = false;
+              break;
+            }
+          }
+
+          turnIndex++;
+          await new Promise(r => setTimeout(r, 500));
         } else {
           // 完成文字回复，主动退出 ReAct 循环
           exhaustedTurns = false;
