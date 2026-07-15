@@ -195,6 +195,15 @@ The runtime follows a hook-oriented loop:
 
 New runtime features should be implemented as detachable modules or plugins instead of growing the main executor with ad-hoc branches.
 
+### Step-Through Runs
+
+The Trajectory toolbar offers a per-run execution control:
+
+- **Continuous** keeps the normal autonomous Agent Loop.
+- **Step Through** pauses after a completed model response that proposes tools, and again after the tool batch returns.
+
+At each pause, the trajectory states the next action and lists the pending tool or MCP tool names. Press **Next step** to advance one semantic boundary, or **Run to completion** to finish the current run without further pauses. This is a foreground inspection mode: it does not change the System Prompt, model payload, or prompt cache; child agents continue after their parent-level launch is approved; and normal security approval remains a separate, higher-priority gate.
+
 ### Context Assembly
 
 Prompt assembly is tracked as explicit sections. The current Context Inspector defaults to model-bound content only:

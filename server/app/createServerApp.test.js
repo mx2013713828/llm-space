@@ -52,6 +52,7 @@ test('createServerApp installs runtime middleware and core route groups', () => 
       'PATCH /api/mcp/servers/:serverId',
       'POST /api/agent/permission',
       'POST /api/agent/run',
+      'POST /api/agent/runs/:runId/advance',
       'POST /api/chat',
       'POST /api/harnesses',
       'POST /api/harnesses/:harnessId/dry-run',

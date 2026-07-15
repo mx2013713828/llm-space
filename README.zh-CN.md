@@ -195,6 +195,15 @@ guidance/<harnessId>/AGENTS.md
 
 新的运行时能力应优先做成可拆卸模块或插件，不要把临时分支继续堆进主 executor。
 
+### 单步运行（Step Through）
+
+Trajectory 工具栏提供按本次运行生效的执行控制：
+
+- **Continuous**：保持现有自主 Agent Loop。
+- **Step Through**：模型完整生成工具意图后暂停；工具批次执行并返回结果后再次暂停。
+
+每个暂停点都会说明下一步动作，并列出待执行的工具或 MCP 工具名。点击 **Next step** 前进一个语义边界，点击 **Run to completion** 则让当前运行不再暂停直至结束。它只用于前台观察：不会修改 System Prompt、模型 payload 或 prompt cache；子代理在父级启动获准后仍连续执行；已有安全审批保持独立且优先级更高。
+
 ### Context Assembly
 
 Prompt 组装会被记录为显式 section。当前 Context Inspector 默认只展示真正发送给模型的内容：

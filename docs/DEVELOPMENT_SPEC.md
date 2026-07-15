@@ -138,6 +138,10 @@ Agent Loop 不应关心底层模型来自 Anthropic、OpenAI、DeepSeek、Kimi�
    - 作用：统计、清理与状态结算。
    - 机制：如果本轮没有 `tool_use`（模型输出纯文本），则触发 `saveSession` 持久化，并向前端广播回合结束，等待下一轮用户输入。
 
+### 单步运行控制（Step Through）
+
+Step Through 是前台、按本次运行生效的控制器，不是执行策略，也不是 prompt 特性。它只能在模型已完成且存在可执行工具、或工具批次已完成时暂停；不得中断 thinking/text/tool-argument 流，不得修改模型可见上下文，也不得绕过 SecurityPlugin 审批。RunController 存在于 active-job 记录中，通过 SSE 暴露有长度上限的 checkpoint 元数据，并且只接受匹配的不透明 run id 对应的 `next`、`run_to_completion` 或暂停状态下的 `abort`。子代理在父级启动 checkpoint 通过后连续执行；定时与后台运行保持连续模式。
+
 ### 3. 新插件/新特性在添加前必须和用户审阅新插件在 Agent Loop中的位置
 
 ### 4. 任务编排保持可拆卸实验性
@@ -153,6 +157,7 @@ LLM-Space 是实验平台，不应把商业 Agent 的“智能执行模式”完
 - Task 15（Local RAG Knowledge Base MVP）已完成最小闭环：支持创建本地知识库、导入文件、chunk/index、检索预览、挂载到 harness。
 - Knowledge Runtime Strategies 已完成：支持 Auto RAG、Agentic RAG、Manual Lab；Mounted Knowledge Manifest 与 Retrieved Knowledge 已拆分，Agentic RAG 暴露 `list_mounted_knowledge_bases` / `query_knowledge_base` 工具，Context Inspector 可分层查看实际发送给模型的知识上下文。
 - Task 16（RAG Retrieval Quality Extensions）已完成到真实向量化闭环：支持 Markdown/text/JSON/CSV/PDF/DOCX loader、智谱 `embedding-3` / OpenAI-compatible embedding provider、Local JSON / Qdrant 向量存储、keyword/vector/hybrid 检索、Retrieval Records 与 Context Inspector 知识上下文分层。
+- Step-Through Agent Runs 已完成：前台运行可在模型/工具语义边界暂停，经 SSE 重连，使用 `Next step` 前进，或切换为完成前不再暂停，且不会改变模型上下文。
 - Task 17（Standalone MCP Client MVP）已完成：支持 STDIO / Streamable HTTP、自编 Echo server、Context7、Harness 级工具挂载、动态工具 schema、通用本地 Environment / HTTP Headers 配置，以及旧 bearer-env 配置读取兼容。
 - Task 18（MCP Observability And Permission UX）已完成：MCP runtime 具备 starting / connected / error / stopped 生命周期、脱敏结构化诊断、认证证据、断开/重连、惰性调用详情，以及复用 SecurityPlugin 的 harness/server/tool 三层审批策略。
 - 下一阶段是 Task 19：在 RAG 与 MCP 已分别形成可观测闭环后，抽取 Runtime Resource Mount Registry。

@@ -138,6 +138,10 @@ We must avoid piling `if-else` blocks in the main loop; future extensions should
    - Purpose: Statistics, cleanup, and state settlement.
    - Mechanisms: If there is no `tool_use` this round (pure text model output), trigger `saveSession` persistence and broadcast the end of the round to the frontend, awaiting the next user input.
 
+### Step-Through Runtime Control
+
+Step Through is a foreground per-run controller, not an execution strategy or a prompt feature. It may pause only after a completed model response with executable tools and after a completed tool batch. It must never interrupt a thinking/text/tool-argument stream, mutate model-visible context, or bypass SecurityPlugin approval. A RunController remains in the active-job record, exposes bounded checkpoint metadata through SSE, and accepts only a matching opaque run id for `next`, `run_to_completion`, or paused-run `abort`. Child agents remain continuous after the parent-level launch checkpoint; scheduled and background runs remain continuous.
+
 ### 3. Before adding new plugins or features, their location in the Agent Loop must be reviewed with the user.
 
 ### 4. Task Orchestration Must Stay Detachable and Experimental
@@ -153,6 +157,7 @@ LLM-Space is an experimental platform and should not fully black-box commercial-
 - Task 15 (Local RAG Knowledge Base MVP) is minimally closed: users can create local Knowledge Bases, import files, chunk/index them, preview retrieval, and mount them to a harness.
 - Knowledge Runtime Strategies are complete: Auto RAG, Agentic RAG, and Manual Lab are supported; Mounted Knowledge Manifest and Retrieved Knowledge are split; Agentic RAG exposes `list_mounted_knowledge_bases` / `query_knowledge_base`; Context Inspector shows the actual knowledge context sent to the model in separate layers.
 - Task 16 (RAG Retrieval Quality Extensions) is complete through the real-vectorization loop: Markdown/text/JSON/CSV/PDF/DOCX loaders, Zhipu `embedding-3` / OpenAI-compatible embedding providers, Local JSON / Qdrant vector stores, keyword/vector/hybrid retrieval, Retrieval Records, and Context Inspector knowledge-context layers.
+- Step-Through Agent Runs are complete: foreground runs can pause at model/tool semantic checkpoints, reattach through SSE, advance with `Next step`, or switch the current run to completion without changing model context.
 - Task 17 (Standalone MCP Client MVP) is complete: STDIO / Streamable HTTP, a custom Echo server, Context7, harness-level tool mounting, dynamic tool schemas, generic local Environment / HTTP Headers configuration, and legacy bearer-env read compatibility are supported.
 - Task 18 (MCP Observability And Permission UX) is complete: MCP runtime has starting / connected / error / stopped lifecycle states, redacted structured diagnostics, authentication evidence, disconnect/reconnect controls, lazy call details, and harness/server/tool approval inheritance through SecurityPlugin.
 - The next phase is Task 19: extract a Runtime Resource Mount Registry after RAG and MCP have independently proven observable working loops.
