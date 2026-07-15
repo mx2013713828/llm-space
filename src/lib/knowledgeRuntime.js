@@ -33,20 +33,77 @@ const DEFAULT_RUNTIME = {
 	knowledge_tools: true,
 };
 
+function getStrategyId(value) {
+	const strategyId = String(value || DEFAULT_RUNTIME.strategy);
+	return strategyId === 'custom' || KNOWLEDGE_RUNTIME_STRATEGIES[strategyId]
+		? strategyId
+		: DEFAULT_RUNTIME.strategy;
+}
+
+/**
+ * Returns the durable knowledge-runtime configuration stored on a Harness.
+ * Retrieval quality belongs to the knowledge base, while named strategies derive
+ * their primitives at runtime instead of persisting redundant flags.
+ */
+export function compactKnowledgeRuntimeConfig(config = {}) {
+	const raw = config && typeof config === 'object' ? config : { enabled: config };
+	const strategy = getStrategyId(raw.strategy);
+	const compact = {
+		enabled: raw.enabled !== false,
+		strategy,
+	};
+
+	if (strategy === 'custom') {
+		compact.manifest_enabled = raw.manifest_enabled ?? DEFAULT_RUNTIME.manifest_enabled;
+		compact.auto_retrieve = raw.auto_retrieve ?? DEFAULT_RUNTIME.auto_retrieve;
+		compact.knowledge_tools = raw.knowledge_tools ?? DEFAULT_RUNTIME.knowledge_tools;
+	}
+
+	return compact;
+}
+
+export function compactKnowledgeRuntimeFeatures(features = {}) {
+	if (!features || typeof features !== 'object' || !('knowledge_bases' in features)) {
+		return features;
+	}
+
+	return {
+		...features,
+		knowledge_bases: compactKnowledgeRuntimeConfig(features.knowledge_bases),
+	};
+}
+
+/**
+ * Expands a compact persisted preset for configuration UI without changing the
+ * durable representation. Custom strategies retain their explicit primitives.
+ */
+export function expandKnowledgeRuntimeConfig(config = {}) {
+	const compact = compactKnowledgeRuntimeConfig(config);
+	const preset = KNOWLEDGE_RUNTIME_STRATEGIES[compact.strategy];
+	if (!preset) return compact;
+
+	return {
+		...compact,
+		manifest_enabled: preset.manifest_enabled,
+		auto_retrieve: preset.auto_retrieve,
+		knowledge_tools: preset.knowledge_tools,
+	};
+}
+
 export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agentic_rag') {
 	const previous = features.knowledge_bases && typeof features.knowledge_bases === 'object'
 		? features.knowledge_bases
 		: {};
 	if (strategyId === 'custom') {
+		const previousRuntime = resolveKnowledgeRuntime(features);
 		return {
 			...features,
 			knowledge_bases: {
-				...previous,
 				enabled: true,
 				strategy: 'custom',
-				manifest_enabled: previous.manifest_enabled ?? DEFAULT_RUNTIME.manifest_enabled,
-				auto_retrieve: previous.auto_retrieve ?? DEFAULT_RUNTIME.auto_retrieve,
-				knowledge_tools: previous.knowledge_tools ?? DEFAULT_RUNTIME.knowledge_tools,
+				manifest_enabled: previous.manifest_enabled ?? previousRuntime.manifestEnabled,
+				auto_retrieve: previous.auto_retrieve ?? previousRuntime.autoRetrieve,
+				knowledge_tools: previous.knowledge_tools ?? previousRuntime.knowledgeTools,
 			},
 		};
 	}
@@ -56,21 +113,15 @@ export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agent
 	return {
 		...features,
 		knowledge_bases: {
-			...previous,
 			enabled: true,
 			strategy: preset.id,
-			manifest_enabled: preset.manifest_enabled,
-			auto_retrieve: preset.auto_retrieve,
-			knowledge_tools: preset.knowledge_tools,
 		},
 	};
 }
 
 export function resolveKnowledgeRuntime(features = {}) {
-	const raw = features.knowledge_bases && typeof features.knowledge_bases === 'object'
-		? features.knowledge_bases
-		: {};
-	const strategy = raw.strategy || DEFAULT_RUNTIME.strategy;
+	const raw = compactKnowledgeRuntimeConfig(features.knowledge_bases);
+	const strategy = raw.strategy;
 	const preset = KNOWLEDGE_RUNTIME_STRATEGIES[strategy];
 	const merged = {
 		...DEFAULT_RUNTIME,

@@ -559,3 +559,51 @@ test('harness save writes systemPrompt to AGENTS.md and strips it from JSON', as
   assert.equal(loadRes.status, 200);
   assert.equal(loadRes.body.systemPrompt, 'Updated AGENTS guidance.');
 });
+
+test('harness persistence compacts knowledge runtime config and copies', async (t) => {
+  const fixture = await createFixture(t);
+  const legacyKnowledge = {
+    enabled: true,
+    strategy: 'auto_rag',
+    auto_retrieve: true,
+    knowledge_tools: false,
+    topK: 40,
+    maxChars: 8000,
+    scoreThreshold: 0.25,
+  };
+  await writeFile(path.join(fixture.harnessDir, 'alpha.json'), JSON.stringify({
+    id: 'alpha',
+    name: 'Alpha',
+    description: 'RAG test',
+    features: { knowledge_bases: legacyKnowledge },
+  }), 'utf-8');
+
+  const app = createRouteApp();
+  registerHarnessRoutes(app, {
+    harnessDir: fixture.harnessDir,
+    guidanceRoot: fixture.guidanceRoot,
+    sessionsDir: fixture.sessionsDir,
+  });
+
+  const copyRes = await dispatchJson(app, 'POST', '/api/harnesses/alpha/copy');
+  assert.equal(copyRes.status, 200);
+  assert.deepEqual(copyRes.body.harness.features.knowledge_bases, {
+    enabled: true,
+    strategy: 'auto_rag',
+  });
+
+  const saveRes = await dispatchJson(app, 'POST', '/api/harnesses/alpha', {
+    body: {
+      id: 'alpha',
+      name: 'Alpha',
+      description: 'RAG test',
+      features: { knowledge_bases: legacyKnowledge },
+    },
+  });
+  assert.equal(saveRes.status, 200);
+  const saved = JSON.parse(await readFile(path.join(fixture.harnessDir, 'alpha.json'), 'utf-8'));
+  assert.deepEqual(saved.features.knowledge_bases, {
+    enabled: true,
+    strategy: 'auto_rag',
+  });
+});

@@ -26,6 +26,7 @@ import { getToolSchemasForTools } from '../tools/index.js';
 import { toolRegistry } from '../tools/ToolRegistry.js';
 import { defaultMcpManager } from '../mcp/mcpManager.js';
 import { loadMcpMount as defaultLoadMcpMount } from '../mcp/mcpMountStore.js';
+import { compactKnowledgeRuntimeFeatures } from '../../src/lib/knowledgeRuntime.js';
 
 const DEFAULT_HARNESS_DIR = path.join(process.cwd(), 'harnesses');
 const DEFAULT_GUIDANCE_ROOT = path.join(process.cwd(), 'guidance');
@@ -173,7 +174,7 @@ export function registerHarnessRoutes(app, {
         fsImpl,
       });
       const harnessToSave = {
-        ...stripLegacySystemPrompt(data),
+        ...compactHarnessKnowledgeRuntime(stripLegacySystemPrompt(data)),
         name: normalizeHarnessDisplayName(data.name) || req.params.id,
         guidance: {
           ...(data.guidance && typeof data.guidance === 'object' ? data.guidance : {}),
@@ -197,7 +198,7 @@ export function registerHarnessRoutes(app, {
 
       const existing = JSON.parse(await fsImpl.readFile(targetPath, 'utf-8'));
       const harness = {
-        ...existing,
+        ...compactHarnessKnowledgeRuntime(existing),
         name: displayName,
         description: String(req.body?.description || ''),
       };
@@ -247,8 +248,9 @@ export function registerHarnessRoutes(app, {
         name: req.body?.name,
         description: req.body?.description,
       });
-      await fsImpl.writeFile(path.join(harnessDir, draft.filename), JSON.stringify(draft.harness, null, 2), 'utf-8');
-      res.json({ success: true, harness: draft.harness, filename: draft.filename });
+      const harness = compactHarnessKnowledgeRuntime(draft.harness);
+      await fsImpl.writeFile(path.join(harnessDir, draft.filename), JSON.stringify(harness, null, 2), 'utf-8');
+      res.json({ success: true, harness, filename: draft.filename });
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message });
     }
@@ -367,6 +369,17 @@ export function registerHarnessRoutes(app, {
       }
     }
   });
+}
+
+function compactHarnessKnowledgeRuntime(harness) {
+  if (!harness?.features || typeof harness.features !== 'object') {
+    return harness;
+  }
+
+  return {
+    ...harness,
+    features: compactKnowledgeRuntimeFeatures(harness.features),
+  };
 }
 
 async function hydrateHarnessGuidance({ harness, harnessId, guidanceRoot, fsImpl }) {

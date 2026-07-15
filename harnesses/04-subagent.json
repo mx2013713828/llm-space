@@ -152,12 +152,7 @@
     },
     "knowledge_bases": {
       "enabled": true,
-      "strategy": "agentic_rag",
-      "auto_retrieve": false,
-      "knowledge_tools": true,
-      "topK": 5,
-      "maxChars": 8000,
-      "scoreThreshold": 0
+      "strategy": "agentic_rag"
     },
     "error_recovery": {
       "enabled": true,

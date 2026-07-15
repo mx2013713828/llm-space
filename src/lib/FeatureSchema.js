@@ -1,3 +1,5 @@
+import { expandKnowledgeRuntimeConfig } from './knowledgeRuntime.js';
+
 export const FEATURE_SCHEMA = {
   security_mode: {
     type: 'select',
@@ -451,6 +453,15 @@ export function parseFeatures(inputFeatures) {
           }
         }
       }
+    }
+    if (parsed.knowledge_bases) {
+      const rawKnowledgeRuntime = inputFeatures?.knowledge_bases;
+      parsed.knowledge_bases = expandKnowledgeRuntimeConfig({
+        ...parsed.knowledge_bases,
+        ...(rawKnowledgeRuntime && typeof rawKnowledgeRuntime === 'object'
+          ? { manifest_enabled: rawKnowledgeRuntime.manifest_enabled }
+          : {}),
+      });
     }
     return parsed;
   } catch (err) {

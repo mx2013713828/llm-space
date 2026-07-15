@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
 	KNOWLEDGE_RUNTIME_STRATEGIES,
 	applyKnowledgeRuntimeStrategy,
+	compactKnowledgeRuntimeConfig,
+	compactKnowledgeRuntimeFeatures,
 	resolveKnowledgeRuntime,
 } from './knowledgeRuntime.js';
 import { parseFeatures } from './FeatureSchema.js';
@@ -75,6 +77,58 @@ test('custom strategy ignores legacy runtime retrieval bounds', () => {
 	assert.equal('scoreThreshold' in runtime, false);
 });
 
+test('preset knowledge runtime configs persist only enablement and strategy', () => {
+	const compact = compactKnowledgeRuntimeConfig({
+		enabled: true,
+		strategy: 'auto_rag',
+		manifest_enabled: true,
+		auto_retrieve: true,
+		knowledge_tools: false,
+		topK: 40,
+		maxChars: 8000,
+		scoreThreshold: 0.25,
+	});
+
+	assert.deepEqual(compact, {
+		enabled: true,
+		strategy: 'auto_rag',
+	});
+	assert.deepEqual(applyKnowledgeRuntimeStrategy({
+		knowledge_bases: {
+			topK: 40,
+			auto_retrieve: false,
+		},
+	}, 'agentic_rag').knowledge_bases, {
+		enabled: true,
+		strategy: 'agentic_rag',
+	});
+});
+
+test('custom knowledge runtime configs retain only explicit primitives', () => {
+	const compact = compactKnowledgeRuntimeFeatures({
+		parallel_tool_execution: true,
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'custom',
+			manifest_enabled: false,
+			auto_retrieve: true,
+			knowledge_tools: false,
+			topK: 40,
+		},
+	});
+
+	assert.deepEqual(compact, {
+		parallel_tool_execution: true,
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'custom',
+			manifest_enabled: false,
+			auto_retrieve: true,
+			knowledge_tools: false,
+		},
+	});
+});
+
 test('parseFeatures removes legacy runtime retrieval bounds', () => {
 	const parsed = parseFeatures({
 		knowledge_bases: {
@@ -90,4 +144,25 @@ test('parseFeatures removes legacy runtime retrieval bounds', () => {
 	assert.equal('topK' in parsed.knowledge_bases, false);
 	assert.equal('maxChars' in parsed.knowledge_bases, false);
 	assert.equal('scoreThreshold' in parsed.knowledge_bases, false);
+});
+
+test('parseFeatures expands presets for UI but preserves custom primitive state', () => {
+	const autoRag = parseFeatures({
+		knowledge_bases: { enabled: true, strategy: 'auto_rag' },
+	});
+	assert.equal(autoRag.knowledge_bases.auto_retrieve, true);
+	assert.equal(autoRag.knowledge_bases.knowledge_tools, false);
+
+	const custom = parseFeatures({
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'custom',
+			manifest_enabled: false,
+			auto_retrieve: true,
+			knowledge_tools: false,
+		},
+	});
+	assert.equal(custom.knowledge_bases.manifest_enabled, false);
+	assert.equal(custom.knowledge_bases.auto_retrieve, true);
+	assert.equal(custom.knowledge_bases.knowledge_tools, false);
 });
