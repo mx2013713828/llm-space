@@ -152,6 +152,7 @@ export async function buildRuntimeRequest({
     temperature: firstDefined(body.temperature, harness.model?.temperature, 1),
     maxTokens: firstDefined(body.maxTokens, harness.model?.max_tokens, harness.model?.maxTokens, 8192),
     thinkingEnabled: body.thinkingEnabled === true,
+		runMode: body.runMode === 'step_through' ? 'step_through' : 'continuous',
     selectedStrategyId,
     interactionMode: firstDefined(body.interactionMode, null),
     skills: asArray(body.skills, asArray(harness.skills)),

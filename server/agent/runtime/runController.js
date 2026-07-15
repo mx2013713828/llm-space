@@ -62,7 +62,7 @@ export function createRunController({ mode = 'continuous', onStateChange = () =>
 			return true;
 		},
 		abort() {
-			if (TERMINAL_STATUSES.has(state.status)) return false;
+			if (!resolveWait || TERMINAL_STATUSES.has(state.status)) return false;
 			settleWait({ action: 'abort' }, {
 				mode: runMode,
 				status: 'aborted',

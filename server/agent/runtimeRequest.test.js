@@ -70,6 +70,18 @@ test('buildRuntimeRequest prefers explicit selected strategy over feature strate
   assert.equal(runtimeRequest.features.task_orchestration.strategy, 'async_teams');
 });
 
+test('buildRuntimeRequest normalizes step-through mode as runtime-only metadata', async () => {
+	const stepped = await buildRuntimeRequest({
+		body: { harnessId: 'h1', model: { key: 'k1' }, runMode: 'step_through' },
+	});
+	const continuous = await buildRuntimeRequest({
+		body: { harnessId: 'h1', model: { key: 'k1' }, runMode: 'unexpected' },
+	});
+
+	assert.equal(stepped.runMode, 'step_through');
+	assert.equal(continuous.runMode, 'continuous');
+});
+
 test('buildRuntimeRequest resolves selected model from model list when body model is omitted', async () => {
   const runtimeRequest = await buildRuntimeRequest({
     body: {

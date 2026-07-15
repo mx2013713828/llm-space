@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import { createActiveJobRegistry } from '../agent/activeJobs.js';
 import { SecurityPlugin } from '../agent/plugins/SecurityPlugin.js';
-import { registerAgentRunRoutes } from './agentRunRoutes.js';
+import { createRunController } from '../agent/runtime/runController.js';
+import { attachToActiveJob, registerAgentRunRoutes } from './agentRunRoutes.js';
 import { createRouteApp, dispatchJson, findRouteHandler } from './routeTestUtils.js';
 
 function deferred() {
@@ -153,4 +154,72 @@ test('permission route keeps the SecurityPlugin receiver when using default depe
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, { success: true });
   assert.equal(decision, 'allow');
+});
+
+test('advance route resolves the matching paused active run only', async () => {
+	const app = createRouteApp();
+	const activeJobs = createActiveJobRegistry();
+	const controller = createRunController({ mode: 'step_through' });
+	const waiting = controller.waitForCheckpoint({
+		phase: 'awaiting_tool_step',
+		turn: 1,
+		nextAction: { kind: 'tools', description: 'Next: run get_current_time' },
+		tools: [{ name: 'get_current_time' }],
+	});
+	activeJobs.set('h1', {
+		runId: 'run_1',
+		runController: controller,
+		runControl: controller.getState(),
+		clients: new Set(),
+		source: 'agent',
+	});
+	registerAgentRunRoutes(app, { activeJobs });
+
+	const result = await dispatchJson(app, 'POST', '/api/agent/runs/run_1/advance', {
+		body: { action: 'next' },
+	});
+
+	assert.equal(result.status, 200);
+	assert.equal(result.body.accepted, true);
+	assert.deepEqual(await waiting, { action: 'next' });
+
+	const missing = await dispatchJson(app, 'POST', '/api/agent/runs/missing/advance', {
+		body: { action: 'next' },
+	});
+	assert.equal(missing.status, 404);
+});
+
+test('active run attachment sends compact control state after runtime snapshots', async () => {
+	const activeJobs = createActiveJobRegistry();
+	const controller = createRunController({ mode: 'step_through' });
+	controller.waitForCheckpoint({
+		phase: 'awaiting_model_step',
+		turn: 1,
+		nextAction: { kind: 'model', description: 'Next: ask the model for its next decision' },
+		tools: [],
+	});
+	const job = {
+		runId: 'run_attach',
+		runController: controller,
+		executor: {
+			messages: [{ role: 'assistant', content: 'snapshot' }],
+			todos: [],
+			backgroundTasks: [],
+		},
+		clients: new Set(),
+		source: 'agent',
+	};
+	activeJobs.set('h1', job);
+	const res = createSseResponse();
+	const attaching = attachToActiveJob({ activeJobs, harnessId: 'h1', res, job });
+
+	await Promise.resolve();
+	assert.deepEqual(parseSseTypes(res), [
+		'messages_update',
+		'todo_update',
+		'background_tasks_update',
+		'run_control_state',
+	]);
+	res.end();
+	await attaching;
 });
