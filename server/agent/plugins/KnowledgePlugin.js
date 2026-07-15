@@ -431,9 +431,9 @@ function emitKnowledgeRetrievalTrace({
 }) {
 	if (!executor || !traceKey) return;
 	if (!Array.isArray(executor.messages)) executor.messages = [];
-	const existingIndex = executor.messages.findIndex(message => (
-		message?.type === 'knowledge_retrieval' && message?.traceKey === traceKey
-	));
+	const existing = Array.isArray(executor.messages)
+		&& executor.messages.some(message => message?.type === 'knowledge_retrieval' && message?.traceKey === traceKey);
+	if (existing) return;
 
 	const chunks = Array.isArray(retrieval?.chunks) ? retrieval.chunks : [];
 	const sources = chunks.slice(0, 10).map(chunk => ({
@@ -455,33 +455,8 @@ function emitKnowledgeRetrievalTrace({
 		reason: String(reason || ''),
 		createdAt: new Date().toISOString(),
 	};
-	if (existingIndex !== -1) {
-		const existing = executor.messages[existingIndex];
-		if (existing?.turn === turn) return;
-
-		// Older sessions wrote retrieval traces without a turn, which groups them
-		// under the first trajectory step. Repair and place that trace beside its user turn.
-		executor.messages.splice(existingIndex, 1);
-		const userIndex = findKnowledgeTraceUserIndex(executor.messages, { turn, query });
-		executor.messages.splice(userIndex + 1, 0, { ...existing, ...message });
-		executor.onEvent?.('messages_update', { messages: executor.messages });
-		return;
-	}
 	executor.messages.push(message);
 	executor.onEvent?.('messages_update', { messages: executor.messages });
-}
-
-function findKnowledgeTraceUserIndex(messages, { turn, query }) {
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message?.role !== 'user' || message?.turn !== turn) continue;
-		if (String(message?.content || '') === query) return index;
-	}
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message?.role === 'user' && message?.turn === turn) return index;
-	}
-	return messages.length - 1;
 }
 
 function resolveAutoRagInjectionThreshold({ retrieval = {}, runtime = {} } = {}) {

@@ -193,36 +193,6 @@ test('KnowledgePlugin reuses one automatic retrieval within the same user turn',
 	assert.equal(first.executor.messages.filter(message => message.type === 'knowledge_retrieval').length, 1);
 });
 
-test('KnowledgePlugin repairs a legacy trace missing its turn instead of leaving it at the top', async () => {
-	const context = createKnowledgeContext({
-		features: {
-			knowledge_bases: {
-				enabled: true,
-				strategy: 'auto_rag',
-				auto_retrieve: true,
-				knowledge_tools: false,
-			},
-		},
-	});
-	context.turnIndex = 7;
-	context.executor.messages = [
-		{
-			role: 'system',
-			type: 'knowledge_retrieval',
-			traceKey: '7:What is RAG?',
-			status: 'injected',
-			query: 'What is RAG?',
-		},
-		{ role: 'user', type: 'text', turn: 7, content: 'What is RAG?' },
-	];
-
-	await KnowledgePlugin.preLLM(context);
-
-	assert.equal(context.executor.messages[0].role, 'user');
-	assert.equal(context.executor.messages[1].type, 'knowledge_retrieval');
-	assert.equal(context.executor.messages[1].turn, 7);
-});
-
 test('KnowledgePlugin skips low-confidence vector retrieval without injecting prompt content', async () => {
 	const context = createKnowledgeContext({
 		retrieval: {
