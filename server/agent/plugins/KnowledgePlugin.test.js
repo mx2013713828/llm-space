@@ -153,7 +153,12 @@ test('KnowledgePlugin emits a presentation-only trajectory trace for automatic r
 	assert.equal(context.executor.messages[0].status, 'injected');
 	assert.equal(context.executor.messages[0].query, 'What is RAG?');
 	assert.equal(context.executor.messages[0].resultCount, 1);
-	assert.deepEqual(context.executor.messages[0].sources, [{ knowledgeBase: 'Docs', filename: 'rag.md', score: 3 }]);
+	assert.deepEqual(context.executor.messages[0].sources, [{
+		knowledgeBase: 'Docs',
+		filename: 'rag.md',
+		chunkIndex: 0,
+		score: 3,
+	}]);
 	assert.match(context.executor.messages[0].createdAt, /^\d{4}-\d{2}-\d{2}T/);
 	assert.equal(events[0]?.type, 'messages_update');
 });

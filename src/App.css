@@ -2049,6 +2049,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.knowledge-retrieval-source-chunk {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
 .knowledge-retrieval-source-base {
   max-width: 160px;
   overflow: hidden;

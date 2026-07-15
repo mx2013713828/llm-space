@@ -442,7 +442,12 @@ export function KnowledgeRetrievalCard({
               {safeSources.map((source, index) => (
                 <div className="knowledge-retrieval-source" key={`${source.knowledgeBase || 'base'}:${source.filename || 'source'}:${index}`}>
                   <span className="knowledge-retrieval-source-index">{index + 1}</span>
-                  <span className="knowledge-retrieval-source-file">{source.filename || 'unknown file'}</span>
+                  <span className="knowledge-retrieval-source-file">
+                    {source.filename || 'unknown file'}
+                    {source.chunkIndex !== undefined && source.chunkIndex !== null && source.chunkIndex !== ''
+                      ? <span className="knowledge-retrieval-source-chunk"> · chunk {source.chunkIndex}</span>
+                      : null}
+                  </span>
                   {source.knowledgeBase && <span className="knowledge-retrieval-source-base">{source.knowledgeBase}</span>}
                   <span className="knowledge-retrieval-source-score">{Number(source.score || 0).toFixed(4)}</span>
                 </div>

@@ -439,6 +439,7 @@ function emitKnowledgeRetrievalTrace({
 	const sources = chunks.slice(0, 10).map(chunk => ({
 		knowledgeBase: String(chunk?.knowledgeBase?.name || chunk?.knowledgeBase?.id || ''),
 		filename: String(chunk?.source?.filename || 'unknown'),
+		chunkIndex: Number(chunk?.source?.chunkIndex ?? chunk?.chunkIndex ?? 0),
 		score: Number(chunk?.score || 0),
 	}));
 	const message = {
