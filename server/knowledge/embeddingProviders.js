@@ -85,30 +85,39 @@ async function embedWithOpenAICompatibleApi({ texts = [], settings, fetchImpl, e
 	if (!apiKey) {
 		throw new Error(`Missing embedding API key env: ${settings.embeddingApiKeyEnv || defaultApiKeyEnv(settings.embeddingProvider)}`);
 	}
-	const response = await fetchImpl(settings.embeddingBaseUrl, {
-		method: 'POST',
-		headers: {
-			'authorization': `Bearer ${apiKey}`,
-			'content-type': 'application/json',
-		},
-		body: JSON.stringify({
-			model: settings.embeddingModel,
-			input: texts.map(text => String(text || '')),
-			...(settings.embeddingDimensions ? { dimensions: settings.embeddingDimensions } : {}),
-		}),
-	});
-	if (!response.ok) {
-		const errorText = await response.text().catch(() => '');
-		throw new Error(`Embedding API error ${response.status}: ${errorText || response.statusText}`);
+	
+	const BATCH_SIZE = 64;
+	const allVectors = [];
+	
+	for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+		const batchTexts = texts.slice(i, i + BATCH_SIZE);
+		const response = await fetchImpl(settings.embeddingBaseUrl, {
+			method: 'POST',
+			headers: {
+				'authorization': `Bearer ${apiKey}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({
+				model: settings.embeddingModel,
+				input: batchTexts.map(text => String(text || '')),
+				...(settings.embeddingDimensions ? { dimensions: settings.embeddingDimensions } : {}),
+			}),
+		});
+		if (!response.ok) {
+			const errorText = await response.text().catch(() => '');
+			throw new Error(`Embedding API error ${response.status}: ${errorText || response.statusText}`);
+		}
+		const data = await response.json();
+		const batchVectors = (data.data || [])
+			.sort((a, b) => Number(a.index || 0) - Number(b.index || 0))
+			.map(item => item.embedding);
+		if (batchVectors.length !== batchTexts.length || batchVectors.some(vector => !Array.isArray(vector))) {
+			throw new Error('Embedding API returned invalid vector data');
+		}
+		allVectors.push(...batchVectors);
 	}
-	const data = await response.json();
-	const vectors = (data.data || [])
-		.sort((a, b) => Number(a.index || 0) - Number(b.index || 0))
-		.map(item => item.embedding);
-	if (vectors.length !== texts.length || vectors.some(vector => !Array.isArray(vector))) {
-		throw new Error('Embedding API returned invalid vector data');
-	}
-	return vectors;
+	
+	return allVectors;
 }
 
 function normalizeEmbeddingModel({ provider, model }) {
