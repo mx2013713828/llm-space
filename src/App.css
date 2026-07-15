@@ -982,32 +982,6 @@
   line-height: 1.45;
 }
 
-.knowledge-runtime-bounds {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  align-content: center;
-}
-
-.knowledge-runtime-bounds label {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.knowledge-runtime-bounds label span {
-  color: var(--text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.knowledge-runtime-bounds .btn {
-  grid-column: 1 / -1;
-  justify-content: center;
-}
-
 .knowledge-workbench {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);

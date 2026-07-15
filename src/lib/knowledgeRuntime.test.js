@@ -24,9 +24,6 @@ test('auto_rag enables manifest and automatic retrieval but hides tools', () => 
 		manifestEnabled: true,
 		autoRetrieve: true,
 		knowledgeTools: false,
-		topK: 5,
-		maxChars: 8000,
-		scoreThreshold: 0,
 	});
 });
 
@@ -58,7 +55,7 @@ test('custom strategy keeps the current primitive mix', () => {
 	assert.equal(runtime.knowledgeTools, false);
 });
 
-test('custom settings preserve numeric retrieval bounds', () => {
+test('custom strategy ignores legacy runtime retrieval bounds', () => {
 	const runtime = resolveKnowledgeRuntime({
 		knowledge_bases: {
 			enabled: true,
@@ -73,12 +70,12 @@ test('custom settings preserve numeric retrieval bounds', () => {
 	});
 
 	assert.equal(runtime.strategy, 'custom');
-	assert.equal(runtime.topK, 3);
-	assert.equal(runtime.maxChars, 1200);
-	assert.equal(runtime.scoreThreshold, 0.25);
+	assert.equal('topK' in runtime, false);
+	assert.equal('maxChars' in runtime, false);
+	assert.equal('scoreThreshold' in runtime, false);
 });
 
-test('parseFeatures normalizes knowledge runtime defaults and numeric settings', () => {
+test('parseFeatures removes legacy runtime retrieval bounds', () => {
 	const parsed = parseFeatures({
 		knowledge_bases: {
 			strategy: 'auto_rag',
@@ -90,7 +87,7 @@ test('parseFeatures normalizes knowledge runtime defaults and numeric settings',
 
 	assert.equal(parsed.knowledge_bases.enabled, true);
 	assert.equal(parsed.knowledge_bases.strategy, 'auto_rag');
-	assert.equal(parsed.knowledge_bases.topK, 3);
-	assert.equal(parsed.knowledge_bases.maxChars, 1200);
-	assert.equal(parsed.knowledge_bases.scoreThreshold, 0.25);
+	assert.equal('topK' in parsed.knowledge_bases, false);
+	assert.equal('maxChars' in parsed.knowledge_bases, false);
+	assert.equal('scoreThreshold' in parsed.knowledge_bases, false);
 });

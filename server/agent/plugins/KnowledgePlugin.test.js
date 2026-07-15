@@ -127,6 +127,43 @@ test('KnowledgePlugin injects retrieved knowledge only for auto_rag with matchin
 	assert.equal(context.promptAssemblySections.some(section => section.id === 'retrieved_knowledge'), true);
 });
 
+test('KnowledgePlugin lets mounted knowledge bases own automatic retrieval bounds', async () => {
+	const context = createKnowledgeContext({
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'auto_rag',
+				auto_retrieve: true,
+				knowledge_tools: false,
+				topK: 4,
+				maxChars: 8000,
+				scoreThreshold: 0,
+			},
+		},
+	});
+	let request;
+	context.executor.knowledgeDependencies.retrieveKnowledge = async options => {
+		request = options;
+		return {
+			query: options.query,
+			chunks: [{
+				id: 'chk_1',
+				score: 3,
+				text: 'RAG retrieves external context.',
+				source: { filename: 'rag.md', chunkIndex: 0 },
+				knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+			}],
+		};
+	};
+
+	await KnowledgePlugin.preLLM(context);
+
+	assert.deepEqual(request, {
+		knowledgeBaseIds: ['kb_docs'],
+		query: 'What is RAG?',
+	});
+});
+
 test('KnowledgePlugin emits a presentation-only trajectory trace for automatic retrieval', async () => {
 	const events = [];
 	const context = createKnowledgeContext({

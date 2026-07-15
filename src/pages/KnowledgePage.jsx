@@ -133,7 +133,6 @@ export function KnowledgePage({ harness, onSave }) {
 	const [hasLoadedBases, setHasLoadedBases] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
-	const [runtimeDraft, setRuntimeDraft] = useState(null);
 	const [baseRetrievalDraft, setBaseRetrievalDraft] = useState(null);
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
@@ -142,14 +141,6 @@ export function KnowledgePage({ harness, onSave }) {
 	const parsedFeatures = useMemo(() => parseFeatures(harness?.features || {}), [harness?.features]);
 	const knowledgeRuntime = useMemo(() => resolveKnowledgeRuntime(parsedFeatures), [parsedFeatures]);
 	const strategySummary = getKnowledgeStrategySummary(knowledgeRuntime.strategy);
-
-	useEffect(() => {
-		setRuntimeDraft({
-			topK: knowledgeRuntime.topK,
-			maxChars: knowledgeRuntime.maxChars,
-			scoreThreshold: knowledgeRuntime.scoreThreshold,
-		});
-	}, [knowledgeRuntime.topK, knowledgeRuntime.maxChars, knowledgeRuntime.scoreThreshold]);
 
 	useEffect(() => {
 		if (!selectedBase) {
@@ -276,20 +267,6 @@ export function KnowledgePage({ harness, onSave }) {
 	async function changeKnowledgeStrategy(strategyId) {
 		const nextFeatures = applyKnowledgeRuntimeStrategy(harness?.features || {}, strategyId);
 		await saveKnowledgeFeatures(nextFeatures, `Knowledge runtime set to ${KNOWLEDGE_RUNTIME_STRATEGIES[strategyId]?.name || strategyId}.`);
-	}
-
-	async function applyRuntimeBounds() {
-		const draft = runtimeDraft || {};
-		const nextFeatures = {
-			...(harness?.features || {}),
-			knowledge_bases: {
-				...(parsedFeatures.knowledge_bases || {}),
-				topK: Number(draft.topK) || knowledgeRuntime.topK,
-				maxChars: Number(draft.maxChars) || knowledgeRuntime.maxChars,
-				scoreThreshold: Number(draft.scoreThreshold) || 0,
-			},
-		};
-		await saveKnowledgeFeatures(nextFeatures, 'Knowledge retrieval bounds updated.');
 	}
 
 	async function deleteKnowledgeBase() {
@@ -532,21 +509,6 @@ export function KnowledgePage({ harness, onSave }) {
 							<span>{strategy.description}</span>
 						</button>
 					))}
-				</div>
-				<div className="knowledge-runtime-bounds">
-					<label>
-						<span>Top K</span>
-						<input className="input" type="number" min="1" max="20" value={runtimeDraft?.topK ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), topK: event.target.value }))} />
-					</label>
-					<label>
-						<span>Max chars</span>
-						<input className="input" type="number" min="500" max="50000" value={runtimeDraft?.maxChars ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), maxChars: event.target.value }))} />
-					</label>
-					<label>
-						<span>Score threshold</span>
-						<input className="input" type="number" min="0" step="0.1" value={runtimeDraft?.scoreThreshold ?? ''} onChange={event => setRuntimeDraft(prev => ({ ...(prev || {}), scoreThreshold: event.target.value }))} />
-					</label>
-					<button className="btn btn-ghost" onClick={applyRuntimeBounds} disabled={isLoading || !harness?.id}>Apply Bounds</button>
 				</div>
 			</section>
 

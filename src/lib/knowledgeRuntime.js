@@ -31,9 +31,6 @@ const DEFAULT_RUNTIME = {
 	manifest_enabled: true,
 	auto_retrieve: false,
 	knowledge_tools: true,
-	topK: 5,
-	maxChars: 8000,
-	scoreThreshold: 0,
 };
 
 export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agentic_rag') {
@@ -50,9 +47,6 @@ export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agent
 				manifest_enabled: previous.manifest_enabled ?? DEFAULT_RUNTIME.manifest_enabled,
 				auto_retrieve: previous.auto_retrieve ?? DEFAULT_RUNTIME.auto_retrieve,
 				knowledge_tools: previous.knowledge_tools ?? DEFAULT_RUNTIME.knowledge_tools,
-				topK: normalizeInteger(previous.topK, DEFAULT_RUNTIME.topK),
-				maxChars: normalizeInteger(previous.maxChars, DEFAULT_RUNTIME.maxChars),
-				scoreThreshold: normalizeNumber(previous.scoreThreshold, DEFAULT_RUNTIME.scoreThreshold),
 			},
 		};
 	}
@@ -68,9 +62,6 @@ export function applyKnowledgeRuntimeStrategy(features = {}, strategyId = 'agent
 			manifest_enabled: preset.manifest_enabled,
 			auto_retrieve: preset.auto_retrieve,
 			knowledge_tools: preset.knowledge_tools,
-			topK: normalizeInteger(previous.topK, DEFAULT_RUNTIME.topK),
-			maxChars: normalizeInteger(previous.maxChars, DEFAULT_RUNTIME.maxChars),
-			scoreThreshold: normalizeNumber(previous.scoreThreshold, DEFAULT_RUNTIME.scoreThreshold),
 		},
 	};
 }
@@ -98,9 +89,6 @@ export function resolveKnowledgeRuntime(features = {}) {
 		manifestEnabled: !!merged.manifest_enabled,
 		autoRetrieve: !!merged.auto_retrieve,
 		knowledgeTools: !!merged.knowledge_tools,
-		topK: normalizeInteger(merged.topK, DEFAULT_RUNTIME.topK),
-		maxChars: normalizeInteger(merged.maxChars, DEFAULT_RUNTIME.maxChars),
-		scoreThreshold: normalizeNumber(merged.scoreThreshold, DEFAULT_RUNTIME.scoreThreshold),
 	};
 }
 
@@ -115,14 +103,4 @@ export function getKnowledgeStrategySummary(strategyId = 'agentic_rag') {
 		return { name: 'Custom', detail: 'Manual mix of manifest, retrieval, and tools' };
 	}
 	return { name: 'Agentic RAG', detail: 'Manifest pinned, retrieval via tools' };
-}
-
-function normalizeInteger(value, fallback) {
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : fallback;
-}
-
-function normalizeNumber(value, fallback) {
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : fallback;
 }

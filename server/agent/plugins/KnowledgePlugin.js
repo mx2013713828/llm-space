@@ -132,9 +132,6 @@ export const KnowledgePlugin = {
 					retrieval: await deps.retrieveKnowledge({
 						knowledgeBaseIds: mountedIds,
 						query,
-						topK: runtime.topK,
-						maxChars: runtime.maxChars,
-						scoreThreshold: runtime.scoreThreshold,
 					}),
 				};
 			} catch (error) {
@@ -271,13 +268,17 @@ export const KnowledgePlugin = {
 			return;
 		}
 
-		const retrieval = await deps.retrieveKnowledge({
+		const retrievalOptions = {
 			knowledgeBaseIds: targetIds,
 			query,
-			topK: normalizeOptionalNumber(args.topK, runtime.topK),
-			maxChars: normalizeOptionalNumber(args.maxChars, runtime.maxChars),
-			scoreThreshold: normalizeOptionalNumber(args.scoreThreshold, runtime.scoreThreshold),
-		});
+		};
+		const topK = normalizeOptionalNumber(args.topK);
+		const maxChars = normalizeOptionalNumber(args.maxChars);
+		const scoreThreshold = normalizeOptionalNumber(args.scoreThreshold);
+		if (topK !== undefined) retrievalOptions.topK = topK;
+		if (maxChars !== undefined) retrievalOptions.maxChars = maxChars;
+		if (scoreThreshold !== undefined) retrievalOptions.scoreThreshold = scoreThreshold;
+		const retrieval = await deps.retrieveKnowledge(retrievalOptions);
 		tool.toolOutput = formatKnowledgeToolResults(retrieval);
 		tool.handled = true;
 	},
@@ -467,7 +468,7 @@ function resolveAutoRagInjectionThreshold({ retrieval = {}, runtime = {} } = {})
 	if (Number.isFinite(retrievalThreshold) && retrievalThreshold > 0) return retrievalThreshold;
 	const strategy = retrieval.effectiveSettings?.strategy || runtime.strategy || '';
 	if (strategy === 'vector' || strategy === 'hybrid') return DEFAULT_AUTO_RAG_MIN_SCORE;
-	return Number(runtime.scoreThreshold || 0);
+	return 0;
 }
 
 async function loadMountedKnowledgeBases({ mountedIds = [], loadBase }) {
@@ -498,9 +499,9 @@ function normalizeRequestedKnowledgeBaseIds(value) {
 	return [...new Set(value.map(id => String(id || '').trim()).filter(Boolean))];
 }
 
-function normalizeOptionalNumber(value, fallback) {
+function normalizeOptionalNumber(value) {
 	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : fallback;
+	return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function escapeXmlText(value) {
