@@ -892,7 +892,7 @@
 
 .knowledge-runtime-panel {
   display: grid;
-  grid-template-columns: minmax(240px, 0.8fr) minmax(360px, 1.2fr) minmax(260px, 0.8fr);
+  grid-template-columns: minmax(240px, 0.8fr) minmax(360px, 1.2fr);
   gap: 14px;
   align-items: stretch;
   margin-bottom: 18px;
@@ -902,6 +902,59 @@
   background: var(--bg-panel-deep);
   box-shadow: var(--shadow-deep);
 }
+
+.knowledge-query-preparation {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(200px, 0.5fr) minmax(360px, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.knowledge-query-preparation-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.knowledge-query-preparation-copy p {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.knowledge-query-preparation-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.knowledge-query-preparation-option {
+  min-height: 70px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.knowledge-query-preparation-option:hover:not(:disabled) {
+  border-color: var(--border-blue-faded);
+}
+
+.knowledge-query-preparation-option.active {
+  border-color: var(--border-light);
+  background: var(--ui-strategy-active-bg);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+.knowledge-query-preparation-option strong { font-size: 12px; }
+.knowledge-query-preparation-option span { color: var(--text-secondary); font-size: 10px; line-height: 1.45; }
 
 .knowledge-runtime-copy {
   min-width: 0;
@@ -1998,6 +2051,13 @@
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.knowledge-retrieval-query em {
+  justify-self: end;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
 }
 .knowledge-retrieval-sources { display: grid; gap: 6px; }
 .knowledge-retrieval-source {

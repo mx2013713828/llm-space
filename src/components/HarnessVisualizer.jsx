@@ -139,8 +139,8 @@ export default function HarnessVisualizer({ harness, features = {}, skills = [],
         {knowledge.showQueryPreparation && (
           <ItemCard
             icon={Activity}
-            label="Query Preparation · Raw User Query"
-            description="Current retrieval query uses the latest user message. Rewrite strategies plug in here."
+            label="Query Preparation"
+            description="Builds a retrieval-only query before search. The selected runtime mode is visible in the retrieval trace."
           />
         )}
         {knowledge.showRetrieval && (

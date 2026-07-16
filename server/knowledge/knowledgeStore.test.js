@@ -10,8 +10,10 @@ import {
   getKnowledgeBaseDir,
   listKnowledgeBases,
   loadKnowledgeBase,
-  mountKnowledgeBases,
-  listMountedKnowledgeBases,
+	mountKnowledgeBases,
+	listMountedKnowledgeBases,
+	loadKnowledgeMount,
+	updateKnowledgeMountConfig,
 } from './knowledgeStore.js';
 
 async function createFixture(t) {
@@ -114,4 +116,37 @@ test('mountKnowledgeBases stores harness mounts independently from knowledge met
 
   assert.deepEqual(await listMountedKnowledgeBases({ harnessId: 'alpha', knowledgeRoot: rootDir }), [kb.id]);
   assert.deepEqual(await listMountedKnowledgeBases({ harnessId: '../alpha', knowledgeRoot: rootDir }), []);
+});
+
+test('knowledge mount retains query preparation while its mounted bases change', async (t) => {
+	const { rootDir } = await createFixture(t);
+	const kb = await createKnowledgeBase({ name: 'Docs', knowledgeRoot: rootDir });
+
+	await mountKnowledgeBases({
+		harnessId: 'alpha',
+		knowledgeBaseIds: [kb.id],
+		queryPreparation: { mode: 'rule_cleanup' },
+		knowledgeRoot: rootDir,
+	});
+	await mountKnowledgeBases({
+		harnessId: 'alpha',
+		knowledgeBaseIds: [],
+		knowledgeRoot: rootDir,
+	});
+
+	assert.deepEqual(await loadKnowledgeMount({ harnessId: 'alpha', knowledgeRoot: rootDir }), {
+		harnessId: 'alpha',
+		knowledgeBaseIds: [],
+		queryPreparation: { mode: 'rule_cleanup' },
+	});
+
+	assert.deepEqual(await updateKnowledgeMountConfig({
+		harnessId: 'alpha',
+		patch: { queryPreparation: { mode: 'raw' } },
+		knowledgeRoot: rootDir,
+	}), {
+		harnessId: 'alpha',
+		knowledgeBaseIds: [],
+		queryPreparation: { mode: 'raw' },
+	});
 });

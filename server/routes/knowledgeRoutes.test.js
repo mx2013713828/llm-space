@@ -85,6 +85,17 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   assert.equal(mountedRes.status, 200);
   assert.deepEqual(mountedRes.body.map(item => item.id), [createRes.body.id]);
 
+  const runtimeBeforeRes = await dispatchJson(app, 'GET', '/api/harnesses/alpha/knowledge-runtime');
+  assert.equal(runtimeBeforeRes.status, 200);
+  assert.deepEqual(runtimeBeforeRes.body.queryPreparation, { mode: 'raw' });
+
+  const runtimeUpdateRes = await dispatchJson(app, 'PATCH', '/api/harnesses/alpha/knowledge-runtime', {
+    body: { queryPreparation: { mode: 'rule_cleanup' } },
+  });
+  assert.equal(runtimeUpdateRes.status, 200);
+  assert.deepEqual(runtimeUpdateRes.body.knowledgeBaseIds, [createRes.body.id]);
+  assert.deepEqual(runtimeUpdateRes.body.queryPreparation, { mode: 'rule_cleanup' });
+
   const deleteRes = await dispatchJson(app, 'DELETE', `/api/knowledge-bases/${createRes.body.id}`);
   assert.equal(deleteRes.status, 200);
 });

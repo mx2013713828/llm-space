@@ -127,6 +127,46 @@ test('KnowledgePlugin injects retrieved knowledge only for auto_rag with matchin
 	assert.equal(context.promptAssemblySections.some(section => section.id === 'retrieved_knowledge'), true);
 });
 
+test('KnowledgePlugin uses the prepared retrieval query while preserving the original user prompt', async () => {
+	const context = createKnowledgeContext({
+		mountConfig: { queryPreparation: { mode: 'rule_cleanup' } },
+		features: {
+			knowledge_bases: {
+				enabled: true,
+				strategy: 'auto_rag',
+				auto_retrieve: true,
+				knowledge_tools: false,
+			},
+		},
+	});
+	context.apiMessages[0].content[0].text = '不要联网，卫霍正式入队';
+	let retrievedQuery = '';
+	context.executor.knowledgeDependencies.retrieveKnowledge = async ({ query }) => {
+		retrievedQuery = query;
+		return {
+			query,
+			chunks: [{
+				id: 'chk_weihuo',
+				score: 0.9,
+				text: '完成卫霍的承诺后，卫霍正式入队。',
+				source: { filename: 'guide.md', chunkIndex: 9 },
+				knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+			}],
+		};
+	};
+
+	await KnowledgePlugin.preLLM(context);
+
+	assert.equal(retrievedQuery, '卫霍正式入队');
+	assert.match(context.apiMessages[0].content[0].text, /Original user query: 不要联网，卫霍正式入队/);
+	assert.match(context.apiMessages[0].content[0].text, /Retrieval query: 卫霍正式入队/);
+	assert.match(context.apiMessages[0].content[0].text, /卫霍正式入队$/);
+	const trace = context.executor.messages.find(message => message.type === 'knowledge_retrieval');
+	assert.equal(trace?.query, '不要联网，卫霍正式入队');
+	assert.equal(trace?.retrievalQuery, '卫霍正式入队');
+	assert.equal(trace?.queryPreparation?.mode, 'rule_cleanup');
+});
+
 test('KnowledgePlugin lets mounted knowledge bases own automatic retrieval bounds', async () => {
 	const context = createKnowledgeContext({
 		features: {
@@ -399,6 +439,7 @@ function createKnowledgeContext({
 	features = {},
 	retrieval,
 	retrievalError,
+	mountConfig,
 	retrievalChunks = [{
 		id: 'chk_1',
 		score: 3,
@@ -416,7 +457,7 @@ function createKnowledgeContext({
 					assert.equal(harnessId, 'alpha');
 					return ['kb_docs'];
 				},
-				async loadKnowledgeBase({ knowledgeBaseId }) {
+			async loadKnowledgeBase({ knowledgeBaseId }) {
 					assert.equal(knowledgeBaseId, 'kb_docs');
 					return {
 						id: 'kb_docs',
@@ -424,8 +465,16 @@ function createKnowledgeContext({
 						description: 'Project docs',
 						fileCount: 1,
 						chunkCount: retrievalChunks.length,
-					};
-				},
+				};
+			},
+			async loadKnowledgeMount() {
+				return {
+					harnessId: 'alpha',
+					knowledgeBaseIds: ['kb_docs'],
+					queryPreparation: { mode: 'raw' },
+					...mountConfig,
+				};
+			},
 			async retrieveKnowledge({ knowledgeBaseIds, query }) {
 				assert.deepEqual(knowledgeBaseIds, ['kb_docs']);
 				if (!retrieval) assert.equal(query, 'What is RAG?');

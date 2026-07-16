@@ -1,5 +1,6 @@
 import path from 'path';
 import { promises as fs } from 'fs';
+import { normalizeQueryPreparation } from './queryPreparation.js';
 
 const DEFAULT_KNOWLEDGE_ROOT = path.join(process.cwd(), '.knowledge');
 const KB_ID_PATTERN = /^kb_[a-z0-9][a-z0-9_-]*$/;
@@ -140,9 +141,9 @@ export async function saveKnowledgeVectorIndex({ knowledgeBaseId, index, knowled
 	await writeJson(path.join(getKnowledgeBaseDir(knowledgeBaseId, { knowledgeRoot }), 'vector-index.json'), index || createEmptyVectorIndex());
 }
 
-export async function mountKnowledgeBases({ harnessId, knowledgeBaseIds = [], knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
+export async function mountKnowledgeBases({ harnessId, knowledgeBaseIds = [], queryPreparation, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
 	if (!HARNESS_ID_PATTERN.test(String(harnessId || ''))) {
-		return { harnessId, knowledgeBaseIds: [] };
+		return { harnessId, knowledgeBaseIds: [], queryPreparation: normalizeQueryPreparation() };
 	}
 	const ids = [];
 	for (const id of Array.isArray(knowledgeBaseIds) ? knowledgeBaseIds : []) {
@@ -156,16 +157,47 @@ export async function mountKnowledgeBases({ harnessId, knowledgeBaseIds = [], kn
 	}
 	const dir = getKnowledgeMountsDir({ knowledgeRoot });
 	await fs.mkdir(dir, { recursive: true });
-	await writeJson(path.join(dir, `${harnessId}.json`), { harnessId, knowledgeBaseIds: ids });
-	return { harnessId, knowledgeBaseIds: ids };
+	const existing = await loadKnowledgeMount({ harnessId, knowledgeRoot });
+	const mount = {
+		harnessId,
+		knowledgeBaseIds: ids,
+		queryPreparation: queryPreparation === undefined
+			? existing.queryPreparation
+			: normalizeQueryPreparation(queryPreparation),
+	};
+	await writeJson(path.join(dir, `${harnessId}.json`), mount);
+	return mount;
 }
 
 export async function listMountedKnowledgeBases({ harnessId, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
-	if (!HARNESS_ID_PATTERN.test(String(harnessId || ''))) return [];
+	return (await loadKnowledgeMount({ harnessId, knowledgeRoot })).knowledgeBaseIds;
+}
+
+export async function loadKnowledgeMount({ harnessId, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
+	if (!HARNESS_ID_PATTERN.test(String(harnessId || ''))) {
+		return { harnessId, knowledgeBaseIds: [], queryPreparation: normalizeQueryPreparation() };
+	}
 	const filePath = path.join(getKnowledgeMountsDir({ knowledgeRoot }), `${harnessId}.json`);
 	const data = await readJson(filePath, { knowledgeBaseIds: [] });
-	return (Array.isArray(data.knowledgeBaseIds) ? data.knowledgeBaseIds : [])
-		.filter(id => KB_ID_PATTERN.test(String(id || '')));
+	return {
+		harnessId,
+		knowledgeBaseIds: (Array.isArray(data.knowledgeBaseIds) ? data.knowledgeBaseIds : [])
+			.filter(id => KB_ID_PATTERN.test(String(id || ''))),
+		queryPreparation: normalizeQueryPreparation(data.queryPreparation),
+	};
+}
+
+export async function updateKnowledgeMountConfig({ harnessId, patch = {}, knowledgeRoot = DEFAULT_KNOWLEDGE_ROOT } = {}) {
+	const current = await loadKnowledgeMount({ harnessId, knowledgeRoot });
+	return mountKnowledgeBases({
+		harnessId,
+		knowledgeBaseIds: current.knowledgeBaseIds,
+		queryPreparation: {
+			...current.queryPreparation,
+			...(patch?.queryPreparation || {}),
+		},
+		knowledgeRoot,
+	});
 }
 
 async function writeKnowledgeBaseMetadata(knowledgeBase, { knowledgeRoot }) {

@@ -4,8 +4,10 @@ import {
 	loadKnowledgeFiles,
 	listKnowledgeBases,
 	listMountedKnowledgeBases,
+	loadKnowledgeMount,
 	loadKnowledgeBase,
 	mountKnowledgeBases,
+	updateKnowledgeMountConfig,
 	updateKnowledgeBaseMetadata,
 } from '../knowledge/knowledgeStore.js';
 import {
@@ -223,6 +225,29 @@ export function registerKnowledgeRoutes(app, { knowledgeRoot } = {}) {
 			res.json(bases);
 		} catch (err) {
 			res.status(500).json({ error: err.message });
+		}
+	});
+
+	app.get('/api/harnesses/:harnessId/knowledge-runtime', async (req, res) => {
+		try {
+			res.json(await loadKnowledgeMount({
+				harnessId: req.params.harnessId,
+				knowledgeRoot,
+			}));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
+		}
+	});
+
+	app.patch('/api/harnesses/:harnessId/knowledge-runtime', async (req, res) => {
+		try {
+			res.json(await updateKnowledgeMountConfig({
+				harnessId: req.params.harnessId,
+				patch: { queryPreparation: req.body?.queryPreparation || {} },
+				knowledgeRoot,
+			}));
+		} catch (err) {
+			res.status(400).json({ error: err.message });
 		}
 	});
 

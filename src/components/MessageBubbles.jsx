@@ -402,6 +402,8 @@ export function ToolCallCard({ toolName, toolInput, toolOutput, toolStatus, subM
 
 export function KnowledgeRetrievalCard({
   query,
+  retrievalQuery,
+  queryPreparation,
   strategy,
   status,
   resultCount,
@@ -434,9 +436,16 @@ export function KnowledgeRetrievalCard({
       {expanded && (
         <div className="knowledge-retrieval-body animate-fade-in">
           <div className="knowledge-retrieval-query">
-            <span>Query</span>
+            <span>{retrievalQuery && retrievalQuery !== query ? 'User query' : 'Query'}</span>
             <code>{query || '(empty query)'}</code>
           </div>
+          {retrievalQuery && retrievalQuery !== query && (
+            <div className="knowledge-retrieval-query">
+              <span>Retrieval</span>
+              <code>{retrievalQuery}</code>
+              {queryPreparation?.mode && <em>{queryPreparation.mode}</em>}
+            </div>
+          )}
           {safeSources.length > 0 ? (
             <div className="knowledge-retrieval-sources">
               {safeSources.map((source, index) => (

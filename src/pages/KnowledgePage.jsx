@@ -23,6 +23,19 @@ const DEFAULT_SETTINGS = {
 	overlap: 150,
 };
 
+const QUERY_PREPARATION_OPTIONS = [
+	{
+		id: 'raw',
+		name: 'Raw query',
+		description: 'Retrieve with the complete user message, unchanged.',
+	},
+	{
+		id: 'rule_cleanup',
+		name: 'Rule cleanup',
+		description: 'Remove clear routing language such as “不要联网” before retrieval.',
+	},
+];
+
 const ACCEPTED_KNOWLEDGE_FILE_TYPES = [
 	'.md',
 	'.markdown',
@@ -134,10 +147,12 @@ export function KnowledgePage({ harness, onSave }) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isIndexing, setIsIndexing] = useState(false);
 	const [baseRetrievalDraft, setBaseRetrievalDraft] = useState(null);
+	const [queryPreparation, setQueryPreparation] = useState({ mode: 'raw' });
 
 	const bases = useMemo(() => knowledgeBases.map(normalizeKnowledgeBaseSummary), [knowledgeBases]);
 	const selectedBase = bases.find(base => base.id === selectedId) || null;
 	const selectedRawBase = knowledgeBases.find(base => base.id === selectedBase?.id) || null;
+	const harnessId = harness?.id || '';
 	const parsedFeatures = useMemo(() => parseFeatures(harness?.features || {}), [harness?.features]);
 	const knowledgeRuntime = useMemo(() => resolveKnowledgeRuntime(parsedFeatures), [parsedFeatures]);
 	const strategySummary = getKnowledgeStrategySummary(knowledgeRuntime.strategy);
@@ -166,6 +181,22 @@ export function KnowledgePage({ harness, onSave }) {
 			setIsLoading(false);
 		}
 	}, []);
+
+	const loadKnowledgeRuntime = useCallback(async () => {
+		if (!harnessId) {
+			setQueryPreparation({ mode: 'raw' });
+			return;
+		}
+		try {
+			const res = await apiFetch(`/api/harnesses/${encodeURIComponent(harnessId)}/knowledge-runtime`);
+			if (!res.ok) throw new Error(`Failed to load knowledge runtime (${res.status})`);
+			const data = await res.json();
+			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'rule_cleanup' ? 'rule_cleanup' : 'raw' });
+		} catch (err) {
+			setQueryPreparation({ mode: 'raw' });
+			setError(err.message || 'Failed to load query preparation settings.');
+		}
+	}, [harnessId]);
 
 	const loadFiles = useCallback(async (knowledgeBaseId) => {
 		if (!knowledgeBaseId) {
@@ -202,6 +233,10 @@ export function KnowledgePage({ harness, onSave }) {
 	useEffect(() => {
 		void Promise.resolve().then(loadBases);
 	}, [loadBases]);
+
+	useEffect(() => {
+		void Promise.resolve().then(loadKnowledgeRuntime);
+	}, [loadKnowledgeRuntime]);
 
 	useEffect(() => {
 		void Promise.resolve().then(() => loadFiles(selectedBase?.id));
@@ -267,6 +302,30 @@ export function KnowledgePage({ harness, onSave }) {
 	async function changeKnowledgeStrategy(strategyId) {
 		const nextFeatures = applyKnowledgeRuntimeStrategy(harness?.features || {}, strategyId);
 		await saveKnowledgeFeatures(nextFeatures, `Knowledge runtime set to ${KNOWLEDGE_RUNTIME_STRATEGIES[strategyId]?.name || strategyId}.`);
+	}
+
+	async function changeQueryPreparation(mode) {
+		if (!harnessId) {
+			setError('Select a harness before changing query preparation.');
+			return;
+		}
+		setIsLoading(true);
+		setError('');
+		try {
+			const res = await apiFetch(`/api/harnesses/${encodeURIComponent(harnessId)}/knowledge-runtime`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ queryPreparation: { mode } }),
+			});
+			if (!res.ok) throw new Error((await res.json()).error || `Failed to save query preparation (${res.status})`);
+			const data = await res.json();
+			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'rule_cleanup' ? 'rule_cleanup' : 'raw' });
+			setStatus(`Query preparation set to ${mode === 'rule_cleanup' ? 'Rule cleanup' : 'Raw query'}.`);
+		} catch (err) {
+			setError(err.message || 'Failed to save query preparation.');
+		} finally {
+			setIsLoading(false);
+		}
 	}
 
 	async function deleteKnowledgeBase() {
@@ -509,6 +568,28 @@ export function KnowledgePage({ harness, onSave }) {
 							<span>{strategy.description}</span>
 						</button>
 					))}
+				</div>
+				<div className="knowledge-query-preparation">
+					<div className="knowledge-query-preparation-copy">
+						<div className="knowledge-panel-title">Query Preparation</div>
+						<p>Builds the retrieval-only query. Your original message remains unchanged in the agent context.</p>
+					</div>
+					<div className="knowledge-query-preparation-options" role="radiogroup" aria-label="Query preparation mode">
+						{QUERY_PREPARATION_OPTIONS.map(option => (
+							<button
+								key={option.id}
+								type="button"
+								className={`knowledge-query-preparation-option ${queryPreparation.mode === option.id ? 'active' : ''}`}
+								onClick={() => changeQueryPreparation(option.id)}
+								disabled={isLoading || !harnessId}
+								role="radio"
+								aria-checked={queryPreparation.mode === option.id}
+							>
+								<strong>{option.name}</strong>
+								<span>{option.description}</span>
+							</button>
+						))}
+					</div>
 				</div>
 			</section>
 
