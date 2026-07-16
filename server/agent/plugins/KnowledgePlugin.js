@@ -129,10 +129,24 @@ export const KnowledgePlugin = {
 		const originalQuery = String(textBlock.text || '').replace(RETRIEVED_KNOWLEDGE_PATTERN, '').trim();
 		if (!originalQuery) return;
 		const mount = await deps.loadKnowledgeMount({ harnessId: executor.harnessId });
-		const queryPreparation = prepareRetrievalQuery({
+		const preparationKey = buildQueryPreparationCacheKey({
+			userMessage,
 			query: originalQuery,
-			config: mount?.queryPreparation,
+			mode: mount?.queryPreparation?.mode,
+			turnIndex: context.turnIndex,
 		});
+		const preparationCache = getQueryPreparationCache(executor);
+		let queryPreparation = preparationCache.get(preparationKey);
+		if (!queryPreparation) {
+			queryPreparation = await prepareRetrievalQuery({
+				query: originalQuery,
+				config: mount?.queryPreparation,
+				callLLM: executor.dryRunMode || typeof executor._callLLMNonStream !== 'function'
+					? null
+					: (messages, systemPrompt) => executor._callLLMNonStream(messages, systemPrompt, { maxTokens: 160 }),
+			});
+			preparationCache.set(preparationKey, queryPreparation);
+		}
 		const retrievalQuery = queryPreparation.retrievalQuery;
 		if (!retrievalQuery) return;
 		const traceKey = buildRetrievalTraceKey({
@@ -463,6 +477,17 @@ function getRetrievalCache(executor) {
 		executor.knowledgeRetrievalCache = new Map();
 	}
 	return executor.knowledgeRetrievalCache;
+}
+
+function getQueryPreparationCache(executor) {
+	if (!(executor.queryPreparationCache instanceof Map)) {
+		executor.queryPreparationCache = new Map();
+	}
+	return executor.queryPreparationCache;
+}
+
+function buildQueryPreparationCacheKey({ userMessage, query, mode, turnIndex }) {
+	return `${userMessage?.turn ?? turnIndex ?? 'unknown'}:${mode || 'raw'}:${query}`;
 }
 
 function buildRetrievalTraceKey({ userMessage, originalQuery, retrievalQuery, mode, turnIndex }) {

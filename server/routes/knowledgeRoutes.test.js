@@ -90,11 +90,11 @@ test('knowledge routes create, ingest, retrieve, mount, and list mounted bases',
   assert.deepEqual(runtimeBeforeRes.body.queryPreparation, { mode: 'raw' });
 
   const runtimeUpdateRes = await dispatchJson(app, 'PATCH', '/api/harnesses/alpha/knowledge-runtime', {
-    body: { queryPreparation: { mode: 'rule_cleanup' } },
+    body: { queryPreparation: { mode: 'llm_rewrite' } },
   });
   assert.equal(runtimeUpdateRes.status, 200);
   assert.deepEqual(runtimeUpdateRes.body.knowledgeBaseIds, [createRes.body.id]);
-  assert.deepEqual(runtimeUpdateRes.body.queryPreparation, { mode: 'rule_cleanup' });
+  assert.deepEqual(runtimeUpdateRes.body.queryPreparation, { mode: 'llm_rewrite' });
 
   const deleteRes = await dispatchJson(app, 'DELETE', `/api/knowledge-bases/${createRes.body.id}`);
   assert.equal(deleteRes.status, 200);

@@ -3,8 +3,8 @@ import test from 'node:test';
 
 import { prepareRetrievalQuery } from './queryPreparation.js';
 
-test('prepareRetrievalQuery keeps the full user query in raw mode', () => {
-	assert.deepEqual(prepareRetrievalQuery({
+test('prepareRetrievalQuery keeps the full user query in raw mode', async () => {
+	assert.deepEqual(await prepareRetrievalQuery({
 		query: '不要联网，卫霍正式入队',
 		config: { mode: 'raw' },
 	}), {
@@ -13,29 +13,43 @@ test('prepareRetrievalQuery keeps the full user query in raw mode', () => {
 		retrievalQuery: '不要联网，卫霍正式入队',
 		changed: false,
 		reasons: [],
+		fallbackReason: '',
 	});
 });
 
-test('prepareRetrievalQuery removes only leading retrieval-control language in rule cleanup mode', () => {
-	assert.deepEqual(prepareRetrievalQuery({
+test('prepareRetrievalQuery uses an LLM-generated retrieval query without changing the original query', async () => {
+	const calls = [];
+	const result = await prepareRetrievalQuery({
 		query: '不要联网，卫霍正式入队',
-		config: { mode: 'rule_cleanup' },
-	}), {
-		mode: 'rule_cleanup',
-		originalQuery: '不要联网，卫霍正式入队',
-		retrievalQuery: '卫霍正式入队',
-		changed: true,
-		reasons: ['removed_network_constraint'],
+		config: { mode: 'llm_rewrite' },
+		callLLM: async (messages, systemPrompt) => {
+			calls.push({ messages, systemPrompt });
+			return '卫霍正式入队 条件';
+		},
 	});
+
+	assert.deepEqual(result, {
+		mode: 'llm_rewrite',
+		originalQuery: '不要联网，卫霍正式入队',
+		retrievalQuery: '卫霍正式入队 条件',
+		changed: true,
+		reasons: [],
+		fallbackReason: '',
+	});
+	assert.match(calls[0].systemPrompt, /retrieval query/i);
+	assert.match(calls[0].messages[0].content[0].text, /不要联网，卫霍正式入队/);
 });
 
-test('prepareRetrievalQuery never replaces an empty cleaned query with an empty retrieval query', () => {
-	const result = prepareRetrievalQuery({
-		query: '不要联网',
-		config: { mode: 'rule_cleanup' },
+test('prepareRetrievalQuery falls back to the original query when LLM rewriting fails', async () => {
+	const result = await prepareRetrievalQuery({
+		query: '卫霍正式入队',
+		config: { mode: 'llm_rewrite' },
+		callLLM: async () => {
+			throw new Error('gateway unavailable');
+		},
 	});
 
-	assert.equal(result.retrievalQuery, '不要联网');
+	assert.equal(result.retrievalQuery, '卫霍正式入队');
 	assert.equal(result.changed, false);
-	assert.deepEqual(result.reasons, ['cleanup_would_empty_query']);
+	assert.equal(result.fallbackReason, 'rewrite_failed');
 });

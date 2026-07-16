@@ -125,7 +125,7 @@ test('knowledge mount retains query preparation while its mounted bases change',
 	await mountKnowledgeBases({
 		harnessId: 'alpha',
 		knowledgeBaseIds: [kb.id],
-		queryPreparation: { mode: 'rule_cleanup' },
+		queryPreparation: { mode: 'llm_rewrite' },
 		knowledgeRoot: rootDir,
 	});
 	await mountKnowledgeBases({
@@ -137,7 +137,7 @@ test('knowledge mount retains query preparation while its mounted bases change',
 	assert.deepEqual(await loadKnowledgeMount({ harnessId: 'alpha', knowledgeRoot: rootDir }), {
 		harnessId: 'alpha',
 		knowledgeBaseIds: [],
-		queryPreparation: { mode: 'rule_cleanup' },
+		queryPreparation: { mode: 'llm_rewrite' },
 	});
 
 	assert.deepEqual(await updateKnowledgeMountConfig({

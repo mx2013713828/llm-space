@@ -30,9 +30,9 @@ const QUERY_PREPARATION_OPTIONS = [
 		description: 'Retrieve with the complete user message, unchanged.',
 	},
 	{
-		id: 'rule_cleanup',
-		name: 'Rule cleanup',
-		description: 'Remove clear routing language such as “不要联网” before retrieval.',
+		id: 'llm_rewrite',
+		name: 'LLM rewrite',
+		description: 'Use the current model to turn the message into a focused retrieval query.',
 	},
 ];
 
@@ -191,7 +191,7 @@ export function KnowledgePage({ harness, onSave }) {
 			const res = await apiFetch(`/api/harnesses/${encodeURIComponent(harnessId)}/knowledge-runtime`);
 			if (!res.ok) throw new Error(`Failed to load knowledge runtime (${res.status})`);
 			const data = await res.json();
-			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'rule_cleanup' ? 'rule_cleanup' : 'raw' });
+			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'llm_rewrite' ? 'llm_rewrite' : 'raw' });
 		} catch (err) {
 			setQueryPreparation({ mode: 'raw' });
 			setError(err.message || 'Failed to load query preparation settings.');
@@ -319,8 +319,8 @@ export function KnowledgePage({ harness, onSave }) {
 			});
 			if (!res.ok) throw new Error((await res.json()).error || `Failed to save query preparation (${res.status})`);
 			const data = await res.json();
-			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'rule_cleanup' ? 'rule_cleanup' : 'raw' });
-			setStatus(`Query preparation set to ${mode === 'rule_cleanup' ? 'Rule cleanup' : 'Raw query'}.`);
+			setQueryPreparation({ mode: data?.queryPreparation?.mode === 'llm_rewrite' ? 'llm_rewrite' : 'raw' });
+			setStatus(`Query preparation set to ${mode === 'llm_rewrite' ? 'LLM rewrite' : 'Raw query'}.`);
 		} catch (err) {
 			setError(err.message || 'Failed to save query preparation.');
 		} finally {

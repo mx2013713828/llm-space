@@ -129,7 +129,7 @@ test('KnowledgePlugin injects retrieved knowledge only for auto_rag with matchin
 
 test('KnowledgePlugin uses the prepared retrieval query while preserving the original user prompt', async () => {
 	const context = createKnowledgeContext({
-		mountConfig: { queryPreparation: { mode: 'rule_cleanup' } },
+		mountConfig: { queryPreparation: { mode: 'llm_rewrite' } },
 		features: {
 			knowledge_bases: {
 				enabled: true,
@@ -140,6 +140,7 @@ test('KnowledgePlugin uses the prepared retrieval query while preserving the ori
 		},
 	});
 	context.apiMessages[0].content[0].text = '不要联网，卫霍正式入队';
+	context.executor._callLLMNonStream = async () => '卫霍正式入队';
 	let retrievedQuery = '';
 	context.executor.knowledgeDependencies.retrieveKnowledge = async ({ query }) => {
 		retrievedQuery = query;
@@ -164,7 +165,7 @@ test('KnowledgePlugin uses the prepared retrieval query while preserving the ori
 	const trace = context.executor.messages.find(message => message.type === 'knowledge_retrieval');
 	assert.equal(trace?.query, '不要联网，卫霍正式入队');
 	assert.equal(trace?.retrievalQuery, '卫霍正式入队');
-	assert.equal(trace?.queryPreparation?.mode, 'rule_cleanup');
+	assert.equal(trace?.queryPreparation?.mode, 'llm_rewrite');
 });
 
 test('KnowledgePlugin lets mounted knowledge bases own automatic retrieval bounds', async () => {
@@ -273,6 +274,43 @@ test('KnowledgePlugin reuses one automatic retrieval within the same user turn',
 
 	assert.equal(retrievalCalls, 1);
 	assert.equal(first.executor.messages.filter(message => message.type === 'knowledge_retrieval').length, 1);
+});
+
+test('KnowledgePlugin rewrites an automatic retrieval query once per user turn', async () => {
+	const features = {
+		knowledge_bases: {
+			enabled: true,
+			strategy: 'auto_rag',
+			auto_retrieve: true,
+			knowledge_tools: false,
+		},
+	};
+	const first = createKnowledgeContext({ features, mountConfig: { queryPreparation: { mode: 'llm_rewrite' } } });
+	first.apiMessages[0].content[0].text = '不要联网，卫霍正式入队';
+	first.executor.messages = [];
+	let rewriteCalls = 0;
+	first.executor._callLLMNonStream = async () => {
+		rewriteCalls += 1;
+		return '卫霍正式入队';
+	};
+	first.executor.knowledgeDependencies.retrieveKnowledge = async ({ query }) => ({
+		query,
+		chunks: [{
+			id: 'chk_weihuo',
+			score: 0.9,
+			text: '卫霍正式入队。',
+			source: { filename: 'guide.md', chunkIndex: 9 },
+			knowledgeBase: { id: 'kb_docs', name: 'Docs' },
+		}],
+	});
+	await KnowledgePlugin.preLLM(first);
+
+	const second = createKnowledgeContext({ features, mountConfig: { queryPreparation: { mode: 'llm_rewrite' } } });
+	second.apiMessages[0].content[0].text = '不要联网，卫霍正式入队';
+	second.executor = first.executor;
+	await KnowledgePlugin.preLLM(second);
+
+	assert.equal(rewriteCalls, 1);
 });
 
 test('KnowledgePlugin skips low-confidence vector retrieval without injecting prompt content', async () => {

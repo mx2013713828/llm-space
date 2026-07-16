@@ -446,6 +446,14 @@ export function KnowledgeRetrievalCard({
               {queryPreparation?.mode && <em>{queryPreparation.mode}</em>}
             </div>
           )}
+		  {queryPreparation?.mode === 'llm_rewrite' && (
+			<div className="knowledge-retrieval-query">
+				<span>Preparation</span>
+				<code>{queryPreparation.fallbackReason
+					? `LLM rewrite fell back to the original query (${queryPreparation.fallbackReason})`
+					: 'LLM rewrite'}</code>
+			</div>
+		  )}
           {safeSources.length > 0 ? (
             <div className="knowledge-retrieval-sources">
               {safeSources.map((source, index) => (

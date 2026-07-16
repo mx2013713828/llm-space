@@ -345,12 +345,10 @@ export class AgentExecutor {
   }
 
   /**
-   * 后台非流式大模型调用，用于生成语义历史摘要
-   * @param {Array} apiMessages 
-   * @param {string} systemPrompt 
-   * @returns {Promise<string>}
+   * Background non-stream model call for bounded side queries such as
+   * compaction, memory selection, and retrieval-query preparation.
    */
-  async _callLLMNonStream(apiMessages, systemPrompt) {
+  async _callLLMNonStream(apiMessages, systemPrompt, { maxTokens = 2048 } = {}) {
     const modelProfile = normalizeModelProfile(this.model);
     const request = buildModelGatewayRequest({
       modelProfile,
@@ -358,7 +356,7 @@ export class AgentExecutor {
       messages: apiMessages,
       apiMessages,
       toolSchemas: [],
-      maxTokens: 2048,
+      maxTokens,
       thinkingEnabled: false,
       stream: false,
     });
