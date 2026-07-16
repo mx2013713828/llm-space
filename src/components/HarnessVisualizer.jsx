@@ -3,16 +3,20 @@ import {
   User, Database, Puzzle, Brain, Settings, ArrowDown, MoveDown, Layers,
   Wrench, Activity, Save, Play, Workflow, ArrowUpCircle, ChevronRight, Network
 } from 'lucide-react';
+import { buildHarnessArchitecture } from '../lib/harnessArchitecture.js';
 
-export default function HarnessVisualizer({ harness, features, skills, tools }) {
-  // Safe parsing of feature flags based on the existing backend logic
-  const isMemoryEnabled = !!features.enable_memory?.enabled;
-  const isAutoRagEnabled = !!features.enable_rag?.auto_rag;
-  const isSkillsEnabled = !!features.enable_skills;
-  const isCompactionEnabled = !!features.context_compaction?.enabled;
-  const isTaskOrchestrationEnabled = features.task_orchestration?.mode && features.task_orchestration.mode !== 'none';
-  const hasTools = tools && tools.length > 0;
-  const hasTeams = !!features.task_orchestration?.enable_agent_teams;
+export default function HarnessVisualizer({ harness, features = {}, skills = [], tools = [] }) {
+  const architecture = buildHarnessArchitecture(features, { tools, skills });
+  const {
+    knowledge,
+    hasTools,
+    hasTeams,
+    memoryEnabled: isMemoryEnabled,
+    skillsEnabled: isSkillsEnabled,
+    compactionEnabled: isCompactionEnabled,
+    taskOrchestrationEnabled: isTaskOrchestrationEnabled,
+  } = architecture;
+  const hasFeedbackLoop = hasTools || isTaskOrchestrationEnabled || hasTeams || knowledge.showKnowledgeTools;
 
   // Safely parse model string
   let modelStr = 'Default Model Routing';
@@ -96,6 +100,74 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
     </div>
   );
 
+  const KnowledgeRuntimeNode = () => {
+    if (!knowledge.showManifest && !knowledge.showQueryPreparation) return null;
+
+    return (
+      <div style={{
+        border: `1px solid ${colors.borderHover}`,
+        borderLeft: `3px solid ${colors.accent}`,
+        borderRadius: '6px',
+        padding: '10px',
+        background: colors.bgElevated,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: colors.textSecondary }}>
+          <Database size={14} />
+          <span style={{ fontSize: '12px', fontWeight: '600' }}>Knowledge Runtime</span>
+          <span style={{
+            marginLeft: 'auto',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: colors.bgMuted,
+            color: colors.textMuted,
+            fontSize: '10px',
+            fontFamily: 'monospace',
+          }}>
+            {knowledge.strategy}
+          </span>
+        </div>
+        {knowledge.showManifest && (
+          <ItemCard
+            icon={Database}
+            label="Mounted Knowledge Manifest"
+            description="Stable mounted-base inventory pinned into the system context."
+          />
+        )}
+        {knowledge.showQueryPreparation && (
+          <ItemCard
+            icon={Activity}
+            label="Query Preparation · Raw User Query"
+            description="Current retrieval query uses the latest user message. Rewrite strategies plug in here."
+          />
+        )}
+        {knowledge.showRetrieval && (
+          <ItemCard
+            icon={Database}
+            label="Knowledge Retrieval"
+            description="Runs vector, keyword, or hybrid search using each knowledge base's settings."
+          />
+        )}
+        {knowledge.showRerank && (
+          <ItemCard
+            icon={Layers}
+            label="Rerank · Per Knowledge Base"
+            description="Reorders retrieved candidates only when the mounted base enables reranking."
+          />
+        )}
+        {knowledge.showInjectionGate && (
+          <ItemCard
+            icon={ArrowDown}
+            label="Retrieved Knowledge Injection Gate"
+            description="Only matching sources are injected into the current user turn."
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{
       padding: '40px 60px', // Extra padding to accommodate the left loop arrow
@@ -121,25 +193,11 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
       </div>
       <Arrow />
 
-      {/* 2. Context Retrieval (Auto RAG) */}
-      {isAutoRagEnabled && (
-        <>
-          <SectionNode title="Context Retrieval" icon={Database}>
-            <ItemCard
-              icon={Database}
-              label="Auto-RAG (Retrieval-Augmented Generation)"
-              description="Queries vector database based on user input before LLM generation."
-            />
-          </SectionNode>
-          <Arrow />
-        </>
-      )}
-
       {/* LOOP WRAPPER: Contains everything from Prompt Assembly down to Execution Phase */}
       <div style={{ position: 'relative' }}>
         
         {/* Feedback Loop Line (drawn absolutely within this wrapper) */}
-        {(hasTools || isTaskOrchestrationEnabled || hasTeams) && (
+        {hasFeedbackLoop && (
           <div style={{
             position: 'absolute',
             left: '-48px', // Pushed further left for more breathing room
@@ -185,8 +243,8 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
           </div>
         )}
 
-        {/* 3. Prompt Assembly */}
-        <SectionNode title="Prompt Assembly (Pre-LLM)" icon={Puzzle}>
+        {/* 2. Pre-LLM Pipeline */}
+        <SectionNode title="Pre-LLM Pipeline" icon={Puzzle}>
           <ItemCard
             icon={Settings}
             label="Base Guidance"
@@ -206,6 +264,7 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
               description="Retrieves relevant past interactions and facts."
             />
           )}
+          <KnowledgeRuntimeNode />
         </SectionNode>
         <Arrow />
 
@@ -253,8 +312,8 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
         </div>
         <Arrow />
 
-        {/* 6. Execution Phase */}
-        {(hasTools || isTaskOrchestrationEnabled || hasTeams) && (
+        {/* 5. Execution Phase */}
+        {hasFeedbackLoop && (
           <>
             <SectionNode title="Execution Phase (Post-LLM)" icon={Play}>
               {hasTools && (
@@ -262,6 +321,13 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
                   icon={Wrench}
                   label={`Tool Dispatcher (${tools.length} Tools)`}
                   description="Executes API integrations and local functions."
+                />
+              )}
+              {knowledge.showKnowledgeTools && (
+                <ItemCard
+                  icon={Database}
+                  label="Knowledge Query Tools"
+                  description="The model can list mounted bases or issue its own knowledge query."
                 />
               )}
               {isTaskOrchestrationEnabled && (
@@ -285,7 +351,7 @@ export default function HarnessVisualizer({ harness, features, skills, tools }) 
       </div> 
       {/* END LOOP WRAPPER */}
 
-      {(hasTools || isTaskOrchestrationEnabled || hasTeams) && <Arrow />}
+      {hasFeedbackLoop && <Arrow />}
 
       {/* 7. Post Processing */}
       {isMemoryEnabled && (
