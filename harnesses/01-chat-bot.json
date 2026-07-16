@@ -26,22 +26,6 @@
           "city"
         ]
       }
-    },
-    {
-      "name": "bash",
-      "description": "Execute a shell command. Use this to run scripts, navigate the filesystem, or interact with the OS.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "command": {
-            "type": "string",
-            "description": "The bash command to execute"
-          }
-        },
-        "required": [
-          "command"
-        ]
-      }
     }
   ],
   "skills": [
